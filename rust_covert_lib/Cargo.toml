@@ -1,0 +1,18 @@
+[package]
+name = "covert"
+version = "0.1.0"
+authors = ["michael <michaelwdysart@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+[dependencies.pnet]
+version = "0.22.0"
+
+[dependencies.rand]
+version = "0.3"
+
+[dependencies.clap]
+version = "2.27.0"
