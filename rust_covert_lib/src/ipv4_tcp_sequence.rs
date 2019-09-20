@@ -3,6 +3,7 @@ extern crate crossbeam;
 extern crate crossbeam_channel;
 extern crate pnet;
 extern crate rand;
+extern crate rayon;
 extern crate socket2;
 
 use pnet::transport::transport_channel;
@@ -246,12 +247,7 @@ impl Sender {
                 Err(e) => return Err(e),
             };
 
-            // Ideally, this would use green threads provided by something like tokio (futures would also be an option,
-            // though doing so would force the use of tokio futures).
-            // However, I have not yet found an equivalent in tokio to
-            // crossbeam::scope, and I thought it best to keep the number of distinct dependencies to
-            // a minimum where possible.
-            return match crossbeam::scope(|scope| {
+            return rayon::scope(|scope| {
                 let (tx_local, rx_local) = crossbeam_channel::unbounded();
                 scope.spawn(move |_| {
                     crossbeam::select! {
@@ -269,10 +265,7 @@ impl Sender {
                     _ => (),
                 };
                 return out;
-            }) {
-                Ok(res) => res,
-                Err(_) => Err(io::Error::new(io::ErrorKind::Other, "Thread Error")),
-            };
+            });
         }
 
         // If we are using the protocol to delimit messages, send an extra packet with the ACK flag set
@@ -350,7 +343,7 @@ impl Receiver {
         };
 
         return match cancel {
-            Some(rx_cancel) => match crossbeam::scope(|scope| -> io::Result<usize> {
+            Some(rx_cancel) => rayon::scope(|scope| -> io::Result<usize> {
                 let (tx_local, rx_local) = crossbeam_channel::unbounded();
                 let sock_ref = &socket;
                 scope.spawn(move |_| {
@@ -372,10 +365,7 @@ impl Receiver {
                     _ => (),
                 };
                 return out;
-            }) {
-                Ok(res) => res,
-                Err(_) => Err(io::Error::new(io::ErrorKind::Other, "Thread Error")),
-            },
+            }),
             None => self.read(&socket, data, progress),
         };
     }

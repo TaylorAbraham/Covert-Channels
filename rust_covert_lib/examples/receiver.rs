@@ -28,7 +28,7 @@ fn main() {
 
         thread::spawn(move || {
             thread::sleep(time::Duration::new(10, 0));
-            t.send(());
+            match t.send(()) { _ => () };
         });
 
         println!("Waiting for message");
