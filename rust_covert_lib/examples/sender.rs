@@ -5,6 +5,8 @@ mod example_utils;
 use example_utils::get_addresses;
 use std::io;
 
+use crossbeam_channel::unbounded;
+
 use covert::ipv4_tcp_sequence::{channel, Config};
 
 fn main() {
@@ -21,6 +23,8 @@ fn main() {
     let (mut cvt, _) = channel(conf).unwrap();
 
     loop {
+        let (t, r) = unbounded();
+
         println!("Write your message");
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
@@ -29,7 +33,7 @@ fn main() {
                 if n > 1024 {
                     n = 1024;
                 }
-                match cvt.send(&input.as_bytes()[..n], None, None) {
+                match cvt.send(&input.as_bytes()[..n], None, Some(r)) {
                     Ok(_) => println!("Msg Sent:"),
                     Err(error) => println!("error: {}", error),
                 }

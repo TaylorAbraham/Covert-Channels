@@ -1,3 +1,4 @@
+extern crate cancellable_timer;
 extern crate crossbeam;
 extern crate crossbeam_channel;
 extern crate pnet;
@@ -18,6 +19,8 @@ use std::thread;
 use std::time::Duration;
 
 use socket2::{Domain, Protocol, Socket, Type};
+
+use cancellable_timer::Timer;
 
 #[derive(Clone)]
 pub enum Delim {
@@ -127,7 +130,7 @@ impl Sender {
         &mut self,
         data: &[u8],
         progress: Option<&crossbeam_channel::Sender<usize>>,
-        _cancel: Option<&crossbeam_channel::Receiver<usize>>,
+        mut cancel: Option<crossbeam_channel::Receiver<()>>,
     ) -> io::Result<usize> {
         let msg_len = data.len();
 
@@ -214,7 +217,62 @@ impl Sender {
                 }
                 _ => (),
             }
-            thread::sleep((self.conf.get_delay)());
+            // In the case of a long running transmission, we
+            // must be able to cancel the operation.
+            // This is done by cancelling on the sleep
+            match cancel {
+                Some(rx_cancel) => {
+                    match cancelleable_sleep((self.conf.get_delay)(), &rx_cancel) {
+                        Ok(_) => (),
+                        Err(e) => return Err(e),
+                    }
+                    cancel = Some(rx_cancel);
+                }
+                None => thread::sleep((self.conf.get_delay)()),
+            }
+        }
+
+        /// A function to implement a cancellable sleep
+        /// # Arguments
+        ///
+        /// * `delay` - The time to sleep.
+        /// * `rx_cancel` - The channel that the user can use to cancel the wait.
+        fn cancelleable_sleep(
+            delay: Duration,
+            rx_cancel: &crossbeam_channel::Receiver<()>,
+        ) -> Result<(), io::Error> {
+            let (mut timer, canceller) = match Timer::new2() {
+                Ok((timer, canceller)) => (timer, canceller),
+                Err(e) => return Err(e),
+            };
+
+            // Ideally, this would use green threads provided by something like tokio (futures would also be an option,
+            // though doing so would force the use of tokio futures).
+            // However, I have not yet found an equivalent in tokio to
+            // crossbeam::scope, and I thought it best to keep the number of distinct dependencies to
+            // a minimum where possible.
+            return match crossbeam::scope(|scope| {
+                let (tx_local, rx_local) = crossbeam_channel::unbounded();
+                scope.spawn(move |_| {
+                    crossbeam::select! {
+                        recv(rx_cancel) -> _ => (),
+                        recv(rx_local) -> _ => (),
+                    }
+                    match canceller.cancel() {
+                        _ => (),
+                    }
+                });
+                let out = timer.sleep(delay);
+                match tx_local.send(()) {
+                    // If the above thread has returned this send will
+                    // have a legitimate error, so we can just ignore it
+                    _ => (),
+                };
+                return out;
+            }) {
+                Ok(res) => res,
+                Err(_) => Err(io::Error::new(io::ErrorKind::Other, "Thread Error")),
+            };
         }
 
         // If we are using the protocol to delimit messages, send an extra packet with the ACK flag set
@@ -258,6 +316,7 @@ impl Receiver {
     ///
     /// * `data` - A buffer to hold the received message.
     /// * `progress` - An optional channel to report regular updates as to the progress of the received message.
+    /// * `cancel` - An optional channel to cancel the read operation.
     ///
     /// # Remarks
     /// The receiver progress channel is not yet implemented, and won't be until timeout is build.
@@ -266,11 +325,12 @@ impl Receiver {
     /// (this packet has special flags set to indicate that the message is done). If the data buffer fills
     /// before this point an error is returned.
     /// Otherwise, the method reads until the data buffer is full.
+    ///
     pub fn receive(
         &mut self,
         data: &mut [u8],
         progress: Option<&crossbeam_channel::Sender<usize>>,
-        cancel: Option<crossbeam_channel::Receiver<usize>>,
+        cancel: Option<crossbeam_channel::Receiver<()>>,
     ) -> io::Result<usize> {
         // If the buffer is empty we can return immediately
         if data.len() == 0 {
@@ -306,7 +366,7 @@ impl Receiver {
                     };
                 });
                 let out = self.read(&socket, data, progress);
-                match tx_local.send(1) {
+                match tx_local.send(()) {
                     // If the above thread has returned this send will
                     // have a legitimate error, so we can just ignore it
                     _ => (),
@@ -320,6 +380,12 @@ impl Receiver {
         };
     }
 
+    /// The private read operation
+    /// # Arguments
+    ///
+    /// * `sock` - The IP socket that is being read from.
+    /// * `data` - A buffer to hold the received message.
+    /// * `progress` - An optional channel to report regular updates as to the progress of the received message.
     fn read(
         &self,
         sock: &Socket,
