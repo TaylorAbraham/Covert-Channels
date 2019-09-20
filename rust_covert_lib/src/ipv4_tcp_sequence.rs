@@ -1,8 +1,11 @@
+extern crate crossbeam;
+extern crate crossbeam_channel;
 extern crate pnet;
 extern crate rand;
+extern crate socket2;
 
+use pnet::transport::transport_channel;
 use pnet::transport::TransportChannelType::Layer3;
-use pnet::transport::{ipv4_packet_iter, transport_channel};
 
 use pnet::packet::ip::IpNextHeaderProtocols;
 use pnet::packet::ipv4::{self, Ipv4Packet, MutableIpv4Packet};
@@ -11,9 +14,10 @@ use pnet::packet::Packet;
 
 use std::io;
 use std::net::{IpAddr, Ipv4Addr};
-use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
+
+use socket2::{Domain, Protocol, Socket, Type};
 
 #[derive(Clone)]
 pub enum Delim {
@@ -122,7 +126,8 @@ impl Sender {
     pub fn send(
         &mut self,
         data: &[u8],
-        progress: Option<&mpsc::Sender<usize>>,
+        progress: Option<&crossbeam_channel::Sender<usize>>,
+        _cancel: Option<&crossbeam_channel::Receiver<usize>>,
     ) -> io::Result<usize> {
         let msg_len = data.len();
 
@@ -264,18 +269,63 @@ impl Receiver {
     pub fn receive(
         &mut self,
         data: &mut [u8],
-        _progress: Option<&mpsc::Sender<usize>>,
+        progress: Option<&crossbeam_channel::Sender<usize>>,
+        cancel: Option<crossbeam_channel::Receiver<usize>>,
     ) -> io::Result<usize> {
         // If the buffer is empty we can return immediately
         if data.len() == 0 {
             return Ok(0);
         }
 
-        let mut rx = match transport_channel(1024, Layer3(IpNextHeaderProtocols::Tcp)) {
-            Ok((_, rx)) => rx,
+        // We want to be able to cancel the read operation
+        // For this reason we can't use pnet, but instead must use Socket2
+        // We don't use Socket2 otherwise for two reasons:
+        //		First, the interface is somewhat cumbersome (though more similar to c socket functions)
+        //		Second, Socket2 does not include IPPROTO_RAW as a Protocol, which is necessary for sending packets
+        // 		where we have spoofed source IP addresses. We would have to include the number (255)
+        //		directly, which I find less clean
+        let socket = match Socket::new(Domain::ipv4(), Type::raw(), Some(Protocol::tcp())) {
+            Ok(socket) => socket,
             Err(e) => return Err(e),
         };
 
+        return match cancel {
+            Some(rx_cancel) => match crossbeam::scope(|scope| -> io::Result<usize> {
+                let (tx_local, rx_local) = crossbeam_channel::unbounded();
+                let sock_ref = &socket;
+                scope.spawn(move |_| {
+                    crossbeam::select! {
+                        recv(rx_cancel) -> _ => (),
+                        recv(rx_local) -> _ => (),
+                    }
+                    match sock_ref.shutdown(std::net::Shutdown::Read) {
+                        // For some reason, a legitimate, functional shutdown
+                        // will return an error (at least on Linux)
+                        // Therefore we can just ignore the error
+                        _ => (),
+                    };
+                });
+                let out = self.read(&socket, data, progress);
+                match tx_local.send(1) {
+                    // If the above thread has returned this send will
+                    // have a legitimate error, so we can just ignore it
+                    _ => (),
+                };
+                return out;
+            }) {
+                Ok(res) => res,
+                Err(_) => Err(io::Error::new(io::ErrorKind::Other, "Thread Error")),
+            },
+            None => self.read(&socket, data, progress),
+        };
+    }
+
+    fn read(
+        &self,
+        sock: &Socket,
+        data: &mut [u8],
+        _progress: Option<&crossbeam_channel::Sender<usize>>,
+    ) -> io::Result<usize> {
         let (src_addr, _, src_port, dst_port) = match self.conf.bounce {
             false => (
                 self.conf.friend_ip,
@@ -291,88 +341,96 @@ impl Receiver {
             ),
         };
 
-        let mut iter = ipv4_packet_iter(&mut rx);
+        let mut buf = [0u8; 1024];
         let mut prev_val: Option<u32> = None;
         let mut pos: usize = 0;
 
         loop {
-            match iter.next() {
-                Ok((packet, origin)) => {
-                    if let Some(tcp_packet) = TcpPacket::new(&packet.packet()[20..]) {
-                        if origin == src_addr {
-                            if tcp_packet.get_source() == src_port
-                                && tcp_packet.get_destination() == dst_port
-                            {
-                                // Check if we have hit the delimiter packet for the message if
-                                // we arre using protocol delimiting
-                                match &self.conf.delimiter {
-                                    Delim::Protocol => {
-                                        // If we use the protocol to delimit messages,
-                                        // then when we stop depends on the bounce status.
-                                        // If not in bounce mode, we wait for an ACK directly from the sender (it normally
-                                        // only sends SYN packets).
-                                        // If in bounce mode, we wait for a packet with the RST flag
-                                        // set (which occurs when the sender sends an ACK packet to the TCP server,
-                                        // which responds with a RST since the connection was not properly established.
-                                        let ended = match self.conf.bounce {
-                                            true => {
-                                                tcp_packet.get_flags() & TcpFlags::RST
-                                                    == TcpFlags::RST
-                                            }
-                                            false => {
-                                                tcp_packet.get_flags() & TcpFlags::ACK
-                                                    == TcpFlags::ACK
-                                            }
-                                        };
-                                        if ended {
-                                            return Ok(pos);
-                                        }
-                                    }
-                                    _ => (),
-                                }
-
-                                // If not in bounce mode, the byte is hidden in the sequence number
-                                // If in bounce mode, the bounce operation of the foreign TCP server causes the original
-                                // sequence number to be shifted into the acknowledgement number and incremented by one.
-                                // We reverse that below.
-                                // In addition, the flags depend on whether or not we are using bounce mode.
-                                let (new_val, expected_flags) = match self.conf.bounce {
-                                    true => (
-                                        tcp_packet.get_acknowledgement().wrapping_sub(1),
-                                        TcpFlags::SYN | TcpFlags::ACK,
-                                    ),
-                                    false => (tcp_packet.get_sequence(), TcpFlags::SYN),
-                                };
-
-                                if tcp_packet.get_flags() == expected_flags {
-                                    match prev_val {
-                                        Some(v) if new_val == v => (),
-                                        _ => {
-                                            let new_byte = (new_val & 0xFF) as u8;
-                                            if pos < data.len() {
-                                                data[pos] = new_byte;
-                                            }
-                                            pos += 1;
-                                            // We return if Delim::None and the entire buffer has been filled
-                                            // However, if Delim::Protocol we are waiting for the delim packet
-                                            // We only return an error if one more packet arrives here,
-                                            // since it is possible to fill the entire buffer and then let the delim
-                                            // packet arrive. For that reason we must check that pos < data.len() above
-                                            // each time in case the buffer has filled when Delim::Protocol and at least
-                                            // one addition non delim packet has arrived
-                                            match &self.conf.delimiter {
-                                                Delim::None if pos == data.len() => return Ok(pos),
-                                                Delim::Protocol if pos > data.len() => {
-                                                    return Err(io::Error::new(
-                                                        io::ErrorKind::Other,
-                                                        "Insufficient buffer size",
-                                                    ))
+            match sock.recv(&mut buf) {
+                Ok(n) => {
+                    if n == 0 {
+                        return Err(io::Error::new(io::ErrorKind::Other, "Read cancelled"));
+                    } else if n < 20 {
+                        continue;
+                    } else if let Some(ip_packet) = Ipv4Packet::new(&buf[..20]) {
+                        if let Some(tcp_packet) = TcpPacket::new(&buf[20..]) {
+                            if ip_packet.get_source() == src_addr {
+                                if tcp_packet.get_source() == src_port
+                                    && tcp_packet.get_destination() == dst_port
+                                {
+                                    // Check if we have hit the delimiter packet for the message if
+                                    // we arre using protocol delimiting
+                                    match &self.conf.delimiter {
+                                        Delim::Protocol => {
+                                            // If we use the protocol to delimit messages,
+                                            // then when we stop depends on the bounce status.
+                                            // If not in bounce mode, we wait for an ACK directly from the sender (it normally
+                                            // only sends SYN packets).
+                                            // If in bounce mode, we wait for a packet with the RST flag
+                                            // set (which occurs when the sender sends an ACK packet to the TCP server,
+                                            // which responds with a RST since the connection was not properly established.
+                                            let ended = match self.conf.bounce {
+                                                true => {
+                                                    tcp_packet.get_flags() & TcpFlags::RST
+                                                        == TcpFlags::RST
                                                 }
-                                                _ => (),
+                                                false => {
+                                                    tcp_packet.get_flags() & TcpFlags::ACK
+                                                        == TcpFlags::ACK
+                                                }
+                                            };
+                                            if ended {
+                                                return Ok(pos);
                                             }
                                         }
+                                        _ => (),
                                     }
-                                    prev_val = Some(new_val);
+
+                                    // If not in bounce mode, the byte is hidden in the sequence number
+                                    // If in bounce mode, the bounce operation of the foreign TCP server causes the original
+                                    // sequence number to be shifted into the acknowledgement number and incremented by one.
+                                    // We reverse that below.
+                                    // In addition, the flags depend on whether or not we are using bounce mode.
+                                    let (new_val, expected_flags) = match self.conf.bounce {
+                                        true => (
+                                            tcp_packet.get_acknowledgement().wrapping_sub(1),
+                                            TcpFlags::SYN | TcpFlags::ACK,
+                                        ),
+                                        false => (tcp_packet.get_sequence(), TcpFlags::SYN),
+                                    };
+
+                                    if tcp_packet.get_flags() == expected_flags {
+                                        match prev_val {
+                                            Some(v) if new_val == v => (),
+                                            _ => {
+                                                let new_byte = (new_val & 0xFF) as u8;
+                                                if pos < data.len() {
+                                                    data[pos] = new_byte;
+                                                }
+                                                pos += 1;
+                                                // We return if Delim::None and the entire buffer has been filled
+                                                // However, if Delim::Protocol we are waiting for the delim packet
+                                                // We only return an error if one more packet arrives here,
+                                                // since it is possible to fill the entire buffer and then let the delim
+                                                // packet arrive. For that reason we must check that pos < data.len() above
+                                                // each time in case the buffer has filled when Delim::Protocol and at least
+                                                // one addition non delim packet has arrived
+                                                match &self.conf.delimiter {
+                                                    Delim::None if pos == data.len() => {
+                                                        return Ok(pos)
+                                                    }
+                                                    Delim::Protocol if pos > data.len() => {
+                                                        return Err(io::Error::new(
+                                                            io::ErrorKind::Other,
+                                                            "Insufficient buffer size",
+                                                        ))
+                                                    }
+                                                    _ => (),
+                                                }
+                                            }
+                                        }
+                                        prev_val = Some(new_val);
+                                    }
                                 }
                             }
                         }

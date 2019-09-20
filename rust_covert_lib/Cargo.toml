@@ -16,3 +16,12 @@ version = "0.3"
 
 [dependencies.clap]
 version = "2.27.0"
+
+[dependencies.crossbeam]
+version = "0.7.2"
+
+[dependencies.crossbeam-channel]
+version = "0.3.9"
+
+[dependencies.socket2]
+version = "0.3.11"

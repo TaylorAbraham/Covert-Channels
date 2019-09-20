@@ -6,6 +6,10 @@ use example_utils::get_addresses;
 
 use covert::ipv4_tcp_sequence::{channel, Config};
 
+use crossbeam_channel::unbounded;
+
+use std::{thread, time};
+
 fn main() {
     println!("Covert Channel Receiver!");
 
@@ -20,9 +24,16 @@ fn main() {
     let (_, mut cvr) = channel(conf).unwrap();
 
     loop {
+        let (t, r) = unbounded();
+
+        thread::spawn(move || {
+            thread::sleep(time::Duration::new(10, 0));
+            t.send(1);
+        });
+
         println!("Waiting for message");
         let mut buf = [0u8; 1024];
-        match cvr.receive(&mut buf[..], None) {
+        match cvr.receive(&mut buf[..], None, Some(r)) {
             Ok(n) => {
                 let msg_cow = String::from_utf8_lossy(&mut buf[..n]);
                 println!("Msg Received: {}", msg_cow.into_owned());

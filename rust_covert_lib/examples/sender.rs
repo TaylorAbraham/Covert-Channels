@@ -29,7 +29,7 @@ fn main() {
                 if n > 1024 {
                     n = 1024;
                 }
-                match cvt.send(&input.as_bytes()[..n], None) {
+                match cvt.send(&input.as_bytes()[..n], None, None) {
                     Ok(_) => println!("Msg Sent:"),
                     Err(error) => println!("error: {}", error),
                 }
