@@ -406,10 +406,19 @@ impl Receiver {
                 Ok(n) => {
                     if n == 0 {
                         return Err(io::Error::new(io::ErrorKind::Other, "Read cancelled"));
-                    } else if n < 20 {
+                    } else if n < 8 {
                         continue;
-                    } else if let Some(ip_packet) = Ipv4Packet::new(&buf[..20]) {
-                        if let Some(tcp_packet) = TcpPacket::new(&buf[20..]) {
+					// The IP header always has at least 20 bytes When finding IP addresses
+                    } else {
+						// The ip header length in bytes (the length in the packet is in 32 bit words)
+						let l_buf = [buf[4], buf[5], buf[6], buf[7]];
+						let ip_header_length = (4 * u32::from_be_bytes(l_buf)) as usize;
+						// Check if we actully received the correct number of bytes
+						if n < ip_header_length {
+							continue
+						} else if let Some(ip_packet) = Ipv4Packet::new(&buf[..ip_header_length]) {
+
+                        if let Some(tcp_packet) = TcpPacket::new(&buf[ip_header_length..]) {
                             if ip_packet.get_source() == src_addr {
                                 if tcp_packet.get_source() == src_port
                                     && tcp_packet.get_destination() == dst_port
@@ -492,6 +501,7 @@ impl Receiver {
                         }
                     }
                 }
+				}
                 Err(e) => return Err(e),
             }
         }
