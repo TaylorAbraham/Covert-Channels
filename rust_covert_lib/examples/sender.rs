@@ -23,7 +23,7 @@ fn main() {
     let (mut cvt, _) = channel(conf).unwrap();
 
     loop {
-		let (_t, r) = unbounded();
+        let (_t, r) = unbounded();
 
         println!("Write your message");
         let mut input = String::new();

@@ -408,100 +408,99 @@ impl Receiver {
                         return Err(io::Error::new(io::ErrorKind::Other, "Read cancelled"));
                     } else if n < 8 {
                         continue;
-					// The IP header always has at least 20 bytes When finding IP addresses
+                    // The IP header always has at least 20 bytes When finding IP addresses
                     } else {
-						// The ip header length in bytes (the length in the packet is in 32 bit words)
-						let l_buf = [buf[4], buf[5], buf[6], buf[7]];
-						let ip_header_length = (4 * u32::from_be_bytes(l_buf)) as usize;
-						// Check if we actully received the correct number of bytes
-						if n < ip_header_length {
-							continue
-						} else if let Some(ip_packet) = Ipv4Packet::new(&buf[..ip_header_length]) {
-
-                        if let Some(tcp_packet) = TcpPacket::new(&buf[ip_header_length..]) {
-                            if ip_packet.get_source() == src_addr {
-                                if tcp_packet.get_source() == src_port
-                                    && tcp_packet.get_destination() == dst_port
-                                {
-                                    // Check if we have hit the delimiter packet for the message if
-                                    // we arre using protocol delimiting
-                                    match &self.conf.delimiter {
-                                        Delim::Protocol => {
-                                            // If we use the protocol to delimit messages,
-                                            // then when we stop depends on the bounce status.
-                                            // If not in bounce mode, we wait for an ACK directly from the sender (it normally
-                                            // only sends SYN packets).
-                                            // If in bounce mode, we wait for a packet with the RST flag
-                                            // set (which occurs when the sender sends an ACK packet to the TCP server,
-                                            // which responds with a RST since the connection was not properly established.
-                                            let ended = match self.conf.bounce {
-                                                true => {
-                                                    tcp_packet.get_flags() & TcpFlags::RST
-                                                        == TcpFlags::RST
-                                                }
-                                                false => {
-                                                    tcp_packet.get_flags() & TcpFlags::ACK
-                                                        == TcpFlags::ACK
-                                                }
-                                            };
-                                            if ended {
-                                                return Ok(pos);
-                                            }
-                                        }
-                                        _ => (),
-                                    }
-
-                                    // If not in bounce mode, the byte is hidden in the sequence number
-                                    // If in bounce mode, the bounce operation of the foreign TCP server causes the original
-                                    // sequence number to be shifted into the acknowledgement number and incremented by one.
-                                    // We reverse that below.
-                                    // In addition, the flags depend on whether or not we are using bounce mode.
-                                    let (new_val, expected_flags) = match self.conf.bounce {
-                                        true => (
-                                            tcp_packet.get_acknowledgement().wrapping_sub(1),
-                                            TcpFlags::SYN | TcpFlags::ACK,
-                                        ),
-                                        false => (tcp_packet.get_sequence(), TcpFlags::SYN),
-                                    };
-
-                                    if tcp_packet.get_flags() == expected_flags {
-                                        match prev_val {
-                                            Some(v) if new_val == v => (),
-                                            _ => {
-                                                let new_byte = (new_val & 0xFF) as u8;
-                                                if pos < data.len() {
-                                                    data[pos] = new_byte;
-                                                }
-                                                pos += 1;
-                                                // We return if Delim::None and the entire buffer has been filled
-                                                // However, if Delim::Protocol we are waiting for the delim packet
-                                                // We only return an error if one more packet arrives here,
-                                                // since it is possible to fill the entire buffer and then let the delim
-                                                // packet arrive. For that reason we must check that pos < data.len() above
-                                                // each time in case the buffer has filled when Delim::Protocol and at least
-                                                // one addition non delim packet has arrived
-                                                match &self.conf.delimiter {
-                                                    Delim::None if pos == data.len() => {
-                                                        return Ok(pos)
+                        // The ip header length in bytes (the length in the packet is in 32 bit words)
+						// We don't do a wrapping add because it should be impossible for this operation to overflow
+                        let ip_header_length = ((buf[0] & 0x0F) * 4) as usize;
+                        // Check if we actully received the correct number of bytes
+                        if n < ip_header_length {
+                            continue;
+                        } else if let Some(ip_packet) = Ipv4Packet::new(&buf[..ip_header_length]) {
+                            if let Some(tcp_packet) = TcpPacket::new(&buf[ip_header_length..]) {
+                                if ip_packet.get_source() == src_addr {
+                                    if tcp_packet.get_source() == src_port
+                                        && tcp_packet.get_destination() == dst_port
+                                    {
+                                        // Check if we have hit the delimiter packet for the message if
+                                        // we arre using protocol delimiting
+                                        match &self.conf.delimiter {
+                                            Delim::Protocol => {
+                                                // If we use the protocol to delimit messages,
+                                                // then when we stop depends on the bounce status.
+                                                // If not in bounce mode, we wait for an ACK directly from the sender (it normally
+                                                // only sends SYN packets).
+                                                // If in bounce mode, we wait for a packet with the RST flag
+                                                // set (which occurs when the sender sends an ACK packet to the TCP server,
+                                                // which responds with a RST since the connection was not properly established.
+                                                let ended = match self.conf.bounce {
+                                                    true => {
+                                                        tcp_packet.get_flags() & TcpFlags::RST
+                                                            == TcpFlags::RST
                                                     }
-                                                    Delim::Protocol if pos > data.len() => {
-                                                        return Err(io::Error::new(
-                                                            io::ErrorKind::Other,
-                                                            "Insufficient buffer size",
-                                                        ))
+                                                    false => {
+                                                        tcp_packet.get_flags() & TcpFlags::ACK
+                                                            == TcpFlags::ACK
                                                     }
-                                                    _ => (),
+                                                };
+                                                if ended {
+                                                    return Ok(pos);
                                                 }
                                             }
+                                            _ => (),
                                         }
-                                        prev_val = Some(new_val);
+
+                                        // If not in bounce mode, the byte is hidden in the sequence number
+                                        // If in bounce mode, the bounce operation of the foreign TCP server causes the original
+                                        // sequence number to be shifted into the acknowledgement number and incremented by one.
+                                        // We reverse that below.
+                                        // In addition, the flags depend on whether or not we are using bounce mode.
+                                        let (new_val, expected_flags) = match self.conf.bounce {
+                                            true => (
+                                                tcp_packet.get_acknowledgement().wrapping_sub(1),
+                                                TcpFlags::SYN | TcpFlags::ACK,
+                                            ),
+                                            false => (tcp_packet.get_sequence(), TcpFlags::SYN),
+                                        };
+
+                                        if tcp_packet.get_flags() == expected_flags {
+                                            match prev_val {
+                                                Some(v) if new_val == v => (),
+                                                _ => {
+                                                    let new_byte = (new_val & 0xFF) as u8;
+                                                    if pos < data.len() {
+                                                        data[pos] = new_byte;
+                                                    }
+                                                    pos += 1;
+                                                    // We return if Delim::None and the entire buffer has been filled
+                                                    // However, if Delim::Protocol we are waiting for the delim packet
+                                                    // We only return an error if one more packet arrives here,
+                                                    // since it is possible to fill the entire buffer and then let the delim
+                                                    // packet arrive. For that reason we must check that pos < data.len() above
+                                                    // each time in case the buffer has filled when Delim::Protocol and at least
+                                                    // one addition non delim packet has arrived
+                                                    match &self.conf.delimiter {
+                                                        Delim::None if pos == data.len() => {
+                                                            return Ok(pos)
+                                                        }
+                                                        Delim::Protocol if pos > data.len() => {
+                                                            return Err(io::Error::new(
+                                                                io::ErrorKind::Other,
+                                                                "Insufficient buffer size",
+                                                            ))
+                                                        }
+                                                        _ => (),
+                                                    }
+                                                }
+                                            }
+                                            prev_val = Some(new_val);
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-				}
                 Err(e) => return Err(e),
             }
         }
