@@ -2,23 +2,23 @@
 package main
 
 import (
-	"net"
-	"os"
 	"./ipv4TCP"
 	"bufio"
 	"flag"
+	"fmt"
 	"log"
-  "fmt"
+	"net"
+	"os"
 )
 
 func main() {
-  fmt.Println("Covert Channel Sender!")
+	fmt.Println("Covert Channel Sender!")
 
 	// Parse flags for destination and bounce IPs
 	fa := flag.String("fa", "127.0.0.1", "The friend IP")
-	oa := flag.String("oa", "127.0.0.1",  "The origin IP")
-  fp := flag.Int("fp", 8081, "The friend port")
-	op := flag.Int("op", 8082,  "The origin port")
+	oa := flag.String("oa", "127.0.0.1", "The origin IP")
+	fp := flag.Int("fp", 8081, "The friend port")
+	op := flag.Int("op", 8082, "The origin port")
 
 	flag.Parse()
 
@@ -32,18 +32,18 @@ func main() {
 		log.Fatal("Invalid Origin IP")
 	}
 
-  conf := ipv4TCP.Config{
-    FriendPort : uint16(*fp),
-    OriginPort : uint16(*op),
-    Delimiter : ipv4TCP.Protocol,
-  }
+	conf := ipv4TCP.Config{
+		FriendPort: uint16(*fp),
+		OriginPort: uint16(*op),
+		Delimiter:  ipv4TCP.Protocol,
+	}
 
 	copy(conf.FriendIP[:], fIP.To4())
-  copy(conf.OriginIP[:], oIP.To4())
+	copy(conf.OriginIP[:], oIP.To4())
 
-  ch, _ := ipv4TCP.MakeChannel(conf)
+	ch, _ := ipv4TCP.MakeChannel(conf)
 
-  can := make(chan struct{})
+	can := make(chan struct{})
 
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -52,17 +52,17 @@ func main() {
 
 		scanner.Scan()
 		text := scanner.Text()
-    fmt.Printf("%d bytes read\n", len(text) + 1)
-    data := []byte(text + "\n")
-    if len(data) > 1024 {
-      data = data[:1024]
-    }
+		fmt.Printf("%d bytes read\n", len(text)+1)
+		data := []byte(text + "\n")
+		if len(data) > 1024 {
+			data = data[:1024]
+		}
 
-    _, err := ch.Send(data, nil, can)
-    if err != nil {
-      fmt.Println("error: " + err.Error())
-    } else {
-      fmt.Println("Msg sent")
-    }
+		_, err := ch.Send(data, nil, can)
+		if err != nil {
+			fmt.Println("error: " + err.Error())
+		} else {
+			fmt.Println("Msg sent")
+		}
 	}
 }

@@ -1,15 +1,15 @@
 package ipv4TCP
 
 import (
-	"log"
-	"net"
-	"errors"
 	"bytes"
-	"golang.org/x/net/ipv4"
+	"errors"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"time"
+	"golang.org/x/net/ipv4"
+	"log"
 	"math/rand"
+	"net"
+	"time"
 )
 
 const (
@@ -17,14 +17,14 @@ const (
 )
 
 type Config struct {
-	FriendIP [4]byte
-	OriginIP [4]byte
+	FriendIP   [4]byte
+	OriginIP   [4]byte
 	FriendPort uint16
 	OriginPort uint16
-	Bounce bool
-	Delimiter uint8
-	Encoder TcpEncoder
-	GetDelay func () time.Duration
+	Bounce     bool
+	Delimiter  uint8
+	Encoder    TcpEncoder
+	GetDelay   func() time.Duration
 }
 
 // An encoded may be provided to the TCP Channel
@@ -42,7 +42,7 @@ type TcpEncoder interface {
 
 // The default TcpEncoder that hides the covert message in the
 // sequence number
-type SeqEncoder struct {}
+type SeqEncoder struct{}
 
 // Since this function explicitely modifies the sequence number, we must ensure
 // we generate a random one in the same way as createPacket
@@ -98,7 +98,7 @@ func MakeChannel(conf Config) (*Channel, error) {
 // returned.
 // We return the number of bytes received even if an error is encountered,
 // in which case data will have valid received bytes up to that point.
-func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan struct {}) (uint64, error) {
+func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan struct{}) (uint64, error) {
 
 	if len(data) == 0 {
 		return 0, nil
@@ -113,26 +113,26 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan str
 	var closer chan struct{} = make(chan struct{})
 	var done chan struct{} = make(chan struct{})
 
-  // This goroutine will wait for either the message being fully Received
+	// This goroutine will wait for either the message being fully Received
 	// or the user sending a message on the cancel channel
 	// It is setup to allow shutdown whant the function returns
-	go func () {
+	go func() {
 		if cancel == nil {
 			<-closer
 		} else {
 			select {
-				case <-cancel:
-				case <-closer:
+			case <-cancel:
+			case <-closer:
 			}
 		}
 		conn.Close()
 		close(done)
 	}()
 
-  // close the connection when the function returns
+	// close the connection when the function returns
 	// (if it hasn't already been closed
 	// and wait for the above goroutine to return
-	defer func () {
+	defer func() {
 		close(closer)
 		<-done
 	}()
@@ -143,11 +143,11 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan str
 	}
 
 	var (
-		buf []byte = make([]byte, 1024)
-		prev_val uint32 = 0
-		current_val uint32 = 0
-		first bool = true
-		saddr [4]byte
+		buf          []byte = make([]byte, 1024)
+		prev_val     uint32 = 0
+		current_val  uint32 = 0
+		first        bool   = true
+		saddr        [4]byte
 		sport, dport uint16
 		// There is guaranteed to be at least one space for a byte in the
 		// data buffer at this point
@@ -166,10 +166,10 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan str
 		h, p, _, err := raw.ReadFrom(buf)
 		if err != nil {
 			return pos, err
-		// Cancelling the read by closing the conn causes an errors
-		// Unfortunately there does not seem to be a way to use the socket shutdown
-		// function on the raw sockets provided by this library,
-		// as is the case with the Rust Socket2 library
+			// Cancelling the read by closing the conn causes an errors
+			// Unfortunately there does not seem to be a way to use the socket shutdown
+			// function on the raw sockets provided by this library,
+			// as is the case with the Rust Socket2 library
 		} else if len(p) == 0 {
 			return pos, errors.New("Read cancelled")
 		}
@@ -179,7 +179,7 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan str
 		if bytes.Equal(h.Src.To4(), saddr[:]) {
 			if tcph.SrcPort == layers.TCPPort(sport) && tcph.DstPort == layers.TCPPort(dport) {
 				if c.conf.Delimiter == Protocol {
-					if (!c.conf.Bounce && tcph.ACK) || (c.conf.Bounce && tcph.RST)  {
+					if (!c.conf.Bounce && tcph.ACK) || (c.conf.Bounce && tcph.RST) {
 						return pos, nil
 					}
 				}
@@ -214,9 +214,9 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan str
 						// We have filled the buffer without protocol delimiter and we should return immediately
 						if pos == uint64(len(data)) && c.conf.Delimiter != Protocol {
 							return pos, nil
-						// If we are using the protocol delimiter, then we can fill the full
-						// buffer and then wait for the end packet. It is only if more bytes
-						// are received that we must notify of an error
+							// If we are using the protocol delimiter, then we can fill the full
+							// buffer and then wait for the end packet. It is only if more bytes
+							// are received that we must notify of an error
 						} else if pos > uint64(len(data)) && c.conf.Delimiter == Protocol {
 							return pos, errors.New("End packet not received, buffer full")
 						}
@@ -238,7 +238,7 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan str
 // The cancel chan will cancel transmission, which can be useful if the user
 // wants to cancel a long running transmission.
 // We return the number of bytes sent even if an error is encountered
-func (c *Channel) Send(data []byte, progress chan<- uint64, cancel <-chan struct {}) (uint64, error) {
+func (c *Channel) Send(data []byte, progress chan<- uint64, cancel <-chan struct{}) (uint64, error) {
 
 	conn, err := net.ListenPacket("ip4:6", "0.0.0.0")
 	if err != nil {
@@ -258,15 +258,15 @@ func (c *Channel) Send(data []byte, progress chan<- uint64, cancel <-chan struct
 		prevSequence uint32 = r.Uint32()
 		saddr, daddr [4]byte
 		sport, dport uint16
-		num uint64 = 0
-		h *ipv4.Header
-		p []byte
-		cm *ipv4.ControlMessage
-		wait time.Duration
-		sendPercent uint64 = 0
+		num          uint64 = 0
+		h            *ipv4.Header
+		p            []byte
+		cm           *ipv4.ControlMessage
+		wait         time.Duration
+		sendPercent  uint64 = 0
 	)
 
-  // The source and destination depend on whether or not we are in bounce mode
+	// The source and destination depend on whether or not we are in bounce mode
 	if c.conf.Bounce {
 		saddr, daddr, sport, dport = c.conf.FriendIP, c.conf.OriginIP, c.conf.FriendPort, c.conf.OriginPort
 	} else {
@@ -274,10 +274,10 @@ func (c *Channel) Send(data []byte, progress chan<- uint64, cancel <-chan struct
 	}
 
 	for _, b := range data {
-		h  = c.createIPHeader(saddr, daddr)
+		h = c.createIPHeader(saddr, daddr)
 		cm = c.createCM(saddr, daddr)
 
-		p, prevSequence, err  = c.createTcpHeadBuf(b, prevSequence, layers.TCP{SYN : true}, saddr, daddr, sport, dport)
+		p, prevSequence, err = c.createTcpHeadBuf(b, prevSequence, layers.TCP{SYN: true}, saddr, daddr, sport, dport)
 		if err != nil {
 			return num, err
 		}
@@ -287,7 +287,7 @@ func (c *Channel) Send(data []byte, progress chan<- uint64, cancel <-chan struct
 		}
 
 		if progress != nil {
-			var currPercent uint64 = uint64(float64(num)/float64(len(data)))
+			var currPercent uint64 = uint64(float64(num) / float64(len(data)))
 			if currPercent > sendPercent {
 				sendPercent = currPercent
 				progress <- currPercent
@@ -307,19 +307,19 @@ func (c *Channel) Send(data []byte, progress chan<- uint64, cancel <-chan struct
 		// We wait for the time specified by the user's GetDelay function
 		// or until the user signals to cancel
 		select {
-			case <-time.After(wait):
-			case <-cancel:
-				return num, errors.New("Write Cancelled")
+		case <-time.After(wait):
+		case <-cancel:
+			return num, errors.New("Write Cancelled")
 		}
 		num += 1
 	}
-  // If we are using Protocol delimiting, we must send a final
+	// If we are using Protocol delimiting, we must send a final
 	// ACK packet to alert the receiver that the message is done sending
 	if c.conf.Delimiter == Protocol {
-		h  = c.createIPHeader(saddr, daddr)
+		h = c.createIPHeader(saddr, daddr)
 		cm = c.createCM(saddr, daddr)
 
-		p, prevSequence, err  = c.createTcpHeadBuf(uint8(r.Uint32()), prevSequence, layers.TCP{ACK : true}, saddr, daddr, sport, dport)
+		p, prevSequence, err = c.createTcpHeadBuf(uint8(r.Uint32()), prevSequence, layers.TCP{ACK: true}, saddr, daddr, sport, dport)
 		if err != nil {
 			return num, err
 		}
@@ -335,25 +335,25 @@ func (c *Channel) Send(data []byte, progress chan<- uint64, cancel <-chan struct
 // Creates the ip header message
 func (c *Channel) createIPHeader(sip, dip [4]byte) *ipv4.Header {
 	return &ipv4.Header{
-		Version : 4,
-		Len     : 20,
-		TOS     : 0,
+		Version:  4,
+		Len:      20,
+		TOS:      0,
 		TotalLen: 40,
-		FragOff : 0,
-		TTL     : 64,
+		FragOff:  0,
+		TTL:      64,
 		Protocol: 6,
-		Src 	: sip[:],
-		Dst 	: dip[:],
+		Src:      sip[:],
+		Dst:      dip[:],
 	}
 }
 
 // Creates the control message
 func (c *Channel) createCM(sip, dip [4]byte) *ipv4.ControlMessage {
 	return &ipv4.ControlMessage{
-		TTL : 64,
-		Src : sip[:],
-		Dst : dip[:],
-		IfIndex : 0,
+		TTL:     64,
+		Src:     sip[:],
+		Dst:     dip[:],
+		IfIndex: 0,
 	}
 }
 
@@ -368,18 +368,18 @@ func (c *Channel) createCM(sip, dip [4]byte) *ipv4.ControlMessage {
 func (c *Channel) createTcpHeadBuf(b byte, prevSequence uint32, tcph layers.TCP, sip, dip [4]byte, sport, dport uint16) ([]byte, uint32, error) {
 	var err error
 
-	iph := layers.IPv4 {
-		Version : 4,
-		Length  : 20,
-		TTL     : 64,
+	iph := layers.IPv4{
+		Version:  4,
+		Length:   20,
+		TTL:      64,
 		Protocol: 6,
-		SrcIP   : sip[:],
-		DstIP   : dip[:],
+		SrcIP:    sip[:],
+		DstIP:    dip[:],
 	}
 
 	tcph.SrcPort = layers.TCPPort(sport)
 	tcph.DstPort = layers.TCPPort(dport)
-	tcph.Window  = 29200
+	tcph.Window = 29200
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	tcph.Seq = r.Uint32() & 0xFFFFFFFF
@@ -397,11 +397,11 @@ func (c *Channel) createTcpHeadBuf(b byte, prevSequence uint32, tcph layers.TCP,
 
 	sb := gopacket.NewSerializeBuffer()
 	op := gopacket.SerializeOptions{
-		ComputeChecksums : true,
-		FixLengths       : true,
+		ComputeChecksums: true,
+		FixLengths:       true,
 	}
 
-  // This will compute proper checksums
+	// This will compute proper checksums
 	if err := tcph.SerializeTo(sb, op); err != nil {
 		log.Println("TCP Serialize error ", err.Error())
 	}
