@@ -36,6 +36,21 @@ receiver just has to read the acknowledgement numbers of
 consecutive SYN/ACK packets that it receives from the 
 bouncer.
 
+The library provides several features to allow configuration
+of message transmission:
+
+- Message Delimiter: The channel can either read until a buffer is filled
+	(i.e. all messages have fixed size) or it can read until a termination
+	packet is received.
+- Message Bouncing: The channel can be setup to bounce messages off of an
+	intermediate TCP socket to help obscure source and destination.
+- Transmission Timing: A preliminary system is setup to allow users to control
+	the inter packet rate of message transmission. By providing a custom 
+	function, the user can control the delay between each packet (with one
+	data byte per packet) is sent. By default the time between packets is 0,
+	but hypothetically users could set it to a large time or even a random 
+	number based on some distribution to better match internet traffic.
+
 # Example
 
 To run this example you will need to install rust. 
@@ -63,4 +78,7 @@ sudo ./target/debug/examples/sender
 
 In the sender window you are now able to send messages to the 
 receiver. Write you message and hit enter to see the message 
-appear in the receiver terminal.
+appear in the receiver terminal. The receiver is set to timeout
+every 10 seconds if no message is received, at which point
+it will print a message to the terminal and wait for another
+message.
