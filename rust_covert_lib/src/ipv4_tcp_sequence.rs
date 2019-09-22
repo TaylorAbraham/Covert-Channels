@@ -130,7 +130,7 @@ impl Sender {
     pub fn send(
         &mut self,
         data: &[u8],
-        progress: Option<&crossbeam_channel::Sender<usize>>,
+        mut progress: Option<crossbeam_channel::Sender<usize>>,
         mut cancel: Option<crossbeam_channel::Receiver<()>>,
     ) -> io::Result<usize> {
         let msg_len = data.len();
@@ -215,6 +215,9 @@ impl Sender {
                             _ => (),
                         }
                     }
+                    // In order to avoid using a borrow progress channel,
+                    // we re-wrap the channel in a new option
+                    progress = Some(s)
                 }
                 _ => (),
             }
@@ -322,7 +325,7 @@ impl Receiver {
     pub fn receive(
         &mut self,
         data: &mut [u8],
-        progress: Option<&crossbeam_channel::Sender<usize>>,
+        progress: Option<crossbeam_channel::Sender<usize>>,
         cancel: Option<crossbeam_channel::Receiver<()>>,
     ) -> io::Result<usize> {
         // If the buffer is empty we can return immediately
@@ -380,7 +383,7 @@ impl Receiver {
         &self,
         sock: &Socket,
         data: &mut [u8],
-        _progress: Option<&crossbeam_channel::Sender<usize>>,
+        _progress: Option<crossbeam_channel::Sender<usize>>,
     ) -> io::Result<usize> {
         let (src_addr, _, src_port, dst_port) = match self.conf.bounce {
             false => (
@@ -411,7 +414,7 @@ impl Receiver {
                     // The IP header always has at least 20 bytes When finding IP addresses
                     } else {
                         // The ip header length in bytes (the length in the packet is in 32 bit words)
-						// We don't do a wrapping add because it should be impossible for this operation to overflow
+                        // We don't do a wrapping add because it should be impossible for this operation to overflow
                         let ip_header_length = ((buf[0] & 0x0F) * 4) as usize;
                         // Check if we actully received the correct number of bytes
                         if n < ip_header_length {
