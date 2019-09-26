@@ -6,7 +6,6 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"golang.org/x/net/ipv4"
-	"log"
 	"math/rand"
 	"net"
 	"time"
@@ -95,7 +94,8 @@ func MakeChannel(conf Config) (*Channel, error) {
 // The optional progress chan has not yet been implemented.
 // The cancel chan will cancel message reception, causing an early return
 // regardless of delimiter mode. If the reception is cancelled an error is
-// returned.
+// returned. The caller should close this
+// channel to cancel the transmission or else risk deadlock.
 // We return the number of bytes received even if an error is encountered,
 // in which case data will have valid received bytes up to that point.
 func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan struct{}) (uint64, error) {
@@ -236,7 +236,8 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan str
 // the progress channel will fire whenever the number of sent bytes has risen
 // by at least 1 percent.
 // The cancel chan will cancel transmission, which can be useful if the user
-// wants to cancel a long running transmission.
+// wants to cancel a long running transmission. The caller should close this
+// channel to cancel the transmission or else risk deadlock.
 // We return the number of bytes sent even if an error is encountered
 func (c *Channel) Send(data []byte, progress chan<- uint64, cancel <-chan struct{}) (uint64, error) {
 
@@ -392,7 +393,7 @@ func (c *Channel) createTcpHeadBuf(b byte, prevSequence uint32, tcph layers.TCP,
 	}
 
 	if err := tcph.SetNetworkLayerForChecksum(&iph); err != nil {
-		log.Println("Set Network Layer Error ", err.Error())
+		return nil, prevSequence, err
 	}
 
 	sb := gopacket.NewSerializeBuffer()
@@ -403,7 +404,7 @@ func (c *Channel) createTcpHeadBuf(b byte, prevSequence uint32, tcph layers.TCP,
 
 	// This will compute proper checksums
 	if err := tcph.SerializeTo(sb, op); err != nil {
-		log.Println("TCP Serialize error ", err.Error())
+		return nil, prevSequence, err
 	}
 
 	return sb.Bytes(), tcph.Seq, nil
