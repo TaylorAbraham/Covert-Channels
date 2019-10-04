@@ -231,7 +231,9 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan str
 // data is the entire message that will be sent.
 // The optional progress chan can be used to alert the user as to the progress
 // of message transmission. This is useful if the user has set the GetDelay
-// function for the channel. The GetDelay function can be used to set a large
+// function for the channel. The channel should be buffered, otherwise the
+// update will be skipped if it is not immediately read.
+// The GetDelay function can be used to set a large
 // inter packet delay to help obscure the communication. In that case
 // the progress channel will fire whenever the number of sent bytes has risen
 // by at least 1 percent.
@@ -290,7 +292,14 @@ func (c *Channel) Send(data []byte, progress chan<- uint64, cancel <-chan struct
 			var currPercent uint64 = uint64(float64(num) / float64(len(data)))
 			if currPercent > sendPercent {
 				sendPercent = currPercent
-				progress <- currPercent
+				// We send the update along the channel
+				// To avoid deadlock we skip if the channel
+				// is not ready to receive.
+				// As such, the channel should be buffered.
+				select {
+					case progress <- currPercent:
+					default:
+				}
 			}
 		}
 
