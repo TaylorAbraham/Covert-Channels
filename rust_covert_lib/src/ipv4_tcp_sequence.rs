@@ -348,13 +348,49 @@ impl Receiver {
         return match cancel {
             Some(rx_cancel) => rayon::scope(|scope| -> io::Result<usize> {
                 let (tx_local, rx_local) = crossbeam_channel::unbounded();
-                let sock_ref = &socket;
+
+				// We copy the socket2 so that we can asynchronously cancel the read operation
+				// in the thread below
+				// Since the socket2 uses immutable references, it is possible
+				// to just use an immutable reference to do this, however this is a slight
+				// problem with the library because it means that it is possible to have
+				// two immutable references that can perform simultaneous reads or writes
+				// Based on my research, concurrent reads (or writes) cannot be performed safely,
+				// and you may get illegitimate data. The idea behind rust is that such an operation 
+				// is prohibited without mutexes, however in this case using a mutex would be impossible
+				// since we want to cancel while a read is occuring. Therefore, the libraries choice
+				// to have all operations (even the technically mutable ones) is the simplist and right
+				// one. However, since I am using this project to learn more about Rust, I thought it 
+				// worthwhile to find out how to do the operation if the library had been implemented 
+				// with mutable references to prevent simultaneous reads (or writes). 
+				// To do this, we must retrieve the file descriptor for the socket, and use it to create
+				// a new socket.
+				let sock_copy = unsafe { get_socket_copy(&socket) };
+
+				// We must implement separate functions for Windows and Unix, as Windows has raw sockets
+				// but Unix has raw file descriptors
+				#[cfg(unix)]
+				#[inline]
+				unsafe fn get_socket_copy(sock_ref : &Socket) -> Socket {
+					use std::os::unix::io::AsRawFd;
+					use std::os::unix::io::FromRawFd;
+					Socket::from_raw_fd(sock_ref.as_raw_fd())
+				}
+
+				#[cfg(windows)]
+				#[inline]
+				unsafe fn get_socket_copy(sock_ref : &Socket) -> Socket {
+					use std::os::windows::io::AsRawSocket;
+					use std::os::windows::io::FromRawSocket;
+					Socket::from_raw_socket(sock_ref.as_raw_socket())
+				}
+
                 scope.spawn(move |_| {
                     crossbeam::select! {
                         recv(rx_cancel) -> _ => (),
                         recv(rx_local) -> _ => (),
                     }
-                    match sock_ref.shutdown(std::net::Shutdown::Read) {
+                    match sock_copy.shutdown(std::net::Shutdown::Read) {
                         // For some reason, a legitimate, functional shutdown
                         // will return an error (at least on Linux)
                         // Therefore we can just ignore the error
