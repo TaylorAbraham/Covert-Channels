@@ -15,6 +15,12 @@ const (
 	Protocol = 1
 )
 
+type OpCancel struct {}
+
+func (o *OpCancel) Error() string {
+	return "Operation Cancelled"
+}
+
 type Config struct {
 	FriendIP   [4]byte
 	OriginIP   [4]byte
@@ -93,8 +99,8 @@ func MakeChannel(conf Config) (*Channel, error) {
 // Otherwise, it will wait until the buffer is filled.
 // The optional progress chan has not yet been implemented.
 // The cancel chan will cancel message reception, causing an early return
-// regardless of delimiter mode. If the reception is cancelled an error is
-// returned. The caller should close this
+// regardless of delimiter mode. If the reception is cancelled an OpCancel error
+// is returned. The caller should close this
 // channel to cancel the transmission or else risk deadlock.
 // We return the number of bytes received even if an error is encountered,
 // in which case data will have valid received bytes up to that point.
@@ -171,7 +177,7 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan str
 			// function on the raw sockets provided by this library,
 			// as is the case with the Rust Socket2 library
 		} else if len(p) == 0 {
-			return pos, errors.New("Read cancelled")
+			return pos, &OpCancel{}
 		}
 		tcph := layers.TCP{}
 		tcph.DecodeFromBytes(p, gopacket.NilDecodeFeedback)
@@ -239,9 +245,15 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan str
 // by at least 1 percent.
 // The cancel chan will cancel transmission, which can be useful if the user
 // wants to cancel a long running transmission. The caller should close this
-// channel to cancel the transmission or else risk deadlock.
+// channel to cancel the transmission or else risk deadlock. If the Write
+// is cancelled and Protocol delimiting is active, the delimiter packet is
+// transmitted. When cancelling this function will return with an OpCancel error
+// unless an error is encountered when transmitting an delimiter packets, in which
+// case that error is returned.
 // We return the number of bytes sent even if an error is encountered
 func (c *Channel) Send(data []byte, progress chan<- uint64, cancel <-chan struct{}) (uint64, error) {
+	// We make it clear that the error always starts as nil
+	var err error = nil
 
 	conn, err := net.ListenPacket("ip4:6", "0.0.0.0")
 	if err != nil {
@@ -276,6 +288,7 @@ func (c *Channel) Send(data []byte, progress chan<- uint64, cancel <-chan struct
 		saddr, daddr, sport, dport = c.conf.OriginIP, c.conf.FriendIP, c.conf.OriginPort, c.conf.FriendPort
 	}
 
+loop:
 	for _, b := range data {
 		h = c.createIPHeader(saddr, daddr)
 		cm = c.createCM(saddr, daddr)
@@ -319,27 +332,34 @@ func (c *Channel) Send(data []byte, progress chan<- uint64, cancel <-chan struct
 		select {
 		case <-time.After(wait):
 		case <-cancel:
-			return num, errors.New("Write Cancelled")
+			// We don't return immediately
+			// so that we send the protocol delimiter packet
+			// even if the write has been cancelled
+			// An error in creating or writing the delimiter packet
+			// will take precedence over the "Write Cancelled" error
+			err = &OpCancel{}
+			break loop
 		}
 		num += 1
 	}
 	// If we are using Protocol delimiting, we must send a final
 	// ACK packet to alert the receiver that the message is done sending
 	if c.conf.Delimiter == Protocol {
+		var errDelim error = nil
 		h = c.createIPHeader(saddr, daddr)
 		cm = c.createCM(saddr, daddr)
 
-		p, prevSequence, err = c.createTcpHeadBuf(uint8(r.Uint32()), prevSequence, layers.TCP{ACK: true}, saddr, daddr, sport, dport)
-		if err != nil {
-			return num, err
+		p, prevSequence, errDelim = c.createTcpHeadBuf(uint8(r.Uint32()), prevSequence, layers.TCP{ACK: true}, saddr, daddr, sport, dport)
+		if errDelim != nil {
+			return num, errDelim
 		}
 
-		if err = raw.WriteTo(h, p, cm); err != nil {
-			return num, err
+		if errDelim = raw.WriteTo(h, p, cm); errDelim != nil {
+			return num, errDelim
 		}
 	}
 
-	return num, nil
+	return num, err
 }
 
 // Creates the ip header message
