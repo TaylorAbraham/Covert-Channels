@@ -589,7 +589,9 @@ fn create_packet<'a>(
     tcp_header.set_flags(flags);
     // Minimum data offset is 5, but this is not checked
     tcp_header.set_data_offset(5);
-    tcp_header.set_window(32768);
+	// Based on a preliminary investigation of my machine (running Ubuntu 18.04),
+	// SYN packets always seem to have a window of 65495
+    tcp_header.set_window(65495);
 
     let checksum = tcp::ipv4_checksum(
         &tcp_header.to_immutable(),

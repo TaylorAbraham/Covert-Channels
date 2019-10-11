@@ -409,7 +409,9 @@ func (c *Channel) createTcpHeadBuf(b byte, prevSequence uint32, tcph layers.TCP,
 
 	tcph.SrcPort = layers.TCPPort(sport)
 	tcph.DstPort = layers.TCPPort(dport)
-	tcph.Window = 29200
+	// Based on a preliminary investigation of my machine (running Ubuntu 18.04),
+	// SYN packets always seem to have a window of 65495
+	tcph.Window = 65495
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	tcph.Seq = r.Uint32() & 0xFFFFFFFF
