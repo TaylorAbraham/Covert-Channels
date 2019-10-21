@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net"
 	"time"
+	"sync"
 )
 
 const (
@@ -111,12 +112,24 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan str
 // Same as Receive, but with an added channel parameter to indicate when the raw
 // socket has been opened and the channel is ready to receive
 // The ready channel is closed when the raw socket has been opened
+// Therefore a new channel must be provided for every call to receive
 // This is primarily used for testing, where it is necessary to
 // coordinate the send to occur after the receive is ready.
 // It is assumed that in a real situation the sender and receiver are on different machines,
 // so that the receiver would have to prepare to receive well before the message is actually
 // send (i.e. the receiver can afford a few milliseconds delay in setting up the read)
 func (c *Channel) receive(data []byte, progress chan<- uint64, cancel <-chan struct{}, ready chan<- struct{}) (uint64, error) {
+	var once sync.Once
+	readyDone := func () {
+		// Indicates that the raw socket has been opened and the channel is ready to read
+		if ready != nil {
+			close(ready)
+		}
+	}
+	// readyDone is called either when we return or once the raw socket is opened,
+	// whichever comes first
+	// It must be called even if there is an error
+	defer	once.Do(readyDone)
 
 	if len(data) == 0 {
 		return 0, nil
@@ -180,10 +193,7 @@ func (c *Channel) receive(data []byte, progress chan<- uint64, cancel <-chan str
 		saddr, sport, dport = c.conf.FriendIP, c.conf.FriendPort, c.conf.OriginPort
 	}
 
-	// Indicates that the raw socket has been opened and the channel is ready to read
-	if ready != nil {
-		close(ready)
-	}
+	once.Do(readyDone)
 
 	for {
 		h, p, _, err := raw.ReadFrom(buf)
