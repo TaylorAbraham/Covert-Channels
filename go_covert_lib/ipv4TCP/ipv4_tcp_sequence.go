@@ -85,7 +85,7 @@ type Channel struct {
 // that this function may one day be used for validating
 // the data structure
 func MakeChannel(conf Config) (*Channel, error) {
-	c := &Channel{conf}
+	c := &Channel{conf : conf}
 	if c.conf.Encoder == nil {
 		c.conf.Encoder = &SeqEncoder{}
 	}
@@ -105,6 +105,18 @@ func MakeChannel(conf Config) (*Channel, error) {
 // We return the number of bytes received even if an error is encountered,
 // in which case data will have valid received bytes up to that point.
 func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan struct{}) (uint64, error) {
+	return c.receive(data, progress, cancel, nil)
+}
+
+// Same as Receive, but with an added channel parameter to indicate when the raw
+// socket has been opened and the channel is ready to receive
+// The ready channel is closed when the raw socket has been opened
+// This is primarily used for testing, where it is necessary to
+// coordinate the send to occur after the receive is ready.
+// It is assumed that in a real situation the sender and receiver are on different machines,
+// so that the receiver would have to prepare to receive well before the message is actually
+// send (i.e. the receiver can afford a few milliseconds delay in setting up the read)
+func (c *Channel) receive(data []byte, progress chan<- uint64, cancel <-chan struct{}, ready chan<- struct{}) (uint64, error) {
 
 	if len(data) == 0 {
 		return 0, nil
@@ -168,6 +180,11 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan str
 		saddr, sport, dport = c.conf.FriendIP, c.conf.FriendPort, c.conf.OriginPort
 	}
 
+	// Indicates that the raw socket has been opened and the channel is ready to read
+	if ready != nil {
+		close(ready)
+	}
+
 	for {
 		h, p, _, err := raw.ReadFrom(buf)
 		if err != nil {
@@ -215,16 +232,16 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan str
 						// (see below)
 						if pos < uint64(len(data)) {
 							data[pos] = b
+						} else if pos == uint64(len(data)) && c.conf.Delimiter == Protocol {
+							// If we are using the protocol delimiter, then we can fill the full
+							// buffer and then wait for the end packet. It is only if more bytes
+							// are received that we must notify of an error
+							return pos, errors.New("End packet not received, buffer full")
 						}
 						pos += 1
 						// We have filled the buffer without protocol delimiter and we should return immediately
 						if pos == uint64(len(data)) && c.conf.Delimiter != Protocol {
 							return pos, nil
-							// If we are using the protocol delimiter, then we can fill the full
-							// buffer and then wait for the end packet. It is only if more bytes
-							// are received that we must notify of an error
-						} else if pos > uint64(len(data)) && c.conf.Delimiter == Protocol {
-							return pos, errors.New("End packet not received, buffer full")
 						}
 					}
 				}
