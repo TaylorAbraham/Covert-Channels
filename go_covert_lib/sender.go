@@ -43,8 +43,6 @@ func main() {
 
 	ch, _ := ipv4TCP.MakeChannel(conf)
 
-	can := make(chan struct{})
-
 	scanner := bufio.NewScanner(os.Stdin)
 
 	for {
@@ -58,7 +56,7 @@ func main() {
 			data = data[:1024]
 		}
 
-		_, err := ch.Send(data, nil, can)
+		_, err := ch.Send(data, nil)
 		if err != nil {
 			fmt.Println("error: " + err.Error())
 		} else {

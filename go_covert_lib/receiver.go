@@ -35,26 +35,22 @@ func main() {
 		FriendPort: uint16(*fp),
 		OriginPort: uint16(*op),
 		Delimiter:  ipv4TCP.Protocol,
+
+		ReadTimeout : time.Second * 10,
 	}
 
 	copy(conf.FriendIP[:], fIP.To4())
 	copy(conf.OriginIP[:], oIP.To4())
 
-	ch, _ := ipv4TCP.MakeChannel(conf)
-
 	for {
-		can := make(chan struct{})
 
-		go func() {
-			time.Sleep(time.Second * 10)
-			close(can)
-		}()
+		ch, _ := ipv4TCP.MakeChannel(conf)
 
 		fmt.Println("Waiting for message")
 
 		var data [1024]byte
 
-		n, err := ch.Receive(data[:], nil, can)
+		n, err := ch.Receive(data[:], nil)
 		if err != nil {
 			fmt.Println("error: " + err.Error())
 		} else {
