@@ -42,15 +42,13 @@ func TestProtocolDelimiter(t *testing.T) {
 	)
 
 	for _, input := range inputs {
-		var bc chan struct{} = make(chan struct{})
-
 		go func () {
 			var data [15]byte
-			nr, rErr = rch.receive(data[:], nil, nil, bc)
+			nr, rErr = rch.Receive(data[:], nil)
 			c <- string(data[:nr])
 		}()
 
-		sendAndCheck(t, input, sch, bc)
+		sendAndCheck(t, input, sch)
 
 		receiveAndCheck(t, input, c)
 
@@ -77,18 +75,15 @@ func TestProtocolDelimiterOverflow(t *testing.T) {
 		rErr error
 		nr uint64
 		c chan string = make(chan string)
-		bc chan struct{} = make(chan struct{})
 	)
 
 	go func () {
-		for {
-			var data [5]byte
-			nr, rErr = rch.receive(data[:], nil, nil, bc)
-			c <- string(data[:nr])
-		}
+		var data [5]byte
+		nr, rErr = rch.Receive(data[:], nil)
+		c <- string(data[:nr])
 	}()
 
-	sendAndCheck(t, input, sch, bc)
+	sendAndCheck(t, input, sch)
 
 	receiveAndCheck(t, input[:5], c)
 
@@ -109,7 +104,7 @@ func TestReceiveNone(t *testing.T) {
 	var nr uint64
 
 	var data [5]byte
-	nr, err = rch.Receive(data[0:0], nil, nil)
+	nr, err = rch.Receive(data[0:0], nil)
 	if err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
@@ -118,15 +113,8 @@ func TestReceiveNone(t *testing.T) {
 	}
 }
 
-func sendAndCheck (t *testing.T, input string, sch *Channel, bc chan struct{}) {
-
-	select {
-		case <-bc:
-		case <-time.After(time.Millisecond * 500):
-			t.Errorf("Read setup timeout")
-	}
-
-	n, err := sch.Send([]byte(input), nil, nil)
+func sendAndCheck (t *testing.T, input string, sch *Channel) {
+	n, err := sch.Send([]byte(input), nil)
 	if err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}

@@ -9,28 +9,52 @@ import (
 	"math/rand"
 	"net"
 	"time"
-	"sync"
 )
 
 const (
 	Protocol = 1
 )
 
-type OpCancel struct {}
+type WriteWaitCancel struct {}
 
-func (o *OpCancel) Error() string {
-	return "Operation Cancelled"
+func (o *WriteWaitCancel) Error() string {
+	return "Write Cancelled"
 }
 
 type Config struct {
+	// The configuration of an ipv4_tcp_sequence covert channel
+	// This structure recognizes three IP-port pairs, the friend, the origin, and an optional bounce.
+	// The friend is the node you are sending messages to.
+	// The origin is where messages are send when they reach you.
+	// If there in bounce mode, the bounce address and port are used by you to bounce
+	// messages to your friend (or for your friend to bounce messages to you)
+	// thus avoiding direct communication between you ande your friend.
 	FriendIP   [4]byte
 	OriginIP   [4]byte
+	BounceIP   [4]byte
 	FriendPort uint16
 	OriginPort uint16
+	BouncePort uint16
+	// In bounce mode, packets are not sent to the friend directly. Instead, they are sent
+	// to a bouncer running a TCP socket on the origin IP-port. The packet SYN has the source IP-port
+	// spoofed as the friend IP-port, so that when the bouncer replies with a SYN-ACK packet it will
+	// be transmitted to your friend.
 	Bounce     bool
+	// The delimiter to use to deliniate messages. Currently it is either no deliniation (Delim::None)
+	// or delinieating by a TCP packet with a specific flag (Delim::Protocol).
+	// Default is Delim::Protocol.
 	Delimiter  uint8
 	Encoder    TcpEncoder
+	// A function to retrieve a delay to implement between sent packets. By default this
+	// function returns a delay of 0 ms, but users can set it to a longer time or even to
+	// their favourite distribution.
 	GetDelay   func() time.Duration
+
+	// Timeouts for reads and writes
+	// These are the inter packet timeout, which will always translate to the inter byte Timeout
+	// since at this time each packet may only contain one byte
+	WriteTimeout time.Duration
+	ReadTimeout time.Duration
 }
 
 // An encoded may be provided to the TCP Channel
@@ -78,6 +102,8 @@ func (s *SeqEncoder) GetByte(tcph layers.TCP, bounce bool) (byte, error) {
 // A TCP covert channel
 type Channel struct {
 	conf Config
+	rawConn *ipv4.RawConn
+	writeCancel chan bool
 }
 
 // Create the covert channel, filling in the SeqEncoder
@@ -86,10 +112,21 @@ type Channel struct {
 // that this function may one day be used for validating
 // the data structure
 func MakeChannel(conf Config) (*Channel, error) {
-	c := &Channel{conf : conf}
+	c := &Channel{conf : conf, writeCancel : make(chan bool)}
 	if c.conf.Encoder == nil {
 		c.conf.Encoder = &SeqEncoder{}
 	}
+
+	conn, err := net.ListenPacket("ip4:6", "0.0.0.0")
+	if err != nil {
+		return nil, err
+	}
+
+	c.rawConn, err = ipv4.NewRawConn(conn)
+	if err != nil {
+		return nil, err
+	}
+
 	return c, nil
 }
 
@@ -99,78 +136,12 @@ func MakeChannel(conf Config) (*Channel, error) {
 // will return as soon as it receives the proper delimiter.
 // Otherwise, it will wait until the buffer is filled.
 // The optional progress chan has not yet been implemented.
-// The cancel chan will cancel message reception, causing an early return
-// regardless of delimiter mode. If the reception is cancelled an OpCancel error
-// is returned. The caller should close this
-// channel to cancel the transmission or else risk deadlock.
 // We return the number of bytes received even if an error is encountered,
 // in which case data will have valid received bytes up to that point.
-func (c *Channel) Receive(data []byte, progress chan<- uint64, cancel <-chan struct{}) (uint64, error) {
-	return c.receive(data, progress, cancel, nil)
-}
-
-// Same as Receive, but with an added channel parameter to indicate when the raw
-// socket has been opened and the channel is ready to receive
-// The ready channel is closed when the raw socket has been opened
-// Therefore a new channel must be provided for every call to receive
-// This is primarily used for testing, where it is necessary to
-// coordinate the send to occur after the receive is ready.
-// It is assumed that in a real situation the sender and receiver are on different machines,
-// so that the receiver would have to prepare to receive well before the message is actually
-// send (i.e. the receiver can afford a few milliseconds delay in setting up the read)
-func (c *Channel) receive(data []byte, progress chan<- uint64, cancel <-chan struct{}, ready chan<- struct{}) (uint64, error) {
-	var once sync.Once
-	readyDone := func () {
-		// Indicates that the raw socket has been opened and the channel is ready to read
-		if ready != nil {
-			close(ready)
-		}
-	}
-	// readyDone is called either when we return or once the raw socket is opened,
-	// whichever comes first
-	// It must be called even if there is an error
-	defer	once.Do(readyDone)
+func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 
 	if len(data) == 0 {
 		return 0, nil
-	}
-
-	conn, err := net.ListenPacket("ip4:6", "0.0.0.0")
-	if err != nil {
-		return 0, err
-	}
-
-	// Setup to allow closing waiting connections
-	var closer chan struct{} = make(chan struct{})
-	var done chan struct{} = make(chan struct{})
-
-	// This goroutine will wait for either the message being fully Received
-	// or the user sending a message on the cancel channel
-	// It is setup to allow shutdown whant the function returns
-	go func() {
-		if cancel == nil {
-			<-closer
-		} else {
-			select {
-			case <-cancel:
-			case <-closer:
-			}
-		}
-		conn.Close()
-		close(done)
-	}()
-
-	// close the connection when the function returns
-	// (if it hasn't already been closed
-	// and wait for the above goroutine to return
-	defer func() {
-		close(closer)
-		<-done
-	}()
-
-	raw, err := ipv4.NewRawConn(conn)
-	if err != nil {
-		return 0, err
 	}
 
 	var (
@@ -188,23 +159,15 @@ func (c *Channel) receive(data []byte, progress chan<- uint64, cancel <-chan str
 	// Figure out the expected source and destination IP address
 	// These change depending on whether or not we are in bounce mode
 	if c.conf.Bounce {
-		saddr, sport, dport = c.conf.OriginIP, c.conf.OriginPort, c.conf.FriendPort
+		saddr, sport, dport = c.conf.BounceIP, c.conf.BouncePort, c.conf.OriginPort
 	} else {
 		saddr, sport, dport = c.conf.FriendIP, c.conf.FriendPort, c.conf.OriginPort
 	}
 
-	once.Do(readyDone)
-
 	for {
-		h, p, _, err := raw.ReadFrom(buf)
+		h, p, _, err := c.readConn(buf)
 		if err != nil {
 			return pos, err
-			// Cancelling the read by closing the conn causes an errors
-			// Unfortunately there does not seem to be a way to use the socket shutdown
-			// function on the raw sockets provided by this library,
-			// as is the case with the Rust Socket2 library
-		} else if len(p) == 0 {
-			return pos, &OpCancel{}
 		}
 		tcph := layers.TCP{}
 		tcph.DecodeFromBytes(p, gopacket.NilDecodeFeedback)
@@ -270,29 +233,10 @@ func (c *Channel) receive(data []byte, progress chan<- uint64, cancel <-chan str
 // inter packet delay to help obscure the communication. In that case
 // the progress channel will fire whenever the number of sent bytes has risen
 // by at least 1 percent.
-// The cancel chan will cancel transmission, which can be useful if the user
-// wants to cancel a long running transmission. The caller should close this
-// channel to cancel the transmission or else risk deadlock. If the Write
-// is cancelled and Protocol delimiting is active, the delimiter packet is
-// transmitted. When cancelling this function will return with an OpCancel error
-// unless an error is encountered when transmitting an delimiter packets, in which
-// case that error is returned.
 // We return the number of bytes sent even if an error is encountered
-func (c *Channel) Send(data []byte, progress chan<- uint64, cancel <-chan struct{}) (uint64, error) {
+func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
 	// We make it clear that the error always starts as nil
 	var err error = nil
-
-	conn, err := net.ListenPacket("ip4:6", "0.0.0.0")
-	if err != nil {
-		return 0, err
-	}
-
-	defer conn.Close()
-
-	raw, err := ipv4.NewRawConn(conn)
-	if err != nil {
-		return 0, err
-	}
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -310,12 +254,11 @@ func (c *Channel) Send(data []byte, progress chan<- uint64, cancel <-chan struct
 
 	// The source and destination depend on whether or not we are in bounce mode
 	if c.conf.Bounce {
-		saddr, daddr, sport, dport = c.conf.FriendIP, c.conf.OriginIP, c.conf.FriendPort, c.conf.OriginPort
+		saddr, daddr, sport, dport = c.conf.FriendIP, c.conf.BounceIP, c.conf.FriendPort, c.conf.BouncePort
 	} else {
 		saddr, daddr, sport, dport = c.conf.OriginIP, c.conf.FriendIP, c.conf.OriginPort, c.conf.FriendPort
 	}
 
-loop:
 	for _, b := range data {
 		h = c.createIPHeader(saddr, daddr)
 		cm = c.createCM(saddr, daddr)
@@ -325,7 +268,7 @@ loop:
 			return num, err
 		}
 
-		if err = raw.WriteTo(h, p, cm); err != nil {
+		if err = c.writeConn(h, p, cm); err != nil {
 			return num, err
 		}
 
@@ -354,39 +297,32 @@ loop:
 			wait = c.conf.GetDelay()
 		}
 
+		num += 1
 		// We wait for the time specified by the user's GetDelay function
 		// or until the user signals to cancel
 		select {
 		case <-time.After(wait):
-		case <-cancel:
-			// We don't return immediately
-			// so that we send the protocol delimiter packet
-			// even if the write has been cancelled
-			// An error in creating or writing the delimiter packet
-			// will take precedence over the "Write Cancelled" error
-			err = &OpCancel{}
-			break loop
+		case <-c.writeCancel:
+			return num, &WriteWaitCancel{}
 		}
-		num += 1
 	}
 	// If we are using Protocol delimiting, we must send a final
 	// ACK packet to alert the receiver that the message is done sending
 	if c.conf.Delimiter == Protocol {
-		var errDelim error = nil
 		h = c.createIPHeader(saddr, daddr)
 		cm = c.createCM(saddr, daddr)
 
-		p, prevSequence, errDelim = c.createTcpHeadBuf(uint8(r.Uint32()), prevSequence, layers.TCP{ACK: true}, saddr, daddr, sport, dport)
-		if errDelim != nil {
-			return num, errDelim
+		p, prevSequence, err = c.createTcpHeadBuf(uint8(r.Uint32()), prevSequence, layers.TCP{ACK: true}, saddr, daddr, sport, dport)
+		if err != nil {
+			return num, err
 		}
 
-		if errDelim = raw.WriteTo(h, p, cm); errDelim != nil {
-			return num, errDelim
+		if err = c.writeConn(h, p, cm); err != nil {
+			return num, err
 		}
 	}
 
-	return num, err
+	return num, nil
 }
 
 // Creates the ip header message
@@ -412,6 +348,47 @@ func (c *Channel) createCM(sip, dip [4]byte) *ipv4.ControlMessage {
 		Dst:     dip[:],
 		IfIndex: 0,
 	}
+}
+
+// Closes the covert channel.
+// If the covert channel is closed while a read or write is occuring then
+// the function function will return with an OpCancel error
+func (c *Channel) Close() error {
+	// The write operation allows the user to specify
+	// a delay between packets
+	// We can't just rely on the raw connection being
+	// close, we must also be able to cancel this delay,
+	// which is done with the writeCancel method
+	select {
+		case <-c.writeCancel:
+		default:
+			close(c.writeCancel)
+	}
+	return c.rawConn.Close()
+}
+
+// Read to a raw connection whil setting a timeout if necessary
+func (c *Channel) readConn(buf []byte) (*ipv4.Header, []byte, *ipv4.ControlMessage, error) {
+	if c.conf.ReadTimeout > 0 {
+		c.rawConn.SetReadDeadline(time.Now().Add(c.conf.ReadTimeout))
+	} else {
+		// A deadline of zero means never timeout
+		// The initial Time struct is zero
+		c.rawConn.SetReadDeadline(time.Time{})
+	}
+  return c.rawConn.ReadFrom(buf)
+}
+
+// Write to a raw connection whil setting a timeout if necessary
+func (c *Channel) writeConn(h *ipv4.Header, p []byte, cm *ipv4.ControlMessage) error {
+	if c.conf.WriteTimeout > 0 {
+		c.rawConn.SetWriteDeadline(time.Now().Add(c.conf.WriteTimeout))
+	} else {
+		// A deadline of zero means never timeout
+		// The initial Time struct is zero
+		c.rawConn.SetWriteDeadline(time.Time{})
+	}
+  return c.rawConn.WriteTo(h, p, cm)
 }
 
 // Create the TCP header IP payload
