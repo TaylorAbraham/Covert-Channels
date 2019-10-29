@@ -15,7 +15,7 @@ const (
 	Protocol = 1
 )
 
-type WriteWaitCancel struct {}
+type WriteWaitCancel struct{}
 
 func (o *WriteWaitCancel) Error() string {
 	return "Write Cancelled"
@@ -39,22 +39,22 @@ type Config struct {
 	// to a bouncer running a TCP socket on the origin IP-port. The packet SYN has the source IP-port
 	// spoofed as the friend IP-port, so that when the bouncer replies with a SYN-ACK packet it will
 	// be transmitted to your friend.
-	Bounce     bool
+	Bounce bool
 	// The delimiter to use to deliniate messages. Currently it is either no deliniation (Delim::None)
 	// or delinieating by a TCP packet with a specific flag (Delim::Protocol).
 	// Default is Delim::Protocol.
-	Delimiter  uint8
-	Encoder    TcpEncoder
+	Delimiter uint8
+	Encoder   TcpEncoder
 	// A function to retrieve a delay to implement between sent packets. By default this
 	// function returns a delay of 0 ms, but users can set it to a longer time or even to
 	// their favourite distribution.
-	GetDelay   func() time.Duration
+	GetDelay func() time.Duration
 
 	// Timeouts for reads and writes
 	// These are the inter packet timeout, which will always translate to the inter byte Timeout
 	// since at this time each packet may only contain one byte
 	WriteTimeout time.Duration
-	ReadTimeout time.Duration
+	ReadTimeout  time.Duration
 }
 
 // An encoded may be provided to the TCP Channel
@@ -101,8 +101,8 @@ func (s *SeqEncoder) GetByte(tcph layers.TCP, bounce bool) (byte, error) {
 
 // A TCP covert channel
 type Channel struct {
-	conf Config
-	rawConn *ipv4.RawConn
+	conf        Config
+	rawConn     *ipv4.RawConn
 	writeCancel chan bool
 }
 
@@ -112,7 +112,7 @@ type Channel struct {
 // that this function may one day be used for validating
 // the data structure
 func MakeChannel(conf Config) (*Channel, error) {
-	c := &Channel{conf : conf, writeCancel : make(chan bool)}
+	c := &Channel{conf: conf, writeCancel: make(chan bool)}
 	if c.conf.Encoder == nil {
 		c.conf.Encoder = &SeqEncoder{}
 	}
@@ -154,6 +154,13 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 		// There is guaranteed to be at least one space for a byte in the
 		// data buffer at this point
 		pos uint64 = 0
+		// The time since the last packet arrived
+		// Timeouts can occur due to the raw socket itself timing out,
+		// however this will typically not happen on a normal system
+		// since the raw socket will read any incoming tcp packet.
+		// This timer is used to timeout if packets are received, but they
+		// are not the correct type
+		prevPacketTime time.Time
 	)
 
 	// Figure out the expected source and destination IP address
@@ -164,61 +171,68 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 		saddr, sport, dport = c.conf.FriendIP, c.conf.FriendPort, c.conf.OriginPort
 	}
 
+	prevPacketTime = time.Now()
+
 	for {
 		h, p, _, err := c.readConn(buf)
 		if err != nil {
 			return pos, err
 		}
 		tcph := layers.TCP{}
-		tcph.DecodeFromBytes(p, gopacket.NilDecodeFeedback)
-		// We check for the expected source IP, source port, and destination port
-		if bytes.Equal(h.Src.To4(), saddr[:]) {
-			if tcph.SrcPort == layers.TCPPort(sport) && tcph.DstPort == layers.TCPPort(dport) {
-				if c.conf.Delimiter == Protocol {
-					if (!c.conf.Bounce && tcph.ACK) || (c.conf.Bounce && tcph.RST) {
-						return pos, nil
-					}
-				}
-				if c.conf.Bounce {
-					prev_val = tcph.Ack
-				} else {
-					prev_val = tcph.Seq
-				}
-
-				// Check the expected flags
-				if (c.conf.Bounce && tcph.SYN && tcph.ACK) || (!c.conf.Bounce && tcph.SYN && !tcph.ACK) {
-					if first || current_val != prev_val {
-						prev_val = current_val
-						first = false
-
-						b, err := c.conf.Encoder.GetByte(tcph, c.conf.Bounce)
-						if err != nil {
-							return pos, err
-						}
-						// Make sure we don't overflow the buffer
-						// The buffer can only overflow if we are in protocol delimiter mode
-						// Once the buffer fills in protocol delimiter mode we
-						// wait for the end packet. If a packet arrives that does not
-						// have the expected flags then we will reach this statement
-						// and be unable to put the new byte into the buffer
-						// In that case we return with an error indicating buffer overflow
-						// (see below)
-						if pos < uint64(len(data)) {
-							data[pos] = b
-						} else if pos == uint64(len(data)) && c.conf.Delimiter == Protocol {
-							// If we are using the protocol delimiter, then we can fill the full
-							// buffer and then wait for the end packet. It is only if more bytes
-							// are received that we must notify of an error
-							return pos, errors.New("End packet not received, buffer full")
-						}
-						pos += 1
-						// We have filled the buffer without protocol delimiter and we should return immediately
-						if pos == uint64(len(data)) && c.conf.Delimiter != Protocol {
+		if err = tcph.DecodeFromBytes(p, gopacket.NilDecodeFeedback); err == nil {
+			// We check for the expected source IP, source port, and destination port
+			if bytes.Equal(h.Src.To4(), saddr[:]) {
+				if tcph.SrcPort == layers.TCPPort(sport) && tcph.DstPort == layers.TCPPort(dport) {
+					if c.conf.Delimiter == Protocol {
+						if (!c.conf.Bounce && tcph.ACK) || (c.conf.Bounce && tcph.RST) {
 							return pos, nil
+						}
+					}
+					if c.conf.Bounce {
+						prev_val = tcph.Ack
+					} else {
+						prev_val = tcph.Seq
+					}
+
+					// Check the expected flags
+					if (c.conf.Bounce && tcph.SYN && tcph.ACK) || (!c.conf.Bounce && tcph.SYN && !tcph.ACK) {
+						if first || current_val != prev_val {
+							prev_val = current_val
+							first = false
+
+							b, err := c.conf.Encoder.GetByte(tcph, c.conf.Bounce)
+							if err != nil {
+								return pos, err
+							}
+							// Make sure we don't overflow the buffer
+							// The buffer can only overflow if we are in protocol delimiter mode
+							// Once the buffer fills in protocol delimiter mode we
+							// wait for the end packet. If a packet arrives that does not
+							// have the expected flags then we will reach this statement
+							// and be unable to put the new byte into the buffer
+							// In that case we return with an error indicating buffer overflow
+							// (see below)
+							if pos < uint64(len(data)) {
+								data[pos] = b
+							} else if pos == uint64(len(data)) && c.conf.Delimiter == Protocol {
+								// If we are using the protocol delimiter, then we can fill the full
+								// buffer and then wait for the end packet. It is only if more bytes
+								// are received that we must notify of an error
+								return pos, errors.New("End packet not received, buffer full")
+							}
+							pos += 1
+							// We have filled the buffer without protocol delimiter and we should return immediately
+							if pos == uint64(len(data)) && c.conf.Delimiter != Protocol {
+								return pos, nil
+							}
+							prevPacketTime = time.Now()
 						}
 					}
 				}
 			}
+		}
+		if c.conf.ReadTimeout > 0 && time.Now().Sub(prevPacketTime) > c.conf.ReadTimeout {
+			return pos, errors.New("Covert Packet Timeout")
 		}
 	}
 }
@@ -281,8 +295,8 @@ func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
 				// is not ready to receive.
 				// As such, the channel should be buffered.
 				select {
-					case progress <- currPercent:
-					default:
+				case progress <- currPercent:
+				default:
 				}
 			}
 		}
@@ -325,6 +339,47 @@ func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
 	return num, nil
 }
 
+// Closes the covert channel.
+// If the covert channel is closed while a read or write is occuring then
+// the function function will return with an OpCancel error
+func (c *Channel) Close() error {
+	// The write operation allows the user to specify
+	// a delay between packets
+	// We can't just rely on the raw connection being
+	// close, we must also be able to cancel this delay,
+	// which is done with the writeCancel method
+	select {
+	case <-c.writeCancel:
+	default:
+		close(c.writeCancel)
+	}
+	return c.rawConn.Close()
+}
+
+// Read to a raw connection whil setting a timeout if necessary
+func (c *Channel) readConn(buf []byte) (*ipv4.Header, []byte, *ipv4.ControlMessage, error) {
+	if c.conf.ReadTimeout > 0 {
+		c.rawConn.SetReadDeadline(time.Now().Add(c.conf.ReadTimeout))
+	} else {
+		// A deadline of zero means never timeout
+		// The initial Time struct is zero
+		c.rawConn.SetReadDeadline(time.Time{})
+	}
+	return c.rawConn.ReadFrom(buf)
+}
+
+// Write to a raw connection while setting a timeout if necessary
+func (c *Channel) writeConn(h *ipv4.Header, p []byte, cm *ipv4.ControlMessage) error {
+	if c.conf.WriteTimeout > 0 {
+		c.rawConn.SetWriteDeadline(time.Now().Add(c.conf.WriteTimeout))
+	} else {
+		// A deadline of zero means never timeout
+		// The initial Time struct is zero
+		c.rawConn.SetWriteDeadline(time.Time{})
+	}
+	return c.rawConn.WriteTo(h, p, cm)
+}
+
 // Creates the ip header message
 func (c *Channel) createIPHeader(sip, dip [4]byte) *ipv4.Header {
 	return &ipv4.Header{
@@ -348,47 +403,6 @@ func (c *Channel) createCM(sip, dip [4]byte) *ipv4.ControlMessage {
 		Dst:     dip[:],
 		IfIndex: 0,
 	}
-}
-
-// Closes the covert channel.
-// If the covert channel is closed while a read or write is occuring then
-// the function function will return with an OpCancel error
-func (c *Channel) Close() error {
-	// The write operation allows the user to specify
-	// a delay between packets
-	// We can't just rely on the raw connection being
-	// close, we must also be able to cancel this delay,
-	// which is done with the writeCancel method
-	select {
-		case <-c.writeCancel:
-		default:
-			close(c.writeCancel)
-	}
-	return c.rawConn.Close()
-}
-
-// Read to a raw connection whil setting a timeout if necessary
-func (c *Channel) readConn(buf []byte) (*ipv4.Header, []byte, *ipv4.ControlMessage, error) {
-	if c.conf.ReadTimeout > 0 {
-		c.rawConn.SetReadDeadline(time.Now().Add(c.conf.ReadTimeout))
-	} else {
-		// A deadline of zero means never timeout
-		// The initial Time struct is zero
-		c.rawConn.SetReadDeadline(time.Time{})
-	}
-  return c.rawConn.ReadFrom(buf)
-}
-
-// Write to a raw connection whil setting a timeout if necessary
-func (c *Channel) writeConn(h *ipv4.Header, p []byte, cm *ipv4.ControlMessage) error {
-	if c.conf.WriteTimeout > 0 {
-		c.rawConn.SetWriteDeadline(time.Now().Add(c.conf.WriteTimeout))
-	} else {
-		// A deadline of zero means never timeout
-		// The initial Time struct is zero
-		c.rawConn.SetWriteDeadline(time.Time{})
-	}
-  return c.rawConn.WriteTo(h, p, cm)
 }
 
 // Create the TCP header IP payload
@@ -427,7 +441,7 @@ func (c *Channel) createTcpHeadBuf(b byte, prevSequence uint32, tcph layers.TCP,
 		return nil, prevSequence, err
 	}
 
-	if err := tcph.SetNetworkLayerForChecksum(&iph); err != nil {
+	if err = tcph.SetNetworkLayerForChecksum(&iph); err != nil {
 		return nil, prevSequence, err
 	}
 
@@ -438,7 +452,7 @@ func (c *Channel) createTcpHeadBuf(b byte, prevSequence uint32, tcph layers.TCP,
 	}
 
 	// This will compute proper checksums
-	if err := tcph.SerializeTo(sb, op); err != nil {
+	if err = tcph.SerializeTo(sb, op); err != nil {
 		return nil, prevSequence, err
 	}
 

@@ -36,7 +36,7 @@ func main() {
 		OriginPort: uint16(*op),
 		Delimiter:  ipv4TCP.Protocol,
 
-		ReadTimeout : time.Second * 10,
+		ReadTimeout: time.Second * 5,
 	}
 
 	copy(conf.FriendIP[:], fIP.To4())

@@ -6,16 +6,16 @@ import (
 )
 
 var sconf Config = Config{
-	FriendIP: [4]byte{127,0,0,1},
-	OriginIP: [4]byte{127,0,0,1},
+	FriendIP:   [4]byte{127, 0, 0, 1},
+	OriginIP:   [4]byte{127, 0, 0, 1},
 	FriendPort: 8080,
 	OriginPort: 8081,
 	Delimiter:  Protocol,
 }
 
 var rconf Config = Config{
-	FriendIP: [4]byte{127,0,0,1},
-	OriginIP: [4]byte{127,0,0,1},
+	FriendIP:   [4]byte{127, 0, 0, 1},
+	OriginIP:   [4]byte{127, 0, 0, 1},
 	FriendPort: 8081,
 	OriginPort: 8080,
 	Delimiter:  Protocol,
@@ -34,15 +34,15 @@ func TestProtocolDelimiter(t *testing.T) {
 	}
 
 	var (
-		c chan string = make(chan string)
+		c    chan string = make(chan string)
 		rErr error
-		nr uint64
+		nr   uint64
 		// Test with message with many characters and with 0 characters
 		inputs []string = []string{"Hello world!", ""}
 	)
 
 	for _, input := range inputs {
-		go func () {
+		go func() {
 			var data [15]byte
 			nr, rErr = rch.Receive(data[:], nil)
 			c <- string(data[:nr])
@@ -72,12 +72,12 @@ func TestProtocolDelimiterOverflow(t *testing.T) {
 
 	var (
 		input string = "123456"
-		rErr error
-		nr uint64
-		c chan string = make(chan string)
+		rErr  error
+		nr    uint64
+		c     chan string = make(chan string)
 	)
 
-	go func () {
+	go func() {
 		var data [5]byte
 		nr, rErr = rch.Receive(data[:], nil)
 		c <- string(data[:nr])
@@ -113,7 +113,7 @@ func TestReceiveNone(t *testing.T) {
 	}
 }
 
-func sendAndCheck (t *testing.T, input string, sch *Channel) {
+func sendAndCheck(t *testing.T, input string, sch *Channel) {
 	n, err := sch.Send([]byte(input), nil)
 	if err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
@@ -123,13 +123,13 @@ func sendAndCheck (t *testing.T, input string, sch *Channel) {
 	}
 }
 
-func receiveAndCheck (t *testing.T, input string, c chan string) {
+func receiveAndCheck(t *testing.T, input string, c chan string) {
 	select {
-		case received := <- c:
-			if received != input {
-				t.Errorf("received = %s; want %s", received, input)
-			}
-		case <-time.After(time.Millisecond * 500):
-			t.Errorf("Read timeout")
+	case received := <-c:
+		if received != input {
+			t.Errorf("received = %s; want %s", received, input)
+		}
+	case <-time.After(time.Millisecond * 500):
+		t.Errorf("Read timeout")
 	}
 }
