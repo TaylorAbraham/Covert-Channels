@@ -12,6 +12,7 @@ import (
 )
 
 const (
+	Buffer = 0
 	Protocol = 1
 )
 
@@ -184,7 +185,7 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 			if bytes.Equal(h.Src.To4(), saddr[:]) {
 				if tcph.SrcPort == layers.TCPPort(sport) && tcph.DstPort == layers.TCPPort(dport) {
 					if c.conf.Delimiter == Protocol {
-						if (!c.conf.Bounce && tcph.ACK) || (c.conf.Bounce && tcph.RST) {
+						if (!c.conf.Bounce && tcph.ACK && !tcph.RST) || (c.conf.Bounce && tcph.RST) {
 							return pos, nil
 						}
 					}

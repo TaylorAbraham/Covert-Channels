@@ -1,0 +1,141 @@
+<html>
+  <head>
+    <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.4.1.min.js"></script>
+    <script>
+      config = {};
+      function sendOpen() {
+        console.log("open");
+        var cmd = JSON.stringify({
+          OpCode : "open",
+          Processor     : config.Processor,
+          Channel       : config.Channel,
+          ProcessorType : config.ProcessorType,
+          ChannelType   : config.ChannelType
+        });
+        console.log(cmd);
+        sock.send(cmd,{binary:true});
+      }
+      function sendClose() {
+        console.log("close");
+        var cmd = JSON.stringify({OpCode : "close"});
+        sock.send(cmd,{binary:true});
+      }
+      function sendWrite() {
+        console.log("write");
+        var msg = $("#message").val()
+        var cmd = JSON.stringify({OpCode : "write", Message : msg});
+        sock.send(cmd,{binary:true});
+      }
+      function sendConfig() {
+        console.log("config");
+        var cmd = JSON.stringify({OpCode : "config"});
+        sock.send(cmd,{binary:true});
+      }
+
+      function writeResponse(response) {
+        $('#response').val(function(i, text) {
+            return text + response + "\n";
+        });
+      }
+
+      function handleConfig(data) {
+        config = data;
+        handleConfigKeys("processor", data.Processor[data.ProcessorType]);
+        handleConfigKeys("channel", data.Channel[data.ChannelType]);
+      }
+
+      function handleConfigKeys(section, data) {
+        var el = $("#" + section);
+        el.empty();
+        var tbl = $("<table>");
+        tbl.appendTo(el);
+        for (var key in data) {
+          if (data.hasOwnProperty(key)) {
+            var tr = $("<tr></tr>")
+            tr.appendTo(tbl);
+            var td = $("<td></td>").html(key);
+            td.appendTo(tr);
+            td = $("<td></td>");
+            var val = data[key].Value;
+            var input;
+            switch (data[key].Type) {
+              case "u16":
+                input = $("<input>").attr("type","number").val(val);
+                break;
+              case "u64":
+                input = $("<input>").attr("type","number").val(val);
+                break;
+              case "bool":
+                input = $("<input>").attr("type","checkbox").prop('checked', val).val(val);
+                break;
+              case "select":
+                input = $("<select>");
+                for (o in data[key].Range) {
+                  input.append('<option value="'+ data[key].Range[o] +'">' + data[key].Range[o] + '</option>')
+                }
+                input.val(data[key].Value);
+                break;
+              case "ipv4":
+                  input = $("<input>").attr("type","text").val(val);
+                  break;
+            }
+            input.on('input', function (obj) {
+              if (obj.Type === "bool") {
+                obj.Value = this.prop('checked');
+              } else if (obj.Type == "u16" || obj.Type == "u64") {
+                obj.Value = Number(this.val());
+              } else {
+                obj.Value = this.val();
+              }
+              console.log(obj.Value);
+            }.bind(input, data[key]));
+            td.append(input);
+            td.appendTo(tr);
+          }
+        }
+      }
+
+      $(document).ready(function() {
+
+        var address = prompt ('Please enter the address to connect to. [Example Below]', 'localhost:8090');
+				sock = new WebSocket('ws://' + address + '/');
+
+        sock.binaryType = 'arraybuffer';
+				sock.onopen = function (event) {
+					writeResponse('Auto Connection established');
+          sendConfig()
+				};
+
+				sock.onerror = function (event) {
+					writeResponse('Auto Connection error');
+				};
+
+        sock.onmessage = function (event) {
+          console.log("received message");
+          console.log(event.data);
+					if(event.data) {
+            var data = JSON.parse(event.data);
+            writeResponse(event.data);
+            if (data.OpCode === "config"){
+                handleConfig(data);
+            }
+          }
+				};
+      });
+    </script>
+  </head>
+  <body>
+    <div>
+      <input type="button" onclick="sendOpen()">Open</input>
+      <input type="button" onclick="sendClose()">Close</input>
+      <input type="button" onclick="sendWrite()">Write</input>
+      <input type="button" onclick="sendConfig()">Config</input>
+    </div>
+    <div><input type="text" id="message"></input></div>
+    <div><textarea id="response" cols="100" rows="10"></textarea></div>
+    <h1>Processor</h1>
+    <div id="processor"></div>
+    <h1>Channel</h1>
+    <div id="channel"></div>
+  </body>
+</html>
