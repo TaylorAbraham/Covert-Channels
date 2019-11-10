@@ -112,6 +112,9 @@ func (ctr *Controller) handleWrite(data []byte) error {
   if err := json.Unmarshal(data, &mt); err != nil {
     return err
   }
+  if ctr.layers == nil {
+    return errors.New("Channel closed")
+  }
   if b, err := ctr.layers.processor.Process([]byte(mt.Message)); err != nil  {
     return errors.New("Unable to process outgoing message: " + err.Error())
   } else {
