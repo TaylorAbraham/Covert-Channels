@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"time"
 	"strconv"
+	"time"
 )
 
 func main() {
@@ -19,13 +19,13 @@ func main() {
 	signalChan := make(chan os.Signal)
 	signal.Notify(signalChan, os.Interrupt)
 
-  var p *int = flag.Int("p", 6000, "the port for the websocket ")
-  flag.Parse()
+	var p *int = flag.Int("p", 6000, "the port for the websocket ")
+	flag.Parse()
 
-  ctr, err := controller.CreateController()
-  if err != nil {
-    log.Fatal(err.Error())
-  }
+	ctr, err := controller.CreateController()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 	//Create each of the possible websocket connections
 	mux := http.NewServeMux()
 
