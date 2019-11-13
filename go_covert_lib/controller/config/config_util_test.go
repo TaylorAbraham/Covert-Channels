@@ -50,8 +50,7 @@ type s8 struct {
 
 type s9 struct{}
 
-
-var	ptr *s1 = &s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}
+var ptr *s1 = &s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}
 
 var tests []testCase = []testCase{
 	testCase{1, true, "Config is not a struct"},
@@ -151,7 +150,7 @@ func TestCopyValueErrors(t *testing.T) {
 		P1 ValStructInter
 	}
 
-	type st7 struct {}
+	type st7 struct{}
 
 	var (
 		intVal int
@@ -160,7 +159,7 @@ func TestCopyValueErrors(t *testing.T) {
 		sVal4  st4
 		sVal5  st5
 		sVal6  st6 = st6{P1: ValStructInter{123}}
-		sVal7 st7
+		sVal7  st7
 	)
 
 	var copyTests []copyTestCase = []copyTestCase{
@@ -328,8 +327,8 @@ func TestNoUpdateUnlessAllValid(t *testing.T) {
 		P2 NoValStruct
 		P3 ValStruct
 	}
-	var s1 s = s{P1 : ValStruct{1}, P2 : NoValStruct{2}, P3 : ValStruct{3}}
-	var s2 s = s{P1 : ValStruct{4}, P2 : NoValStruct{5}, P3 : ValStruct{6}}
+	var s1 s = s{P1: ValStruct{1}, P2: NoValStruct{2}, P3: ValStruct{3}}
+	var s2 s = s{P1: ValStruct{4}, P2: NoValStruct{5}, P3: ValStruct{6}}
 
 	err := CopyValue(&s1, s2)
 	if err == nil {
