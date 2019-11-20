@@ -10,9 +10,21 @@ As you now have a JIRA issue tied to your changes, name your branch after your J
 
 `CC-42/fix-submit-button`
 
+## PR Guidelines
+
+Before creating a PR, ensure to do the following:
+1. Run `go fmt` if you worked on any go code.
+2. Ensure your code compiles and runs as expected!
+3. Sync your branch with master. This can be done with `git checkout master`, `git pull`, `git checkout -`, and `git merge master` in that order, or any method you understand the implications of.
+
+When creating the PR:
+1. Give it a meaningful description that helps another developer understand what you have changed *and why*
+2. Add any appropriate labels
+3. Assign a reviewer and set the assignee to yourself
+
 ## Commit Guidelines
 
-Please follow commit message guidelines outlined here: https://chris.beams.io/posts/git-commit/
+This section is a lot more optional, but in general please follow general commit message practices. Common guidelines outlined here: https://chris.beams.io/posts/git-commit/
 In summary,
 1. Separate subject from body with a blank line
 2. Limit the subject line to 50 characters
