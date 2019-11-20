@@ -98,7 +98,7 @@
       $(document).ready(function() {
 
         var address = prompt ('Please enter the address to connect to. [Example Below]', 'localhost:8090');
-				sock = new WebSocket('ws://' + address + '/');
+				sock = new WebSocket('ws://' + address + '/api/ws');
 
         sock.binaryType = 'arraybuffer';
 				sock.onopen = function (event) {
