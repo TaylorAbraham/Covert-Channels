@@ -1,12 +1,12 @@
 package controller
 
 import (
-  "github.com/gorilla/websocket"
-  "sync"
-  "./channel"
-  "./channel/ipv4TCP"
-  "./processor"
-  "./processor/none"
+	"./channel"
+	"./channel/ipv4TCP"
+	"./processor"
+	"./processor/none"
+	"github.com/gorilla/websocket"
+	"sync"
 )
 
 // The go json library has this really convenient feature
@@ -18,57 +18,57 @@ import (
 // data. This protects against having to always use the same
 // struct for communication
 type command struct {
-  OpCode string
+	OpCode string
 }
 
 type messageType struct {
-  OpCode string
-  Message string
+	OpCode  string
+	Message string
 }
 
 type configType struct {
-  OpCode string
-  ChannelType string
-  ProcessorType string
+	OpCode        string
+	ChannelType   string
+	ProcessorType string
 }
 
 type configData struct {
-  OpCode string
-  ChannelType string
-  ProcessorType string
-  Processor processorData
-  Channel   channelData
+	OpCode        string
+	ChannelType   string
+	ProcessorType string
+	Processor     processorData
+	Channel       channelData
 }
 
 type channelData struct {
-  Ipv4TCP ipv4TCP.ConfigClient
+	Ipv4TCP ipv4TCP.ConfigClient
 }
 
 type processorData struct {
-  None none.ConfigClient
+	None none.ConfigClient
 }
 
 type Layers struct {
-  processor processor.Processor
-  channel   channel.Channel
+	processor processor.Processor
+	channel   channel.Channel
 
-  // Chans for handling closing of the covert channel
-  readClose chan interface{}
-  readCloseDone chan interface{}
+	// Chans for handling closing of the covert channel
+	readClose     chan interface{}
+	readCloseDone chan interface{}
 }
 
 type Controller struct {
-  config configData
-  layers *Layers
-  upgrader websocket.Upgrader
-  clients map[*websocket.Conn]bool
-  clientLock sync.Mutex
-  waitGroup sync.WaitGroup
-  clientStop chan interface{}
-  recvStop   chan interface{}
-  sendStop   chan interface{}
-  doneWsSend chan interface{}
-  doneWsRecv chan interface{}
-  wsSend chan []byte
-  wsRecv chan []byte
+	config     configData
+	layers     *Layers
+	upgrader   websocket.Upgrader
+	clients    map[*websocket.Conn]bool
+	clientLock sync.Mutex
+	waitGroup  sync.WaitGroup
+	clientStop chan interface{}
+	recvStop   chan interface{}
+	sendStop   chan interface{}
+	doneWsSend chan interface{}
+	doneWsRecv chan interface{}
+	wsSend     chan []byte
+	wsRecv     chan []byte
 }

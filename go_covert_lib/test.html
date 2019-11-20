@@ -91,6 +91,10 @@
             }.bind(input, data[key]));
             td.append(input);
             td.appendTo(tr);
+
+            var desc = $('<div>').attr('title', data[key].Description).css('width','10px').css('height','10px').css({'background-color' : 'red'});
+            td = $('<td>').append(desc);
+            td.appendTo(tr);
           }
         }
       }

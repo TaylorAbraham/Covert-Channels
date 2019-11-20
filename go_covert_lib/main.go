@@ -19,7 +19,7 @@ func main() {
 	signalChan := make(chan os.Signal)
 	signal.Notify(signalChan, os.Interrupt)
 
-	var p *int = flag.Int("p", 3000, "the port for the webpage and websocket ")
+	var p *int = flag.Int("p", 3000, "the port for the webpage and websocket")
 	flag.Parse()
 
 	ctr, err := controller.CreateController()

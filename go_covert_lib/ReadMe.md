@@ -1,6 +1,41 @@
 Covert Channel
 ==============
 
+To create the server:
+
+Build the code.
+```
+go build main.go
+```
+
+Run two instances of the server with different websocket ports (must run in supper user mode).
+In one terminal, run:
+```
+sudo ./main -p 8080
+```
+In a second terminal, run:
+```
+sudo ./main -p 8081
+```
+
+Open up `test.html` twice in separate browser tabs.
+
+You will be prompted for the port numbers. Choose the two websocket ports chosen 
+earlier (in our case, 8080 and 8081).
+
+The config will open for the TCP covert channel. You will see inputs for FriendPort and
+OriginPort. These should start at 8123 and 8124. In one of the open tabs, switch these 
+ports (to 8124 and 8123 for the FriendPort and OriginPort). This will set up a channel that
+is complementary to the other channel.
+
+In both taps, click the `Open` button. If everything works, you should now be able to 
+exchange messages by typing into the input and clicking the `Send` button.
+
+Received messages will appear in the `textarea`.
+
+Covert Channel
+==============
+
 The following contains a simple covert channel implemented
 with the TCP protocol.
 
