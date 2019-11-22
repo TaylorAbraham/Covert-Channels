@@ -1,0 +1,5 @@
+.input-text {
+  width: 120px;
+  text-align: right !important;
+  display: inline-block !important; /* This centers text */
+}
