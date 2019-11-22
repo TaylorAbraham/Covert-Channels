@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// Constructor for the controller
 func CreateController() (*Controller, error) {
 	var ctr *Controller = &Controller{
 		config:     DefaultConfig(),
@@ -34,6 +35,7 @@ func CreateController() (*Controller, error) {
 	return ctr, nil
 }
 
+// A default config for the system and all Covert Channels
 func DefaultConfig() configData {
 	return configData{
 		OpCode:        "config",
@@ -48,12 +50,14 @@ func DefaultConfig() configData {
 	}
 }
 
+// Callback when receiving a message from the client
 func (ctr *Controller) handleMessage(data []byte) []byte {
 	var cmd command
 	if err := json.Unmarshal(data, &cmd); err != nil {
 		return toMessage("error", "Unable to read command: "+err.Error())
 	}
 
+  // Determine the operation to perform
 	switch cmd.OpCode {
 	case "open":
 		// Close a channel if it is already open
@@ -88,6 +92,9 @@ func (ctr *Controller) handleMessage(data []byte) []byte {
 	}
 }
 
+// A helper function for preparing responses to the client
+// opcode is the type of message, and is one of the valid opCodes from the client or "error"
+// data is the message
 func toMessage(opcode string, data string) []byte {
 	var mt messageType
 	mt.OpCode = opcode
@@ -99,6 +106,7 @@ func toMessage(opcode string, data string) []byte {
 	}
 }
 
+// Handle the config command
 func (ctr *Controller) handleConfig() ([]byte, error) {
 	if data, err := json.Marshal(ctr.config); err != nil {
 		return nil, err
@@ -107,6 +115,7 @@ func (ctr *Controller) handleConfig() ([]byte, error) {
 	}
 }
 
+// Handle the write command
 func (ctr *Controller) handleWrite(data []byte) error {
 	var mt messageType
 	if err := json.Unmarshal(data, &mt); err != nil {
@@ -126,6 +135,7 @@ func (ctr *Controller) handleWrite(data []byte) error {
 	}
 }
 
+// Handle a read operation
 func (ctr *Controller) handleRead() ([]byte, error) {
 
 	var buffer [1024]byte
@@ -141,6 +151,7 @@ func (ctr *Controller) handleRead() ([]byte, error) {
 	}
 }
 
+// Loop for repeatedly reading from  any open Covert Channel
 func (ctr *Controller) readLoop() {
 loop:
 	for {
@@ -163,6 +174,7 @@ loop:
 	}
 }
 
+// Handle the close operation
 func (ctr *Controller) handleClose() error {
 	var err error
 	if ctr.layers != nil {
@@ -175,6 +187,7 @@ func (ctr *Controller) handleClose() error {
 	return err
 }
 
+// Shutdown the controller
 func (ctr *Controller) Shutdown() error {
 	return ctr.webShutdown()
 }

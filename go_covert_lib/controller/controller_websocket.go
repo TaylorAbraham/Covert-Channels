@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// The HTTP handler function for initializing and running the websocket
 func (ctr *Controller) HandleFunc(w http.ResponseWriter, r *http.Request) {
 	r.Header.Del("Origin")
 	ctr.clientLock.Lock()
@@ -41,8 +42,8 @@ func (ctr *Controller) HandleFunc(w http.ResponseWriter, r *http.Request) {
 
 loop:
 	for {
-		_, data, err := ws.ReadMessage()
-		if err == nil {
+		mt, data, err := ws.ReadMessage()
+	  if err == nil {
 			select {
 			case ctr.wsRecv <- data:
 			case <-ctr.clientStop:
@@ -56,6 +57,7 @@ loop:
 	}
 }
 
+// A loop for processing incomming messages from the client
 func (ctr *Controller) webReceiveLoop() {
 	defer close(ctr.doneWsRecv)
 
@@ -70,6 +72,7 @@ loop:
 	}
 }
 
+// A loop for broadcasting outgoing messages along all websockets
 func (ctr *Controller) webSendLoop() {
 	defer close(ctr.doneWsSend)
 
@@ -90,6 +93,7 @@ loop:
 	}
 }
 
+// Shutdown the websocket and all send and receive loops
 func (ctr *Controller) webShutdown() error {
 	var err error
 	ctr.clientLock.Lock()

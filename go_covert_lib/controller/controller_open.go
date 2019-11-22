@@ -10,6 +10,8 @@ import (
 	"errors"
 )
 
+// Function for opening a covert channel
+// Input is the byte string representing a JSON object with the configuration for the channel
 func (ctr *Controller) handleOpen(data []byte) error {
 	if l, err := ctr.retrieveLayers(data); err == nil {
 		ctr.layers = l
@@ -19,6 +21,7 @@ func (ctr *Controller) handleOpen(data []byte) error {
 	}
 }
 
+// Retrieve the layer entities that make up the covert channel
 func (ctr *Controller) retrieveLayers(data []byte) (*Layers, error) {
 	var (
 		ct  configType
@@ -43,23 +46,26 @@ func (ctr *Controller) retrieveLayers(data []byte) (*Layers, error) {
 	return &Layers{processor: p, channel: c, readClose: make(chan interface{}), readCloseDone: make(chan interface{})}, nil
 }
 
+// Retrieve the channel entity
+// channelType is the type of channel
+// data is the byte string of the configuration struct JSON
 func (ctr *Controller) retrieveChannel(channelType string, data []byte) (channel.Channel, error) {
 	var (
 		c   channel.Channel
 		err error
+		tempconf configData = DefaultConfig()
 	)
 
 	switch channelType {
 	case "Ipv4TCP":
-		var tempconf configData = DefaultConfig()
-		var itConf ipv4TCP.ConfigClient = ipv4TCP.GetDefault()
-		var ipCh *ipv4TCP.Channel
+		var (
+			itConf ipv4TCP.ConfigClient = ipv4TCP.GetDefault()
+			ipCh *ipv4TCP.Channel
+		)
 		if err = unmarshalCopyValidate(data, &tempconf,
 			&ctr.config.Channel.Ipv4TCP, &tempconf.Channel.Ipv4TCP, &itConf,
 			func() error { var err error; ipCh, err = ipv4TCP.ToChannel(itConf); return err }); err != nil {
-			if ipCh != nil {
-				ipCh.Close()
-			}
+			if ipCh != nil {	ipCh.Close() }
 		} else {
 			c = ipCh
 		}
@@ -69,6 +75,9 @@ func (ctr *Controller) retrieveChannel(channelType string, data []byte) (channel
 	return c, err
 }
 
+// Retrieve the processor entity
+// processorType is the type of processor
+// data is the byte string of the configuration struct JSON
 func (ctr *Controller) retrieveProcessor(processorType string, data []byte) (processor.Processor, error) {
 	var (
 		p   processor.Processor
@@ -88,6 +97,7 @@ func (ctr *Controller) retrieveProcessor(processorType string, data []byte) (pro
 	return p, err
 }
 
+// The following function simplifies unarshalling, validating, and copying the new config, as well as executing a function to create the new channel
 // Five steps:
 //  copy originalItem to tempItem. This way the original is not changed if we find an error when validating (tempItem is the specific config found in temp)
 //  unmarshal into temp. This way only the temp is updated during unmarshalling
