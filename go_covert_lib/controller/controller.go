@@ -57,7 +57,7 @@ func (ctr *Controller) handleMessage(data []byte) []byte {
 		return toMessage("error", "Unable to read command: "+err.Error())
 	}
 
-  // Determine the operation to perform
+	// Determine the operation to perform
 	switch cmd.OpCode {
 	case "open":
 		// Close a channel if it is already open

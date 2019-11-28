@@ -51,8 +51,8 @@ func (ctr *Controller) retrieveLayers(data []byte) (*Layers, error) {
 // data is the byte string of the configuration struct JSON
 func (ctr *Controller) retrieveChannel(channelType string, data []byte) (channel.Channel, error) {
 	var (
-		c   channel.Channel
-		err error
+		c        channel.Channel
+		err      error
 		tempconf configData = DefaultConfig()
 	)
 
@@ -60,12 +60,14 @@ func (ctr *Controller) retrieveChannel(channelType string, data []byte) (channel
 	case "Ipv4TCP":
 		var (
 			itConf ipv4TCP.ConfigClient = ipv4TCP.GetDefault()
-			ipCh *ipv4TCP.Channel
+			ipCh   *ipv4TCP.Channel
 		)
 		if err = unmarshalCopyValidate(data, &tempconf,
 			&ctr.config.Channel.Ipv4TCP, &tempconf.Channel.Ipv4TCP, &itConf,
 			func() error { var err error; ipCh, err = ipv4TCP.ToChannel(itConf); return err }); err != nil {
-			if ipCh != nil {	ipCh.Close() }
+			if ipCh != nil {
+				ipCh.Close()
+			}
 		} else {
 			c = ipCh
 		}

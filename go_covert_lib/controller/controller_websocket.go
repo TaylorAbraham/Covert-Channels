@@ -43,7 +43,7 @@ func (ctr *Controller) HandleFunc(w http.ResponseWriter, r *http.Request) {
 loop:
 	for {
 		mt, data, err := ws.ReadMessage()
-	  if err == nil {
+		if err == nil {
 			select {
 			case ctr.wsRecv <- data:
 			case <-ctr.clientStop:

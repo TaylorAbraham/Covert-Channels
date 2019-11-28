@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	Buffer = 0
+	Buffer   = 0
 	Protocol = 1
 )
 

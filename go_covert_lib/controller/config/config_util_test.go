@@ -50,6 +50,11 @@ type s8 struct {
 
 type s9 struct{}
 
+type s10 struct {
+	Prm1 SelectParam
+	Prm2 int
+}
+
 var ptr *s1 = &s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}
 
 var tests []testCase = []testCase{
@@ -92,6 +97,8 @@ var tests []testCase = []testCase{
 	testCase{s8{Prm1: MakeSelect("yes", []string{"yes", "no"}, "")}, true, "Prm2 : Invalid struct field type"},
 
 	testCase{s9{}, false, ""},
+
+	testCase{s10{Prm1: MakeSelect("yes", []string{"yes", "no"}, "")}, true, "Prm2 : Invalid struct field type"},
 }
 
 func TestValidate(t *testing.T) {
