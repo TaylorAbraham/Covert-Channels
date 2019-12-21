@@ -100,32 +100,33 @@ func (ctr *Controller) retrieveProcessor(processorType string, data []byte) (pro
 }
 
 // The following function simplifies unarshalling, validating, and copying the new config, as well as executing a function to create the new channel
-// Five steps:
-//  copy originalItem to tempItem. This way the original is not changed if we find an error when validating (tempItem is the specific config found in temp)
-//  unmarshal into temp. This way only the temp is updated during unmarshalling
-//  copy tempItem into newItem to preserve the correct range values (i.e. the UI can't overwrite them)
-//  Execute the function f to create the channel or processor
-//  validate the newItem (which has been updated with the new values)
+// originalItem, tempItem, and newItem must all be the same config type
+// tempItem must be an instance of a config found in the temp instance
 func unmarshalCopyValidate(data []byte, temp interface{}, originalItem interface{}, tempItem interface{}, newItem interface{}, f func() error) error {
+	//  copy values from originalItem to tempItem. This way the original is not changed if we find an error when validating and if the incoming configuration
+	//  lacks parameters they are replaced with the current values.
+	// (tempItem is the specific config found in temp)
 	if err := config.CopyValue(tempItem, originalItem); err != nil {
 		return err
 	}
+	//  unmarshal into temp. This way only the temp is updated during unmarshalling
 	if err := json.Unmarshal(data, temp); err != nil {
 		return err
 	}
-	// We must copy to ensure that the JSON does not
-	// overwrite any of the range values
+	// copy tempItem into newItem to restore the correct range values (i.e. the UI can't overwrite them)
+	// newItem must have been preinitialized
 	if err := config.CopyValue(newItem, tempItem); err != nil {
 		return err
 	}
+	// validate the newItem (which has been updated with the new values)
 	if err := config.Validate(newItem); err != nil {
 		return err
 	}
-
+	// Execute the function f to create the channel or processor
 	if err := f(); err != nil {
 		return err
 	}
-
+	// If all validation passes, copy newItem values to originalItem values
 	if err := config.CopyValue(originalItem, newItem); err != nil {
 		return err
 	}
