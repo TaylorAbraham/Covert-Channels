@@ -115,12 +115,12 @@ func TestRetrieveWiteMessage(t *testing.T) {
 	conf := checkConfig(read1, DefaultConfig(), t)
 
 	conf.OpCode = "open"
-	conf.Channel.Ipv4TCP.FriendPort.Value = 8090
-	conf.Channel.Ipv4TCP.OriginPort.Value = 8091
+	conf.Channel.Data.Ipv4TCP.FriendPort.Value = 8090
+	conf.Channel.Data.Ipv4TCP.OriginPort.Value = 8091
 	writeTestMsg(write1, conf, t)
 
-	conf.Channel.Ipv4TCP.FriendPort.Value = 8091
-	conf.Channel.Ipv4TCP.OriginPort.Value = 8090
+	conf.Channel.Data.Ipv4TCP.FriendPort.Value = 8091
+	conf.Channel.Data.Ipv4TCP.OriginPort.Value = 8090
 	writeTestMsg(write2, conf, t)
 
 	checkMsgType(read1, "open", "Open success", t)

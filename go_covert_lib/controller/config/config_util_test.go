@@ -120,18 +120,19 @@ type copyTestCase struct {
 	errorMsg string
 }
 
+type ValStruct struct {
+	Value int
+}
+
+type ValStructInter struct {
+	Value interface{}
+}
+
+type NoValStruct struct {
+	NotValue int
+}
+
 func TestCopyValueErrors(t *testing.T) {
-	type ValStruct struct {
-		Value int
-	}
-
-	type ValStructInter struct {
-		Value interface{}
-	}
-
-	type NoValStruct struct {
-		NotValue int
-	}
 
 	type st1 struct {
 		p1 int
@@ -348,5 +349,179 @@ func TestNoUpdateUnlessAllValid(t *testing.T) {
 		t.Errorf("Expected %d: Found %d", s1.P2.NotValue, 2)
 	} else if s1.P3.Value != 3 {
 		t.Errorf("Expected %d: Found %d", s1.P3.Value, 3)
+	}
+}
+
+type copySetTestCase struct {
+	c1       interface{}
+	c2       interface{}
+	fields   []string
+	error    bool
+	errorMsg string
+}
+
+func TestCopySet(t *testing.T) {
+
+	type conf1 struct {
+		P1 ValStruct
+	}
+
+	type conf2 struct {
+		P2 ValStruct
+	}
+
+	type noConf struct {
+		P3 NoValStruct
+	}
+
+	type st1 struct{}
+	type st2 struct {
+		C1 int
+	}
+	type st3 struct {
+		C1 conf1
+	}
+	type st4 struct {
+		C1 conf1
+		C2 conf2
+	}
+	type st5 struct {
+		C1 conf1
+		C2 conf2
+		C3 noConf
+	}
+
+	var (
+		intVal int
+		sVal1  st1
+		sVal2  st2
+		sVal3  st3
+		sVal4  st4
+		sVal5  st5
+	)
+
+	var copyTests []copySetTestCase = []copySetTestCase{
+		copySetTestCase{1, 2, nil, true, "Initial config must be pointer"},
+		copySetTestCase{&intVal, 2, nil, true, "Configs must be struct"},
+		copySetTestCase{sVal1, sVal1, nil, true, "Initial config must be pointer"},
+		copySetTestCase{&sVal1, sVal1, nil, false, ""},
+		copySetTestCase{&sVal1, sVal1, []string{"C1"}, true, "C1 : field not in struct"},
+		copySetTestCase{&sVal2, sVal2, []string{}, false, ""},
+		copySetTestCase{&sVal2, sVal2, nil, true, "C1 : Configs must be struct"},
+		copySetTestCase{&sVal3, sVal3, nil, false, ""},
+		copySetTestCase{&sVal3, sVal3, []string{"C1"}, false, ""},
+		copySetTestCase{&sVal3, sVal3, []string{"C1", "C2"}, true, "C2 : field not in struct"},
+		copySetTestCase{&sVal4, sVal4, nil, false, ""},
+		copySetTestCase{&sVal4, sVal4, []string{"C2"}, false, ""},
+		copySetTestCase{&sVal4, sVal4, []string{"C1", "C2"}, false, ""},
+		copySetTestCase{&sVal3, sVal4, nil, true, "Configs must be same type"},
+		copySetTestCase{&sVal5, sVal5, []string{}, false, ""},
+		copySetTestCase{&sVal5, sVal5, []string{"C1", "C2"}, false, ""},
+		copySetTestCase{&sVal5, sVal5, nil, true, "C3 : P3 : struct must contain Value field"},
+	}
+
+	for i, v := range copyTests {
+		if err := CopyValueSet(v.c1, v.c2, v.fields); v.error && err == nil {
+			t.Errorf("Case %d : Expected error %s", i, v.errorMsg)
+		} else if v.error && err != nil && v.errorMsg != err.Error() {
+			t.Errorf("Case %d : Expected error %s: Found %s", i, v.errorMsg, err.Error())
+		} else if !v.error && err != nil {
+			t.Errorf("Case %d : Expected no error: Found %s", i, err.Error())
+		}
+	}
+}
+
+func TestSetCopy(t *testing.T) {
+
+	type conf1 struct {
+		P1 ValStruct
+	}
+	type conf2 struct {
+		P1 ValStruct
+	}
+
+	type st struct {
+		C1 conf1
+		C2 conf2
+	}
+
+	var s1 st = st{C1: conf1{P1: ValStruct{Value: 1}}, C2: conf2{P1: ValStruct{Value: 1}}}
+	var s2 st = st{C1: conf1{P1: ValStruct{Value: 2}}, C2: conf2{P1: ValStruct{Value: 2}}}
+
+	err := CopyValueSet(&s1, s2, []string{})
+	if err != nil {
+		t.Errorf("Unexpected error %s", err.Error())
+	} else if s1.C1.P1.Value != 1 && s2.C1.P1.Value != 2 {
+		t.Errorf("Expected %d: Found %d", 1, s1.C1.P1.Value)
+	} else if s1.C2.P1.Value != 1 && s2.C2.P1.Value != 2 {
+		t.Errorf("Expected %d: Found %d", 1, s1.C1.P1.Value)
+	}
+
+	err = CopyValueSet(&s1, s2, nil)
+	if err != nil {
+		t.Errorf("Unexpected error %s", err.Error())
+	} else if s1.C1.P1.Value != s2.C1.P1.Value {
+		t.Errorf("Expected %d: Found %d", s2.C1.P1.Value, s1.C1.P1.Value)
+	} else if s1.C2.P1.Value != s2.C2.P1.Value {
+		t.Errorf("Expected %d: Found %d", s2.C2.P1.Value, s1.C1.P1.Value)
+	}
+
+	s1 = st{C1: conf1{P1: ValStruct{Value: 1}}, C2: conf2{P1: ValStruct{Value: 1}}}
+	s2 = st{C1: conf1{P1: ValStruct{Value: 2}}, C2: conf2{P1: ValStruct{Value: 2}}}
+
+	err = CopyValueSet(&s1, s2, []string{"C1"})
+	if err != nil {
+		t.Errorf("Unexpected error %s", err.Error())
+	} else if s1.C1.P1.Value != s2.C1.P1.Value {
+		t.Errorf("Expected %d: Found %d", 1, s1.C1.P1.Value)
+	} else if s1.C2.P1.Value != 1 && s2.C2.P1.Value != 2 {
+		t.Errorf("Expected %d: Found %d", 1, s1.C1.P1.Value)
+	}
+
+	s1 = st{C1: conf1{P1: ValStruct{Value: 1}}, C2: conf2{P1: ValStruct{Value: 1}}}
+	s2 = st{C1: conf1{P1: ValStruct{Value: 2}}, C2: conf2{P1: ValStruct{Value: 2}}}
+
+	err = CopyValueSet(&s1, s2, []string{"C1", "C2"})
+	if err != nil {
+		t.Errorf("Unexpected error %s", err.Error())
+	} else if s1.C1.P1.Value != 1 && s2.C1.P1.Value != 2 {
+		t.Errorf("Expected %d: Found %d", 1, s1.C1.P1.Value)
+	} else if s1.C2.P1.Value != 1 && s2.C2.P1.Value != 2 {
+		t.Errorf("Expected %d: Found %d", 1, s1.C1.P1.Value)
+	}
+}
+
+func TestSetNoUpdateUnlessAllValid(t *testing.T) {
+
+	type conf1 struct {
+		P1 ValStruct
+	}
+	type noConf struct {
+		P2 NoValStruct
+	}
+	type conf2 struct {
+		P1 ValStruct
+	}
+
+	type st struct {
+		C1 conf1
+		C2 noConf
+		C3 conf2
+	}
+
+	var s1 st = st{C1: conf1{P1: ValStruct{Value: 1}}}
+	var s2 st = st{C1: conf1{P1: ValStruct{Value: 2}}}
+
+	err := CopyValueSet(&s1, s2, []string{"C1", "C2"})
+	if err == nil {
+		t.Errorf("Expected error")
+	} else if err.Error() != "C2 : P2 : struct must contain Value field" {
+		t.Errorf("Expected error %s: Found %s", "C2 : P2 : struct must contain Value field", err.Error())
+	} else if s1.C1.P1.Value != 1 {
+		t.Errorf("Expected %d: Found %d", s1.C1.P1.Value, 1)
+	} else if s1.C2.P2.NotValue != 0 {
+		t.Errorf("Expected %d: Found %d", s1.C2.P2.NotValue, 0)
+	} else if s2.C1.P1.Value != 2 {
+		t.Errorf("Expected %d: Found %d", s2.C1.P1.Value, 3)
 	}
 }

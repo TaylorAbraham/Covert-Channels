@@ -24,10 +24,21 @@ func CreateController() (*Controller, error) {
 		wsSend:     make(chan []byte),
 		wsRecv:     make(chan []byte),
 	}
-	if err := config.ValidateConfigSet(ctr.config.Processor); err != nil {
+	// Validate the default values
+	if err := config.ValidateConfigSet(ctr.config.Default.Processor); err != nil {
 		return nil, err
 	}
-	if err := config.ValidateConfigSet(ctr.config.Channel); err != nil {
+	if err := config.ValidateConfigSet(ctr.config.Default.Channel); err != nil {
+		return nil, err
+	}
+	// Validate all of the active processor configs
+	for i := range ctr.config.Processors {
+		if err := config.ValidateConfigSet(ctr.config.Processors[i].Data); err != nil {
+			return nil, err
+		}
+	}
+	// Validate the active channel config
+	if err := config.ValidateConfigSet(ctr.config.Channel.Data); err != nil {
 		return nil, err
 	}
 	go ctr.webReceiveLoop()
@@ -38,15 +49,28 @@ func CreateController() (*Controller, error) {
 // A default config for the system and all Covert Channels
 func DefaultConfig() configData {
 	return configData{
-		OpCode:        "config",
-		ChannelType:   "Ipv4TCP",
-		ProcessorType: "None",
-		Processor: processorData{
-			None: none.GetDefault(),
+		OpCode: "config",
+		Default: defaultConfig{
+			Processor: defaultProcessor(),
+			Channel:   defaultChannel(),
 		},
-		Channel: channelData{
-			Ipv4TCP: ipv4TCP.GetDefault(),
+		Processors: []processorConfig{},
+		Channel: channelConfig{
+			Type: "Ipv4TCP",
+			Data: defaultChannel(),
 		},
+	}
+}
+
+func defaultProcessor() processorData {
+	return processorData{
+		None: none.GetDefault(),
+	}
+}
+
+func defaultChannel() channelData {
+	return channelData{
+		Ipv4TCP: ipv4TCP.GetDefault(),
 	}
 }
 
@@ -116,39 +140,51 @@ func (ctr *Controller) handleConfig() ([]byte, error) {
 }
 
 // Handle the write command
-func (ctr *Controller) handleWrite(data []byte) error {
-	var mt messageType
-	if err := json.Unmarshal(data, &mt); err != nil {
+func (ctr *Controller) handleWrite(b []byte) error {
+	var (
+		mt   messageType
+		err  error
+		data []byte
+	)
+	if err = json.Unmarshal(b, &mt); err != nil {
 		return err
 	}
 	if ctr.layers == nil {
 		return errors.New("Channel closed")
 	}
-	if b, err := ctr.layers.processor.Process([]byte(mt.Message)); err != nil {
-		return errors.New("Unable to process outgoing message: " + err.Error())
-	} else {
-		if n, err := ctr.layers.channel.Send(b, nil); err != nil {
-			return errors.New("Write fail: Wrote " + strconv.FormatUint(n, 10) + "bytes out of " + strconv.FormatUint(uint64(len(b)), 10) + ": " + err.Error())
-		} else {
-			return nil
+
+	data = []byte(mt.Message)
+	for i := range ctr.layers.processors {
+		if data, err = ctr.layers.processors[i].Process(data); err != nil {
+			return errors.New("Unable to process outgoing message: " + err.Error())
 		}
+	}
+	if n, err := ctr.layers.channel.Send(data, nil); err != nil {
+		return errors.New("Write fail: Wrote " + strconv.FormatUint(n, 10) + "bytes out of " + strconv.FormatUint(uint64(len(b)), 10) + ": " + err.Error())
+	} else {
+		return nil
 	}
 }
 
 // Handle a read operation
 func (ctr *Controller) handleRead() ([]byte, error) {
 
-	var buffer [1024]byte
+	var (
+		buffer [1024]byte
+		data   []byte
+	)
 
 	if n, err := ctr.layers.channel.Receive(buffer[:], nil); err != nil {
 		return nil, errors.New("Read fail: Read " + strconv.FormatUint(n, 10) + " bytes out of " + strconv.FormatUint(uint64(len(buffer)), 10) + " available bytes: " + err.Error())
 	} else {
-		if data, err := ctr.layers.processor.Unprocess(buffer[:n]); err != nil {
-			return nil, errors.New("Unable to unprocess incoming message: " + err.Error())
-		} else {
-			return data, nil
+		data = buffer[:n]
+		for i := len(ctr.layers.processors) - 1; i >= 0; i-- {
+			if data, err = ctr.layers.processors[i].Unprocess(data); err != nil {
+				return nil, errors.New("Unable to unprocess incoming message: " + err.Error())
+			}
 		}
 	}
+	return data, nil
 }
 
 // Loop for repeatedly reading from  any open Covert Channel

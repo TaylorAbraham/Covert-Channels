@@ -106,31 +106,6 @@ func MakeBool(value bool, description string) BoolParam {
 	return BoolParam{"bool", value, description}
 }
 
-// This function analysis a struct containing several config structs
-// to ensure that they are all valid
-func ValidateConfigSet(c interface{}) error {
-	v := reflect.ValueOf(c)
-	// We support pointers
-	if v.Kind() == reflect.Ptr {
-		v = v.Elem()
-	}
-	t := v.Type()
-	if t.Kind() != reflect.Struct {
-		return errors.New("Config is not a struct")
-	}
-	for i := 0; i < t.NumField(); i++ {
-		fieldName := t.Field(i).Name
-		if v.Field(i).CanInterface() {
-			if err := Validate(v.Field(i).Interface()); err != nil {
-				return err
-			}
-		} else {
-			return errors.New(fieldName + " : Could not retrieve unexported field")
-		}
-	}
-	return nil
-}
-
 func Validate(c interface{}) error {
 	v := reflect.ValueOf(c)
 	// We support pointers
@@ -159,8 +134,91 @@ func Validate(c interface{}) error {
 	return nil
 }
 
+// This function analysis a struct containing several config structs
+// to ensure that they are all valid
+func ValidateConfigSet(c interface{}) error {
+	v := reflect.ValueOf(c)
+	// We support pointers
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	t := v.Type()
+	if t.Kind() != reflect.Struct {
+		return errors.New("Config is not a struct")
+	}
+	for i := 0; i < t.NumField(); i++ {
+		fieldName := t.Field(i).Name
+		if v.Field(i).CanInterface() {
+			if err := Validate(v.Field(i).Interface()); err != nil {
+				return err
+			}
+		} else {
+			return errors.New(fieldName + " : Could not retrieve unexported field")
+		}
+	}
+	return nil
+}
+
 // Copy Every param value from c2 to c1
 func CopyValue(c1 interface{}, c2 interface{}) error {
+	p1 := reflect.ValueOf(c1)
+	v2 := reflect.ValueOf(c2)
+
+	if p1.Kind() != reflect.Ptr {
+		return errors.New("Initial config must be pointer")
+	}
+
+	v1 := p1.Elem()
+	// We support pointers as the second interface for convenience
+	if v2.Kind() == reflect.Ptr {
+		v2 = v2.Elem()
+	}
+	if err := validateCopy(v1, v2); err != nil {
+		return err
+	}
+	performCopy(v1, v2)
+	return nil
+}
+
+func validateCopy(v1 reflect.Value, v2 reflect.Value) error {
+	if v1.Type() != v2.Type() {
+		return errors.New("Configs must be same type")
+	}
+	t := v1.Type()
+	if t.Kind() != reflect.Struct {
+		return errors.New("Configs must be struct")
+	}
+	for i := 0; i < t.NumField(); i++ {
+		fieldName := t.Field(i).Name
+		f1 := v1.Field(i)
+		f2 := v2.Field(i)
+		if t.Field(i).Type.Kind() != reflect.Struct {
+			return errors.New(fieldName + " : must be struct")
+		}
+		if _, ok := t.Field(i).Type.FieldByName("Value"); !ok {
+			return errors.New(fieldName + " : struct must contain Value field")
+		}
+		if !f1.FieldByName("Value").CanSet() {
+			return errors.New(fieldName + " : struct Value field must be settable")
+		}
+		if f1.FieldByName("Value").Type() != f2.FieldByName("Value").Type() {
+			return errors.New(fieldName + " : struct Value field must contain compatible types")
+		}
+	}
+	return nil
+}
+
+func performCopy(v1 reflect.Value, v2 reflect.Value) {
+	t := v1.Type()
+	for i := 0; i < t.NumField(); i++ {
+		f1 := v1.Field(i)
+		f2 := v2.Field(i)
+		f1.FieldByName("Value").Set(f2.FieldByName("Value"))
+	}
+}
+
+// Copy the set of config param values betweem the config structs
+func CopyValueSet(c1 interface{}, c2 interface{}, fields []string) error {
 	p1 := reflect.ValueOf(c1)
 	v2 := reflect.ValueOf(c2)
 
@@ -182,30 +240,27 @@ func CopyValue(c1 interface{}, c2 interface{}) error {
 	if t.Kind() != reflect.Struct {
 		return errors.New("Configs must be struct")
 	}
-	// We run the loop twice, the first time to validate the structure
-	for i := 0; i < t.NumField(); i++ {
-		fieldName := t.Field(i).Name
-		f1 := v1.Field(i)
-		f2 := v2.Field(i)
-		if t.Field(i).Type.Kind() != reflect.Struct {
-			return errors.New(fieldName + " : must be struct")
-		}
-		if _, ok := t.Field(i).Type.FieldByName("Value"); !ok {
-			return errors.New(fieldName + " : struct must contain Value field")
-		}
-		if !f1.FieldByName("Value").CanSet() {
-			return errors.New(fieldName + " : struct Value field must be settable")
-		}
-		if f1.FieldByName("Value").Type() != f2.FieldByName("Value").Type() {
-			return errors.New(fieldName + " : struct Value field must contain compatible types")
+	// If nil is supplied we copy all fields
+	if fields == nil {
+		for i := 0; i < t.NumField(); i++ {
+			fields = append(fields, t.Field(i).Name)
 		}
 	}
-	// The second time is to update the fields
-	// This way no updates happen unless all updates are valid
-	for i := 0; i < t.NumField(); i++ {
-		f1 := v1.Field(i)
-		f2 := v2.Field(i)
-		f1.FieldByName("Value").Set(f2.FieldByName("Value"))
+	for _, fname := range fields {
+		f1 := v1.FieldByName(fname)
+		f2 := v2.FieldByName(fname)
+		if f1.IsValid() || f2.IsValid() {
+			if err := validateCopy(f1, f2); err != nil {
+				return errors.New(fname + " : " + err.Error())
+			}
+		} else {
+			return errors.New(fname + " : field not in struct")
+		}
+	}
+	for _, fname := range fields {
+		f1 := v1.FieldByName(fname)
+		f2 := v2.FieldByName(fname)
+		performCopy(f1, f2)
 	}
 	return nil
 }

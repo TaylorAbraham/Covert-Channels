@@ -26,18 +26,26 @@ type messageType struct {
 	Message string
 }
 
-type configType struct {
-	OpCode        string
-	ChannelType   string
-	ProcessorType string
+type defaultConfig struct {
+	Processor processorData
+	Channel   channelData
 }
 
 type configData struct {
-	OpCode        string
-	ChannelType   string
-	ProcessorType string
-	Processor     processorData
-	Channel       channelData
+	OpCode     string
+	Default    defaultConfig
+	Processors []processorConfig
+	Channel    channelConfig
+}
+
+type processorConfig struct {
+	Type string
+	Data processorData
+}
+
+type channelConfig struct {
+	Type string
+	Data channelData
 }
 
 type channelData struct {
@@ -49,8 +57,8 @@ type processorData struct {
 }
 
 type Layers struct {
-	processor processor.Processor
-	channel   channel.Channel
+	processors []processor.Processor
+	channel    channel.Channel
 
 	// Chans for handling closing of the covert channel
 	readClose     chan interface{}
