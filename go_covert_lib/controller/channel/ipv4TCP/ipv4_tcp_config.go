@@ -23,18 +23,18 @@ type ConfigClient struct {
 
 func GetDefault() ConfigClient {
 	return ConfigClient{
-		FriendIP:     config.MakeIPV4("127.0.0.1", "Your Friends IP Address"),
-		OriginIP:     config.MakeIPV4("127.0.0.1", "Your IP Address"),
-		BounceIP:     config.MakeIPV4("127.0.0.1", "The Bouncer IP Address, if any"),
-		FriendPort:   config.MakeU16(8123, [2]uint16{0, 65535}, "Your Friends Port"),
-		OriginPort:   config.MakeU16(8124, [2]uint16{0, 65535}, "Your Port"),
-		BouncePort:   config.MakeU16(0, [2]uint16{0, 65535}, "The Bouncer Port, if any"),
-		Bounce:       config.MakeBool(false, "Whether or not we are in bounce mode"),
-		Delimiter:    config.MakeSelect("protocol", []string{"buffer", "protocol"}, "The delimiter to use for deciding when to return after having received a message"),
-		Encoder:      config.MakeSelect("sequence", []string{"sequence"}, "The encoding mechanism to use for this protocol"),
-		GetDelay:     config.MakeSelect("none", []string{"none"}, "The function to use for inter byte delay"),
-		WriteTimeout: config.MakeU64(0, [2]uint64{0, 65535}, "The Write Timeout in milliseconds"),
-		ReadTimeout:  config.MakeU64(0, [2]uint64{0, 65535}, "The Read Timeout in milliseconds"),
+		FriendIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "Your Friends IP Address"}),
+		OriginIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "Your IP Address"}),
+		BounceIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "The Bouncer IP Address, if any"}),
+		FriendPort:   config.MakeU16(8123, [2]uint16{0, 65535}, config.Display{Description: "Your Friends Port"}),
+		OriginPort:   config.MakeU16(8124, [2]uint16{0, 65535}, config.Display{Description: "Your Port"}),
+		BouncePort:   config.MakeU16(0, [2]uint16{0, 65535}, config.Display{Description: "The Bouncer Port, if any"}),
+		Bounce:       config.MakeBool(false, config.Display{Description: "Whether or not we are in bounce mode"}),
+		Delimiter:    config.MakeSelect("protocol", []string{"buffer", "protocol"}, config.Display{Description: "The delimiter to use for deciding when to return after having received a message"}),
+		Encoder:      config.MakeSelect("sequence", []string{"sequence"}, config.Display{Description: "The encoding mechanism to use for this protocol"}),
+		GetDelay:     config.MakeSelect("none", []string{"none"}, config.Display{Description: "The function to use for inter byte delay"}),
+		WriteTimeout: config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The Write Timeout in milliseconds"}),
+		ReadTimeout:  config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The Read Timeout in milliseconds"}),
 	}
 }
 

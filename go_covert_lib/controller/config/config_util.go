@@ -10,39 +10,45 @@ type param interface {
 	Validate() error
 }
 
-type U16Param struct {
-	Type        string
-	Value       uint16
-	Range       [2]uint16
+type Display struct {
 	Description string
+	Name        string
+	Group       string
+}
+
+type U16Param struct {
+	Type    string
+	Value   uint16
+	Range   [2]uint16
+	Display Display
 }
 
 type U64Param struct {
-	Type        string
-	Value       uint64
-	Range       [2]uint64
-	Description string
+	Type    string
+	Value   uint64
+	Range   [2]uint64
+	Display Display
 }
 
 type BoolParam struct {
-	Type        string
-	Value       bool
-	Description string
+	Type    string
+	Value   bool
+	Display Display
 }
 
 type SelectParam struct {
-	Type        string
-	Value       string
-	Range       []string
-	Description string
+	Type    string
+	Value   string
+	Range   []string
+	Display Display
 }
 
 type IPV4Param struct {
 	Type string
 	// To support the range of IP addresses, this is a string
 	// To convert to the proper IP address that can be used later on use GetValue
-	Value       string
-	Description string
+	Value   string
+	Display Display
 }
 
 func (p U16Param) Validate() error {
@@ -90,20 +96,20 @@ func (p *IPV4Param) GetValue() ([4]byte, error) {
 	return buf, errors.New("Invalid IPV4 address")
 }
 
-func MakeIPV4(value string, description string) IPV4Param {
-	return IPV4Param{"ipv4", value, description}
+func MakeIPV4(value string, display Display) IPV4Param {
+	return IPV4Param{"ipv4", value, display}
 }
-func MakeU16(value uint16, rng [2]uint16, description string) U16Param {
-	return U16Param{"u16", value, rng, description}
+func MakeU16(value uint16, rng [2]uint16, display Display) U16Param {
+	return U16Param{"u16", value, rng, display}
 }
-func MakeU64(value uint64, rng [2]uint64, description string) U64Param {
-	return U64Param{"u64", value, rng, description}
+func MakeU64(value uint64, rng [2]uint64, display Display) U64Param {
+	return U64Param{"u64", value, rng, display}
 }
-func MakeSelect(value string, rng []string, description string) SelectParam {
-	return SelectParam{"select", value, rng, description}
+func MakeSelect(value string, rng []string, display Display) SelectParam {
+	return SelectParam{"select", value, rng, display}
 }
-func MakeBool(value bool, description string) BoolParam {
-	return BoolParam{"bool", value, description}
+func MakeBool(value bool, display Display) BoolParam {
+	return BoolParam{"bool", value, display}
 }
 
 func Validate(c interface{}) error {
