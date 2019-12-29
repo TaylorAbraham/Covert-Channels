@@ -6,15 +6,15 @@ import (
 )
 
 var sconf Config = Config{
-	FriendIP:   [4]byte{127, 0, 0, 1},
-	OriginIP:   [4]byte{127, 0, 0, 1},
+	FriendIP:          [4]byte{127, 0, 0, 1},
+	OriginIP:          [4]byte{127, 0, 0, 1},
 	FriendReceivePort: 8080,
 	OriginReceivePort: 8081,
 }
 
 var rconf Config = Config{
-	FriendIP:   [4]byte{127, 0, 0, 1},
-	OriginIP:   [4]byte{127, 0, 0, 1},
+	FriendIP:          [4]byte{127, 0, 0, 1},
+	OriginIP:          [4]byte{127, 0, 0, 1},
 	FriendReceivePort: 8081,
 	OriginReceivePort: 8080,
 }
@@ -104,6 +104,7 @@ func TestReceiveOverflow(t *testing.T) {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
 }
+
 /*
 func TestReceiveNone(t *testing.T) {
 

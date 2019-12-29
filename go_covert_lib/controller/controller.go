@@ -72,7 +72,7 @@ func defaultProcessor() processorData {
 func defaultChannel() channelData {
 	return channelData{
 		Ipv4tcp: ipv4tcp.GetDefault(),
-		Tcp: tcp.GetDefault(),
+		Tcp:     tcp.GetDefault(),
 	}
 }
 
