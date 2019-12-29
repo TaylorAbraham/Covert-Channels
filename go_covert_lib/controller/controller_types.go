@@ -2,7 +2,8 @@ package controller
 
 import (
 	"./channel"
-	"./channel/ipv4TCP"
+	"./channel/ipv4tcp"
+	"./channel/tcp"
 	"./processor"
 	"./processor/none"
 	"github.com/gorilla/websocket"
@@ -49,7 +50,8 @@ type channelConfig struct {
 }
 
 type channelData struct {
-	Ipv4TCP ipv4TCP.ConfigClient
+	Ipv4tcp ipv4tcp.ConfigClient
+	Tcp     tcp.ConfigClient
 }
 
 type processorData struct {

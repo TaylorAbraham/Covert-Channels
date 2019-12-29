@@ -2,7 +2,8 @@ package controller
 
 import (
 	"./channel"
-	"./channel/ipv4TCP"
+	"./channel/ipv4tcp"
+	"./channel/tcp"
 	"./config"
 	"./processor"
 	"./processor/none"
@@ -90,8 +91,12 @@ func (ctr *Controller) retrieveChannel(cconf channelConfig) (channel.Channel, *c
 	}
 
 	switch newConf.Type {
-	case "Ipv4TCP":
-		if c, err = ipv4TCP.ToChannel(newConf.Data.Ipv4TCP); err != nil {
+	case "Ipv4tcp":
+		if c, err = ipv4tcp.ToChannel(newConf.Data.Ipv4tcp); err != nil {
+			return nil, nil, err
+		}
+	case "Tcp":
+		if c, err = tcp.ToChannel(newConf.Data.Tcp); err != nil {
 			return nil, nil, err
 		}
 	default:

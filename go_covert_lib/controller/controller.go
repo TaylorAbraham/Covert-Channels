@@ -1,7 +1,8 @@
 package controller
 
 import (
-	"./channel/ipv4TCP"
+	"./channel/ipv4tcp"
+	"./channel/tcp"
 	"./config"
 	"./processor/none"
 	"encoding/json"
@@ -56,7 +57,7 @@ func DefaultConfig() configData {
 		},
 		Processors: []processorConfig{},
 		Channel: channelConfig{
-			Type: "Ipv4TCP",
+			Type: "Ipv4tcp",
 			Data: defaultChannel(),
 		},
 	}
@@ -70,7 +71,8 @@ func defaultProcessor() processorData {
 
 func defaultChannel() channelData {
 	return channelData{
-		Ipv4TCP: ipv4TCP.GetDefault(),
+		Ipv4tcp: ipv4tcp.GetDefault(),
+		Tcp: tcp.GetDefault(),
 	}
 }
 
