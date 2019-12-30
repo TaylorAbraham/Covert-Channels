@@ -2,6 +2,7 @@ package tcp
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -47,10 +48,10 @@ type Channel struct {
 	conf     Config
 	rawConn  *ipv4.RawConn
 	listener net.Listener
-	recvChan chan data
+	recvChan chan packet
 	// A channel for receiving TCP acks from the socket we are sending messages to
 	// This allows us to find the Ack and Seq numbers
-	replyChan chan data
+	replyChan chan packet
 	cancel    chan bool
 }
 
@@ -80,7 +81,7 @@ func (id *IDEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte) (ip
 // that this function may one day be used for validating
 // the data structure
 func MakeChannel(conf Config) (*Channel, error) {
-	c := &Channel{conf: conf, cancel: make(chan bool), recvChan: make(chan data, 1024), replyChan: make(chan data, 1024)}
+	c := &Channel{conf: conf, cancel: make(chan bool), recvChan: make(chan packet, 1024), replyChan: make(chan packet, 1024)}
 
 	if c.conf.Encoder == nil {
 		c.conf.Encoder = &IDEncoder{}
@@ -123,6 +124,48 @@ func (c *Channel) Close() error {
 	return c.listener.Close()
 }
 
+// A convenience function to handle the two timeout scenarios.
+// Incoming packets are handled by a separate go routine.
+// When a new packet arrives it is sent on a channel, the receiver then
+// validates it. Thus, a timeout could occur if no packet is received over the
+// go channel in enough time or if there are packets coming along the go channel
+// but they are not valid packets. We check for both cases here.
+// Set timeout to zero for no timeout
+func waitPacket(pktChan chan packet, timeout time.Duration, f func(p packet) (bool, error), cancel chan bool) error {
+	var startTime time.Time = time.Now()
+	if timeout == 0 {
+		for {
+			select {
+			case p := <-pktChan:
+				ok, err := f(p)
+				// Exit if done (i.e. a valid packet is received and processed) or an error is received
+				if ok || err != nil {
+					return err
+				}
+			case <-cancel:
+				return errors.New("Cancel")
+			}
+		}
+	} else {
+		for {
+			select {
+			case p := <-pktChan:
+				ok, err := f(p)
+				// Exit if done (i.e. a valid packet is received and processed) or an error is received
+				if ok || err != nil {
+					return err
+				} else if time.Now().Sub(startTime) > timeout {
+					return errors.New("Timeout")
+				}
+			case <-time.After(timeout):
+				return errors.New("Timeout")
+			case <-cancel:
+				return errors.New("Cancel")
+			}
+		}
+	}
+}
+
 func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 
 	for {
@@ -143,7 +186,6 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 			friendPort uint16
 			handshake  byte = 0
 			n          uint64
-			valid      bool
 			fin        bool
 		)
 
@@ -159,51 +201,29 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 
 		defer conn.Close()
 
-		// If we have not set a timeout
-		if c.conf.ReadTimeout == 0 {
-			for {
-				select {
-				case d := <-c.recvChan:
-					n, handshake, valid, fin, err = c.handleReceivedPacket(d, data, n, friendPort, handshake)
-					// If there is an error or the fin packet has been received we return
-					if err != nil || fin {
-						return n, err
-					}
-				case <-c.cancel:
-					return n, errors.New("Receive cancelled")
-				}
-			}
-		} else {
-			// Timeouts can occur for two reasons.
-			// Either no packet arrives within the timeout period,
-			// or a packet arrives but it is not a valid part of the message
-			// We cover the first case with the time.After in the select
-			// The second is by measuring time an invalid packet arrives since the
-			// previous valid packet
-			var tValid time.Time = time.Now()
-			for {
-				select {
-				case d := <-c.recvChan:
-					n, handshake, valid, fin, err = c.handleReceivedPacket(d, data, n, friendPort, handshake)
-					// If there is an error or the fin packet has been received we return
-					if err != nil || fin {
-						return n, err
-					} else if valid {
-						tValid = time.Now()
-					} else if time.Now().Sub(tValid) > c.conf.ReadTimeout {
-						return n, errors.New("Timeout Error")
-					}
-				case <-time.After(c.conf.ReadTimeout):
-					return n, errors.New("Timeout Error")
-				case <-c.cancel:
-					return n, errors.New("Receive cancelled")
-				}
+		// Exit when the fin packet is received
+		for !fin {
+			// Wait until a valid packet is received
+			// This way we measure the time between valid packets.
+			// If no valid packet is received within timeout of the previous valid packet
+			// we exit with an error
+			err = waitPacket(c.recvChan, c.conf.ReadTimeout, func(p packet) (bool, error) {
+				var (
+					valid bool
+					err   error
+				)
+				n, handshake, valid, fin, err = c.handleReceivedPacket(p, data, n, friendPort, handshake)
+				return valid, err
+			}, c.cancel)
+			if err != nil {
+				return n, err
 			}
 		}
+		return n, nil
 	}
 }
 
-func (c *Channel) handleReceivedPacket(d data, data []byte, n uint64, friendPort uint16, handshake byte) (uint64, byte, bool, bool, error) {
+func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPort uint16, handshake byte) (uint64, byte, bool, bool, error) {
 
 	var (
 		valid         bool // Was this packet a valid part of the message
@@ -212,21 +232,21 @@ func (c *Channel) handleReceivedPacket(d data, data []byte, n uint64, friendPort
 		receivedBytes []byte
 	)
 	// Verify that the source port is the one associated with this connection
-	if layers.TCPPort(friendPort) != d.tcph.SrcPort {
+	if layers.TCPPort(friendPort) != p.tcph.SrcPort {
 		// Incorrect source Port
-	} else if handshake == 0 && d.tcph.SYN {
+	} else if handshake == 0 && p.tcph.SYN {
 		// three way handshake SYN
 		handshake = 1
 		valid = true
-	} else if handshake == 1 && d.tcph.ACK {
+	} else if handshake == 1 && p.tcph.ACK {
 		// three way handshake ACK
 		//          ack = d.tcph.Ack
 		//          seq = d.tcph.Seq
 		handshake = 2
-	} else if d.tcph.RST {
+	} else if p.tcph.RST {
 		// If rst packet is sent we quit
 		err = errors.New("RST packet")
-	} else if d.tcph.SYN {
+	} else if p.tcph.SYN {
 		// During testing I found that a hung receiver connection
 		// could still be dialed a second time from the sender
 		// I.e. the tcp dial operation could be performed in the sender method
@@ -238,13 +258,13 @@ func (c *Channel) handleReceivedPacket(d data, data []byte, n uint64, friendPort
 		err = errors.New("Duplicate SYN packet")
 	} else if handshake != 2 {
 		// Not started
-	} else if d.tcph.FIN {
+	} else if p.tcph.FIN {
 		valid = true
 		// FIN - done message
 		fin = true
 	} else {
 		// Normal transmission packet
-		if receivedBytes, err = c.conf.Encoder.GetByte(d.ipv4h, d.tcph); err != nil {
+		if receivedBytes, err = c.conf.Encoder.GetByte(p.ipv4h, p.tcph); err != nil {
 			err = errors.New("Decode Error")
 		} else {
 			valid = true
@@ -267,6 +287,25 @@ func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
 	nd := net.Dialer{
 		Timeout: c.conf.WriteTimeout,
 	}
+
+	ctx, cancelFn := context.WithCancel(context.Background())
+	// A channel to be closed after message sending is over
+	// to end the goroutine used for cancelling the dial
+	doneMsg := make(chan byte)
+	// If the cancel method is called for the covert channel, we want to
+	// exit the dial operation. This goroutine waits for the cancel channel
+	// to be closed and cancels the context if so
+	go func() {
+		select {
+		case <-c.cancel:
+			cancelFn()
+		// doneDial ensures that this go routine always exits
+		case <-doneMsg:
+		}
+	}()
+	// we close the doneMsg channel to ensure that the go routine always exits
+	defer close(doneMsg)
+
 	// We must empty the reply chan of all messages
 	// That way we will be able to take in new packets
 	// when after starting the dial and be able to determine the
@@ -281,7 +320,7 @@ empty:
 	}
 
 	// DialContext
-	conn, err := nd.Dial("tcp4", (&net.TCPAddr{IP: c.conf.FriendIP[:], Port: int(c.conf.FriendReceivePort)}).String())
+	conn, err := nd.DialContext(ctx, "tcp4", (&net.TCPAddr{IP: c.conf.FriendIP[:], Port: int(c.conf.FriendReceivePort)}).String())
 	if err != nil {
 		return 0, err
 	}
@@ -304,23 +343,16 @@ empty:
 	}
 
 	// Wait for the SYN/ACK packet
-wait:
-	for {
-		select {
-		case d := <-c.replyChan:
-			// Verify that this packet was sent to the correct address
-			if layers.TCPPort(originPort) != d.tcph.DstPort {
-				continue
-			} else if d.tcph.ACK && d.tcph.SYN {
-				seq = d.tcph.Ack
-				ack = d.tcph.Seq + 1
-				break wait
-			}
-		case <-time.After(time.Second * 5):
-			return 0, errors.New("ACK packet not received")
-		case <-c.cancel:
-			return 0, errors.New("Receive cancelled")
+	err = waitPacket(c.replyChan, time.Second*5, func(p packet) (bool, error) {
+		if layers.TCPPort(originPort) == p.tcph.DstPort && p.tcph.ACK && p.tcph.SYN {
+			seq = p.tcph.Ack
+			ack = p.tcph.Seq + 1
+			return true, nil
 		}
+		return false, nil
+	}, c.cancel)
+	if err != nil {
+		return 0, err
 	}
 
 	for len(rem) > 0 {
@@ -423,7 +455,7 @@ func (c *Channel) readLoop() {
 		tcph := layers.TCP{}
 		if err = tcph.DecodeFromBytes(p, gopacket.NilDecodeFeedback); err == nil {
 			if bytes.Equal(h.Src.To4(), c.conf.OriginIP[:]) {
-				var pckChan chan data
+				var pckChan chan packet
 				// Packets may be received as ACKs to our sent messages or as packets sent to this channel
 				// We must route accordingly
 				if tcph.SrcPort == layers.TCPPort(c.conf.FriendReceivePort) {
@@ -439,19 +471,19 @@ func (c *Channel) readLoop() {
 
 				select {
 				// If our buffered chan is full, empty it
-				case pckChan <- data{ipv4h: *h, tcph: tcph}:
+				case pckChan <- packet{ipv4h: *h, tcph: tcph}:
 				case <-time.After(time.Millisecond * 200):
 					// If the channel buffer is full we empty the first item and add
 					// the current item to the end
 					<-pckChan
-					pckChan <- data{ipv4h: *h, tcph: tcph}
+					pckChan <- packet{ipv4h: *h, tcph: tcph}
 				}
 			}
 		}
 	}
 }
 
-type data struct {
+type packet struct {
 	ipv4h ipv4.Header
 	tcph  layers.TCP
 }
