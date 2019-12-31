@@ -12,7 +12,7 @@ type ConfigClient struct {
 	FriendReceivePort config.U16Param
 	OriginReceivePort config.U16Param
 	Encoder           config.SelectParam
-	WriteTimeout      config.U64Param
+	DialTimeout       config.U64Param
 	ReadTimeout       config.U64Param
 }
 
@@ -23,8 +23,8 @@ func GetDefault() ConfigClient {
 		FriendReceivePort: config.MakeU16(8123, [2]uint16{0, 65535}, config.Display{Description: "Your friends tcp receive Port. Their send port is chosen randomly."}),
 		OriginReceivePort: config.MakeU16(8124, [2]uint16{0, 65535}, config.Display{Description: "Your tcp receive Port. Send port is chosen randomly."}),
 		Encoder:           config.MakeSelect("id", []string{"id"}, config.Display{Description: "The encoding mechanism to use for this protocol."}),
-		WriteTimeout:      config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The write timeout in milliseconds."}),
-		ReadTimeout:       config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The read timeout in milliseconds."}),
+		DialTimeout:       config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The dial timeout for the 3 way handshake in the write method in milliseconds. Zero for no timeout."}),
+		ReadTimeout:       config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The intra-packet read timeout for the receive method in milliseconds. Zero for no timeout."}),
 	}
 }
 
@@ -44,8 +44,8 @@ func ToChannel(cc ConfigClient) (*Channel, error) {
 	c.FriendReceivePort = cc.FriendReceivePort.Value
 	c.OriginReceivePort = cc.OriginReceivePort.Value
 
-	c.WriteTimeout = time.Duration(cc.WriteTimeout.Value)
-	c.ReadTimeout = time.Duration(cc.ReadTimeout.Value)
+	c.DialTimeout = time.Duration(cc.DialTimeout.Value) * time.Millisecond
+	c.ReadTimeout = time.Duration(cc.ReadTimeout.Value) * time.Millisecond
 
 	switch cc.Encoder.Value {
 	case "id":

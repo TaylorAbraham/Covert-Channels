@@ -59,8 +59,8 @@ func ToChannel(cc ConfigClient) (*Channel, error) {
 	c.BouncePort = cc.BouncePort.Value
 	c.Bounce = cc.Bounce.Value
 
-	c.WriteTimeout = time.Duration(cc.WriteTimeout.Value)
-	c.ReadTimeout = time.Duration(cc.ReadTimeout.Value)
+	c.WriteTimeout = time.Duration(cc.WriteTimeout.Value) * time.Millisecond
+	c.ReadTimeout = time.Duration(cc.ReadTimeout.Value) * time.Millisecond
 
 	switch cc.Delimiter.Value {
 	case "buffer":

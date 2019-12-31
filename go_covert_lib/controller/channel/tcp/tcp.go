@@ -39,7 +39,12 @@ type Config struct {
 	FriendReceivePort uint16
 	OriginReceivePort uint16
 	Encoder           TcpEncoder
-	WriteTimeout      time.Duration
+  // The TCP dial timeout for the three way handshake in the the send method
+	DialTimeout       time.Duration
+  // The intra-packet read timeout.
+  // The receive method will block until a three way handshake
+  // is complete and the listener returns, and will only exit with a
+  // read timeout if the intra-packet delay is too large.
 	ReadTimeout       time.Duration
 }
 
@@ -169,12 +174,16 @@ func waitPacket(pktChan chan packet, timeout time.Duration, f func(p packet) (bo
 func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 
 	for {
+    // Check if the covert channel has been closed
 		select {
 		case <-c.cancel:
 			return 0, errors.New("Receive Cancelled")
 		default:
 		}
 
+    // Accept an incoming TCP connection
+    // This allows this covert channel to make use of a proper 3-way TCP handshake,
+    // to better obscure the covert communication that is occurring.
 		conn, err := c.listener.Accept()
 		if err != nil {
 			return 0, errors.New("Accept Error")
@@ -183,12 +192,18 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 		var (
 			//    ack uint32
 			//    seq uint32
+      // The TCP port used by our Friend IP in this covert message
 			friendPort uint16
+      // When we read packets with the raw socket we read the packets of the 3-way handshake
+      // This variable is used to keep track of the stage in the 3-way handshake
 			handshake  byte = 0
-			n          uint64
-			fin        bool
+			n          uint64   // the number of bytes received
+			fin        bool     // if the FIN packet has arrived
 		)
 
+    // Check that the TCP connection is being established from the correct
+    // peer IP address
+    // If not, we close the connection and continue the receive loop
 		if tcpAddr, ok := conn.RemoteAddr().(*net.TCPAddr); !ok {
 			conn.Close()
 			continue
@@ -196,6 +211,9 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 			conn.Close()
 			continue
 		} else {
+      // We have the correct IP address.
+      // We must now record the port associated with that address to
+      // restrict incoming packets to that port, and not a different port on the same machine.
 			friendPort = uint16(tcpAddr.Port)
 		}
 
@@ -223,6 +241,15 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 	}
 }
 
+// Once the three way handshake is complete we must read the incoming packets
+// Since any packet could arrive, we must distinguish incomming packets
+// that are part of the three way handshake and covert message from those that are not.
+// The handshake variable allows use to keep track of the three way handshake packets.
+// Once it reaches 2 the three way handshake is done and the rest of the packets (from the correct port)
+// form the message. A packet with the FIN flag set indicates the end of transmission (due to the closed
+// TCP connection). RST or second SYN packets are interpreted as an error in the connection and
+// cause the Receive method to abort.
+// We return a valid flag to indicate if the packet forms part of the TCP covert communication (three way handshake, message, or FIN packet )
 func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPort uint16, handshake byte) (uint64, byte, bool, bool, error) {
 
 	var (
@@ -257,7 +284,8 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 		// but resetting the receive call to ensure that subsequent messages can be read
 		err = errors.New("Duplicate SYN packet")
 	} else if handshake != 2 {
-		// Not started
+		// Covert message not started since we have not yet reached the packets
+    // making up the three way handshake
 	} else if p.tcph.FIN {
 		valid = true
 		// FIN - done message
@@ -285,7 +313,7 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
 
 	nd := net.Dialer{
-		Timeout: c.conf.WriteTimeout,
+		Timeout: c.conf.DialTimeout,
 	}
 
 	ctx, cancelFn := context.WithCancel(context.Background())
@@ -344,6 +372,9 @@ empty:
 
 	// Wait for the SYN/ACK packet
 	err = waitPacket(c.replyChan, time.Second*5, func(p packet) (bool, error) {
+    // We empty packets from the channel until we get the SYN/ACK packet
+    // from the 3-way handshake. This packet can be used to retrieve
+    // the seq and ack numbers
 		if layers.TCPPort(originPort) == p.tcph.DstPort && p.tcph.ACK && p.tcph.SYN {
 			seq = p.tcph.Ack
 			ack = p.tcph.Seq + 1
@@ -355,6 +386,7 @@ empty:
 		return 0, err
 	}
 
+  // Send each packet
 	for len(rem) > 0 {
 		var (
 			ipv4h ipv4.Header         = createIPHeader(c.conf.OriginIP, c.conf.FriendIP)
@@ -436,11 +468,17 @@ func createCM(sip, dip [4]byte) ipv4.ControlMessage {
 	}
 }
 
+// A loop that continuously receives packets across the raw socket
+// Incoming packets are analysed to confirm that they
+// have the expected source IP address (Our friend's IP address)
+// Based on the port numbers, we
 func (c *Channel) readLoop() {
 	var buf [1024]byte
 	for {
 		h, p, _, err := c.rawConn.ReadFrom(buf[:])
 
+    // Once the covert channel is closed we
+    // must exit this read loop
 		select {
 		case <-c.cancel:
 			close(c.recvChan)
@@ -454,17 +492,19 @@ func (c *Channel) readLoop() {
 
 		tcph := layers.TCP{}
 		if err = tcph.DecodeFromBytes(p, gopacket.NilDecodeFeedback); err == nil {
-			if bytes.Equal(h.Src.To4(), c.conf.OriginIP[:]) {
+			if bytes.Equal(h.Src.To4(), c.conf.FriendIP[:]) {
 				var pckChan chan packet
 				// Packets may be received as ACKs to our sent messages or as packets sent to this channel
 				// We must route accordingly
-				if tcph.SrcPort == layers.TCPPort(c.conf.FriendReceivePort) {
-					// If it is from the port we send to, then it must be an ACK to a packet we sent
-					pckChan = c.replyChan
-				} else if tcph.DstPort == layers.TCPPort(c.conf.OriginReceivePort) {
-					// Otherwise it is potentially from the sender to this channel
+        if tcph.DstPort == layers.TCPPort(c.conf.OriginReceivePort) {
+					// If the port number is to our receive port, then it is potentially
+          // an incomming message.
 					// We confirm by checking the port number based on the port of the open connection
+          // in the Receive method
 					pckChan = c.recvChan
+				} else if tcph.SrcPort == layers.TCPPort(c.conf.FriendReceivePort) {
+					// Otherwise, ff the packet is from our friend's receive port, then it is likely an ACK to a packet we sent
+					pckChan = c.replyChan
 				} else {
 					continue
 				}
