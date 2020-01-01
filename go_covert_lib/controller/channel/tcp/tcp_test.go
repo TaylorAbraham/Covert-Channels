@@ -3,6 +3,7 @@ package tcp
 import (
 	"bytes"
 	"math/rand"
+	"sort"
 	"testing"
 	"time"
 )
@@ -107,9 +108,9 @@ func TestReceiveOverflow(t *testing.T) {
 	}
 }
 
-func randomString() string {
+func randomString(maxLen int) string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	l := r.Int() & 0xFF
+	l := r.Int() & maxLen
 	buf := []byte{}
 	for i := 0; i < l; i++ {
 		buf = append(buf, byte(r.Int()&0xFF))
@@ -131,6 +132,8 @@ func TestMultipleSendTimeout(t *testing.T) {
 	runMultiTest(t, sconfCopy, rconfCopy)
 }
 
+// Test that multiple messages can be sent before a
+// the receive calls its Receive method
 func runMultiTest(t *testing.T, sconf, rconf Config) {
 
 	sch, err := MakeChannel(sconf)
@@ -143,30 +146,51 @@ func runMultiTest(t *testing.T, sconf, rconf Config) {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
 
-	var (
+	type receiveOutput struct {
+		data []byte
 		rErr error
-		nr   uint64
+	}
+
+	var (
 		// Test with message with many characters and with 0 characters
-		inputs [][]byte = [][]byte{}
+		inputs   []string
+		received chan receiveOutput = make(chan receiveOutput)
 	)
+
 	// Randomly generate input strings
 	for i := 0; i < 32; i++ {
-		inputs = append(inputs, []byte(randomString()))
+		inputs = append(inputs, randomString(0xFF))
+		// Test simultaneous receives
+		go func() {
+			var data [1024]byte
+			var rOut receiveOutput
+			nr, rErr := rch.Receive(data[:], nil)
+			rOut.rErr = rErr
+			rOut.data = data[:nr]
+			received <- rOut
+		}()
 	}
 
 	for _, input := range inputs {
-		sendAndCheck(t, input, sch)
+		sendAndCheck(t, []byte(input), sch)
 	}
 
-	for _, input := range inputs {
-		var data [1024]byte
-		nr, rErr = rch.Receive(data[:], nil)
-		if rErr != nil {
-			t.Errorf("err = '%s'; want nil", rErr.Error())
-		} else if bytes.Compare(data[:nr], input) != 0 {
-			t.Errorf("Received '%s'; want '%s'", string(data[:nr]), string(input))
-			t.Error(data[:nr])
-			t.Error(input)
+	var outputs []string
+
+	for i := 0; i < 32; i++ {
+		rOut := <-received
+		if rOut.rErr != nil {
+			t.Errorf("err = '%s'; want nil", rOut.rErr)
+		}
+		outputs = append(outputs, string(rOut.data))
+	}
+
+	sort.Strings(outputs)
+	sort.Strings(inputs)
+
+	for i := range inputs {
+		if outputs[i] != inputs[i] {
+			t.Errorf("Received '%s'; want '%s'", outputs[i], inputs[i])
 		}
 	}
 
@@ -175,6 +199,79 @@ func runMultiTest(t *testing.T, sconf, rconf Config) {
 	}
 	if err := rch.Close(); err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
+	}
+}
+
+// Test that no panic errors occur
+// with large numbers of messages being sent
+func TestStress(t *testing.T) {
+	sconfCopy := sconf
+	sconfCopy.DialTimeout = time.Second
+	sconfCopy.ReadTimeout = time.Second
+	rconfCopy := rconf
+	rconfCopy.DialTimeout = time.Second
+	rconfCopy.ReadTimeout = time.Second
+
+	sch, err := MakeChannel(sconfCopy)
+	if err != nil {
+		t.Errorf("err = '%s'; want nil", err.Error())
+	}
+
+	rch, err := MakeChannel(rconfCopy)
+	if err != nil {
+		t.Errorf("err = '%s'; want nil", err.Error())
+	}
+
+	var (
+		// Test with message with many characters and with 0 characters
+		inputs [][]byte = [][]byte{}
+	)
+	var done chan int = make(chan int)
+
+	// Randomly generate input strings
+	// Send more messages than can be stored simultaneously
+	for i := 0; i < 64; i++ {
+		var s string = randomString(0x2FF)
+		// Send some strings that are longer than the message buffer size
+		inputs = append(inputs, []byte(s))
+
+		// simultaneous reads should be safe
+		go func(i int) {
+			// Choose a length between the buffer size of the go channels
+			// that hold the incoming message and the largest possible random string
+			// specified above
+			var data [700]byte
+			data[0] = byte(i)
+			rch.Receive(data[:], nil)
+			done <- i
+		}(i)
+	}
+
+	for _, input := range inputs {
+		sch.Send(input, nil)
+	}
+
+	if err := sch.Close(); err != nil {
+		t.Errorf("err = '%s'; want nil", err.Error())
+	}
+	if err := rch.Close(); err != nil {
+		t.Errorf("err = '%s'; want nil", err.Error())
+	}
+
+	var dones map[int]bool = make(map[int]bool)
+
+	for i := 0; i < 64; i++ {
+		select {
+		case ri := <-done:
+			dones[ri] = true
+		case <-time.After(time.Second * 15):
+		}
+	}
+
+	for i := 0; i < 64; i++ {
+		if _, ok := dones[i]; !ok {
+			t.Errorf("Goroutine %d did not complete", i)
+		}
 	}
 }
 

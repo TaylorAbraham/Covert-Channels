@@ -268,7 +268,7 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 		// Check if the covert channel has been closed
 		case <-c.cancel:
 			return 0, errors.New("Receive Cancelled")
-		case <-time.After(time.Second * 5):
+		case <-time.After(c.conf.DialTimeout):
 			return 0, errors.New("Accept timeout")
 		}
 	}
@@ -311,7 +311,12 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 	// after resources for packets from this friendport
 	// are dropped
 	// This issue is discussed and handled further in the packetRouter loop
-	defer func() { c.dropPortChan <- ac.friendPort }()
+	defer func() {
+		select {
+		case c.dropPortChan <- ac.friendPort:
+		case <-c.cancel:
+		}
+	}()
 
 	// Exit when the fin packet is received
 	for !fin {
@@ -698,7 +703,9 @@ loop:
 			friendPort := uint16(p.tcph.SrcPort)
 			if _, ok := pktMap[friendPort]; ok {
 				// we have already stored packets for this friend port
-				// We will send the packet
+				// or are waiting for packets on this friend port (by
+				// creating the channel with the requestPortChan in the Receive method)
+				// We will send the packet on this go channel
 			} else if len(pktMap) < maxAccept && p.tcph.SYN {
 				// If a go channel has not already been setup for this friend port,
 				// we check if the initial packet is a SYN packet
@@ -732,7 +739,39 @@ loop:
 			// and the go channel for receiving such packets may be
 			// dropped to make room for other incoming messages from
 			// different friend ports
-			delete(pktMap, friendPort)
+
+			// First, we check that there are no syn packets in the queue for this
+			// friend port.
+			// Although the sender should not generally send messages using the same
+			// port multiple times in quick succession, it is theoretically possible
+			// to do so, and we want to avoid dropping the second message if possible
+			// Empty the go channel of all packets, checking for SYN packets
+
+			var (
+				hasSYN  bool
+				newChan chan packet = make(chan packet, maxStorePacket)
+			)
+		dropLoop:
+			for {
+				select {
+				case p := <-pktMap[friendPort]:
+					if p.tcph.SYN {
+						hasSYN = true
+					}
+					if hasSYN {
+						newChan <- p
+					}
+				default:
+					break dropLoop
+				}
+			}
+			// If a SYN packet was found, replace the empty channel with
+			// the new channel that has stored all packets from the SYN packet onward
+			if hasSYN {
+				pktMap[friendPort] = newChan
+			} else {
+				delete(pktMap, friendPort)
+			}
 		case <-c.cancel:
 			break loop
 		}
