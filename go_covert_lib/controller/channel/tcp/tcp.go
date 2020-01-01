@@ -129,7 +129,7 @@ func (id *IDEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte) (ip
 	ipv4h.ID = (r.Int() & 0xFF00) | int(buf[0])
 	// Based on my experimental results, the raw socket will override
 	// an IP ID of zero. We use this loop to ensure that the ID is something
-	// other than zero
+	// other than zero so that our real data is transmitted
 	for ipv4h.ID == 0 {
 		ipv4h.ID = (r.Int() & 0xFF00) | int(buf[0])
 	}
