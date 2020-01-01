@@ -672,6 +672,59 @@ func (c *Channel) acceptLoop() {
 	}
 }
 
+type pktStore struct {
+	hasRead bool
+	pktChan chan packet
+}
+
+func dropUnused(pktMap map[uint16]*pktStore) bool {
+
+	// Everytime a new packet arrives it is added to the pktMap
+	// in packetRouter so that it may be read by the Receive method
+	// when appropriate.
+	// This raises a problem, as packet that are not part of a valid
+	// message may arrive but be stored in the pktMap
+	// If no successful dial (i.e. three way handshake) is associated
+	// with the friendPort of those packets, those packets may never be read by a Receive
+	// since it will not receive a corresponding connection from the acceptLoop
+	// To handle this situation, this function is available to remove unused packets
+	// if a new packet (with a new friendPort) arrives and there is not enough room in
+
+	var storedLen map[uint16]int = make(map[uint16]int)
+
+	var minPort uint16
+	var minLen int
+
+	for storedPort := range pktMap {
+		if !pktMap[storedPort].hasRead {
+			storedLen[storedPort] = len(pktMap[storedPort].pktChan)
+			// We assign the minLen to guarantee that the below for
+			// loop always includes a valid port key
+			// This length will be used as a baseline for calculating
+			// the actual minimum length
+			minLen = storedLen[storedPort]
+		}
+	}
+
+	if 0 == len(storedLen) {
+		// If all all of the pktStores have been read from, we must drop the incoming packet because
+		// the go channel is part of an ongoing connection
+		// If not, we are permitted to drop one of the packet stores to make room.
+		return false
+	} else {
+		// we drop the pktStore with he fewest stored packets in the go channel,
+		// as that is more likely to represent an incomplete message
+		for k, v := range storedLen {
+			if v <= minLen {
+				minLen = v
+				minPort = k
+			}
+		}
+		delete(pktMap, minPort)
+		return true
+	}
+}
+
 // Messages could be received from multiple friend ports in quick succession
 // if the send method is called repeatedly.
 // This method takes the incoming packets from the recvChan
@@ -683,9 +736,10 @@ func (c *Channel) acceptLoop() {
 // the desired friend port
 func (c *Channel) packetRouter() {
 	var (
-		pktMap map[uint16]chan packet = make(map[uint16]chan packet)
-		l      *log.Logger            = log.New(os.Stderr, "", log.Flags())
+		pktMap map[uint16]*pktStore = make(map[uint16]*pktStore)
+		l      *log.Logger          = log.New(os.Stderr, "", log.Flags())
 	)
+
 loop:
 	for {
 		select {
@@ -693,11 +747,18 @@ loop:
 		// packets coming from the desired friend port
 		case request := <-c.requestPortChan:
 			if _, ok := pktMap[request.friendPort]; ok {
-			} else if len(pktMap) < maxAccept {
-				pktMap[request.friendPort] = make(chan packet, maxStorePacket)
+				pktMap[request.friendPort].hasRead = true
+				request.reply <- pktMap[request.friendPort].pktChan
+			} else if len(pktMap) < maxAccept || dropUnused(pktMap) {
+				pktMap[request.friendPort] = &pktStore{
+					hasRead: true,
+					pktChan: make(chan packet, maxStorePacket),
+				}
+				request.reply <- pktMap[request.friendPort].pktChan
+			} else {
+				// else packetChan is nil
+				request.reply <- nil
 			}
-			// else packetChan is nil
-			request.reply <- pktMap[request.friendPort]
 		case p := <-c.recvChan:
 
 			friendPort := uint16(p.tcph.SrcPort)
@@ -706,7 +767,8 @@ loop:
 				// or are waiting for packets on this friend port (by
 				// creating the channel with the requestPortChan in the Receive method)
 				// We will send the packet on this go channel
-			} else if len(pktMap) < maxAccept && p.tcph.SYN {
+			} else if p.tcph.SYN {
+
 				// If a go channel has not already been setup for this friend port,
 				// we check if the initial packet is a SYN packet
 				// All TCP messages should start with the SYN packet of a three way handshake,
@@ -715,21 +777,30 @@ loop:
 				// arrive after the Receive method has terminated and the go channel has been removed
 				// by the dropPortChan below
 				// It helps prevent us from having trailing resources.
-				pktMap[friendPort] = make(chan packet, maxStorePacket)
-			} else if !p.tcph.SYN {
+
+				// If we have room to store this packet go channel or we can clear space for the channel
+				if len(pktMap) < maxAccept || dropUnused(pktMap) {
+					pktMap[friendPort] = &pktStore{
+						hasRead: false,
+						pktChan: make(chan packet, maxStorePacket),
+					}
+				} else {
+					// There is not room to store the packet,
+					// since all of he go channels are actively
+					// being read by a Receive method
+					l.Println("Too many connections: Dropped Packet")
+					continue
+				}
+			} else {
 				// If a SYN packet is not the first packet in the stream, we drop it silently
 				// Such a situation is very common based on experimental results,
 				// so it is not worth reporting
-				continue
-			} else {
-				// There is not room to store the packet
-				l.Println("Too many connections: Dropped Packet")
 				continue
 			}
 
 			// Send the packet on the channel
 			select {
-			case pktMap[friendPort] <- p:
+			case pktMap[friendPort].pktChan <- p:
 			case <-time.After(time.Millisecond * 200):
 				l.Println("Too many packets: Dropped Packet")
 			}
@@ -748,18 +819,21 @@ loop:
 			// Empty the go channel of all packets, checking for SYN packets
 
 			var (
-				hasSYN  bool
-				newChan chan packet = make(chan packet, maxStorePacket)
+				hasSYN   bool
+				newStore pktStore = pktStore{
+					hasRead: false,
+					pktChan: make(chan packet, maxStorePacket),
+				}
 			)
 		dropLoop:
 			for {
 				select {
-				case p := <-pktMap[friendPort]:
+				case p := <-pktMap[friendPort].pktChan:
 					if p.tcph.SYN {
 						hasSYN = true
 					}
 					if hasSYN {
-						newChan <- p
+						newStore.pktChan <- p
 					}
 				default:
 					break dropLoop
@@ -768,7 +842,7 @@ loop:
 			// If a SYN packet was found, replace the empty channel with
 			// the new channel that has stored all packets from the SYN packet onward
 			if hasSYN {
-				pktMap[friendPort] = newChan
+				pktMap[friendPort] = &newStore
 			} else {
 				delete(pktMap, friendPort)
 			}
