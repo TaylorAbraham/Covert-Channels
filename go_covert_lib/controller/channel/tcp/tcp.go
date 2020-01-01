@@ -16,7 +16,13 @@ import (
 )
 
 const maxAccept = 32
-const maxStorePacket = 256
+
+// Based on experimental results,
+// a raw socket can hold approximately 300 packets
+// before they start to get dropped.
+// This number was chosen based on that estimate of how
+// many packets should be stored
+const maxStorePacket = 512
 
 type packet struct {
 	ipv4h ipv4.Header
@@ -121,6 +127,13 @@ func (id *IDEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte) (ip
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	ipv4h.ID = (r.Int() & 0xFF00) | int(buf[0])
+	// Based on my experimental results, the raw socket will override
+	// an IP ID of zero. We use this loop to ensure that the ID is something
+	// other than zero
+	for ipv4h.ID == 0 {
+		ipv4h.ID = (r.Int() & 0xFF00) | int(buf[0])
+	}
+
 	return ipv4h, tcph, buf[1:], nil
 }
 
@@ -502,6 +515,9 @@ func createTCPHeader(tcph layers.TCP, seq, ack uint32, sip, dip [4]byte, sport, 
 	tcph.Seq = seq
 	tcph.Ack = ack
 
+	// These packets must have the ACK flag set as they are a part of regular messages
+	tcph.ACK = true
+
 	// Based on a preliminary investigation of my machine (running Ubuntu 18.04),
 	// SYN packets always seem to have a window of 65495
 	tcph.Window = 65495
@@ -554,7 +570,10 @@ func createCM(sip, dip [4]byte) ipv4.ControlMessage {
 // have the expected source IP address (Our friend's IP address)
 // Based on the port numbers, we
 func (c *Channel) readLoop() {
-	var buf [1024]byte
+	var (
+		buf [1024]byte
+		l   *log.Logger = log.New(os.Stderr, "", log.Flags())
+	)
 	for {
 		h, p, _, err := c.rawConn.ReadFrom(buf[:])
 
@@ -589,13 +608,9 @@ func (c *Channel) readLoop() {
 				}
 
 				select {
-				// If our buffered chan is full, empty it
 				case pckChan <- packet{ipv4h: *h, tcph: tcph}:
 				case <-time.After(time.Millisecond * 200):
-					// If the channel buffer is full we empty the first item and add
-					// the current item to the end
-					<-pckChan
-					pckChan <- packet{ipv4h: *h, tcph: tcph}
+					l.Println("Too many packets: Dropped Packet")
 				}
 			}
 		}
@@ -606,6 +621,7 @@ func (c *Channel) readLoop() {
 // verify if they are to the correct friend IP address,
 // and if so, extract the friend port and send it to the receive method
 func (c *Channel) acceptLoop() {
+	var l *log.Logger = log.New(os.Stderr, "", log.Flags())
 	for {
 		select {
 		case <-c.cancel:
@@ -644,6 +660,7 @@ func (c *Channel) acceptLoop() {
 			select {
 			case c.acceptChan <- acceptedConn{conn: conn, friendPort: uint16(tcpAddr.Port)}:
 			default:
+				l.Println("Too many connections: Dropped TCP Connection")
 				conn.Close()
 			}
 		}
@@ -660,8 +677,10 @@ func (c *Channel) acceptLoop() {
 // to retrieve a go channel that will provide packets received from
 // the desired friend port
 func (c *Channel) packetRouter() {
-	var pktMap map[uint16]chan packet = make(map[uint16]chan packet)
-	var l *log.Logger = log.New(os.Stderr, "", log.Flags())
+	var (
+		pktMap map[uint16]chan packet = make(map[uint16]chan packet)
+		l      *log.Logger            = log.New(os.Stderr, "", log.Flags())
+	)
 loop:
 	for {
 		select {
@@ -670,7 +689,7 @@ loop:
 		case request := <-c.requestPortChan:
 			if _, ok := pktMap[request.friendPort]; ok {
 			} else if len(pktMap) < maxAccept {
-				pktMap[request.friendPort] = make(chan packet, 256)
+				pktMap[request.friendPort] = make(chan packet, maxStorePacket)
 			}
 			// else packetChan is nil
 			request.reply <- pktMap[request.friendPort]
@@ -689,7 +708,7 @@ loop:
 				// arrive after the Receive method has terminated and the go channel has been removed
 				// by the dropPortChan below
 				// It helps prevent us from having trailing resources.
-				pktMap[friendPort] = make(chan packet, 256)
+				pktMap[friendPort] = make(chan packet, maxStorePacket)
 			} else if !p.tcph.SYN {
 				// If a SYN packet is not the first packet in the stream, we drop it silently
 				// Such a situation is very common based on experimental results,
@@ -705,8 +724,7 @@ loop:
 			select {
 			case pktMap[friendPort] <- p:
 			case <-time.After(time.Millisecond * 200):
-				<-pktMap[friendPort]
-				pktMap[friendPort] <- p
+				l.Println("Too many packets: Dropped Packet")
 			}
 		case friendPort := <-c.dropPortChan:
 			// Once the Receive method is done, it no longer
