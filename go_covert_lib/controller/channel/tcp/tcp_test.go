@@ -190,7 +190,9 @@ func runMultiTest(t *testing.T, sconf, rconf Config) {
 
 	for i := range inputs {
 		if outputs[i] != inputs[i] {
-			t.Errorf("Received '%s'; want '%s'", outputs[i], inputs[i])
+			t.Errorf("At index %d, received '%s'; want '%s'", i, outputs[i], inputs[i])
+			t.Error([]byte(outputs[i]))
+			t.Error([]byte(inputs[i]))
 		}
 	}
 

@@ -38,10 +38,15 @@ type acceptedConn struct {
 type portRequest struct {
 	// The friendPort retrieved from the open TCP connection
 	// in the Receive method
-	friendPort uint16
+	port uint16
 	// A go channel to allow the portRouter
 	// to provide the desired packet go channel to the Receive method
 	reply chan chan packet
+}
+
+type dropRequest struct {
+	port     uint16
+	keepNext bool
 }
 
 // This covert channel is formed by two peers.
@@ -146,12 +151,12 @@ func MakeChannel(conf Config) (*Channel, error) {
 		receiveRouter: portRouter{
 			pktRecvChan:     make(chan packet, 1024),
 			requestPortChan: make(chan portRequest),
-			dropPortChan:    make(chan uint16),
+			dropPortChan:    make(chan dropRequest),
 		},
 		sendRouter: portRouter{
 			pktRecvChan:     make(chan packet, 1024),
 			requestPortChan: make(chan portRequest),
-			dropPortChan:    make(chan uint16),
+			dropPortChan:    make(chan dropRequest),
 		},
 	}
 
@@ -183,6 +188,8 @@ func MakeChannel(conf Config) (*Channel, error) {
 	// based on their src port
 	go c.receiveRouter.run(true, c.cancel)
 
+	go c.sendRouter.run(false, c.cancel)
+
 	return c, nil
 }
 
@@ -197,7 +204,7 @@ type portRouter struct {
 	// A channel to signal to the portRouter loop that
 	// a given message has been completely received from the given friend port,
 	// and that the storage space for that friend port may be dropped
-	dropPortChan chan uint16
+	dropPortChan chan dropRequest
 }
 
 func (c *Channel) Close() error {
@@ -308,7 +315,7 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 	// after resources for packets from this friendport
 	// are dropped
 	// This issue is discussed and handled further in the portRouter loop
-	defer c.receiveRouter.donePktChan(ac.friendPort, c.cancel)
+	defer c.receiveRouter.donePktChan(ac.friendPort, true, c.cancel)
 
 	// Exit when the fin packet is received
 	for !fin {
@@ -425,19 +432,6 @@ func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
 	// we close the doneMsg channel to ensure that the go routine always exits
 	defer close(doneMsg)
 
-	// We must empty the reply chan of all messages
-	// That way we will be able to take in new packets
-	// when after starting the dial and be able to determine the
-	// initial sequence and acknowledgement numbers
-empty:
-	for {
-		select {
-		case <-c.sendRouter.pktRecvChan:
-		default:
-			break empty
-		}
-	}
-
 	// DialContext
 	conn, err := nd.DialContext(ctx, "tcp4", (&net.TCPAddr{IP: c.conf.FriendIP[:], Port: int(c.conf.FriendReceivePort)}).String())
 	if err != nil {
@@ -461,8 +455,14 @@ empty:
 		originPort = uint16(tcpAddr.Port)
 	}
 
+	recvPktChan, err := c.sendRouter.getPktChan(originPort, c.cancel)
+	if err != nil {
+		return 0, err
+	}
+	defer c.sendRouter.donePktChan(originPort, false, c.cancel)
+
 	// Wait for the SYN/ACK packet
-	err = waitPacket(c.sendRouter.pktRecvChan, time.Second*5, func(p packet) (bool, error) {
+	err = waitPacket(recvPktChan, time.Second*5, func(p packet) (bool, error) {
 		// We empty packets from the channel until we get the SYN/ACK packet
 		// from the 3-way handshake. This packet can be used to retrieve
 		// the seq and ack numbers
@@ -693,15 +693,15 @@ loop:
 		// The Receive method requests a channel to report
 		// packets coming from the desired friend port
 		case request := <-r.requestPortChan:
-			if _, ok := pktMap[request.friendPort]; ok {
-				pktMap[request.friendPort].hasRead = true
-				request.reply <- pktMap[request.friendPort].pktChan
+			if _, ok := pktMap[request.port]; ok {
+				pktMap[request.port].hasRead = true
+				request.reply <- pktMap[request.port].pktChan
 			} else if len(pktMap) < maxAccept || dropUnused(pktMap) {
-				pktMap[request.friendPort] = &pktStore{
+				pktMap[request.port] = &pktStore{
 					hasRead: true,
 					pktChan: make(chan packet, maxStorePacket),
 				}
-				request.reply <- pktMap[request.friendPort].pktChan
+				request.reply <- pktMap[request.port].pktChan
 			} else {
 				// else packetChan is nil
 				request.reply <- nil
@@ -755,10 +755,35 @@ loop:
 			case <-time.After(time.Millisecond * 200):
 				l.Println("Too many packets: Dropped Packet")
 			}
-		case friendPort := <-r.dropPortChan:
-			if _, ok := pktMap[friendPort]; !ok {
+		case drop := <-r.dropPortChan:
+
+			// Under normal operation it should not be possible to
+			// attempt to drop a port that has already been dropped,
+			// since the request of a port and dropping always occur together
+			// in a single Receive or Send method.
+			// Depending on how TCP works exactly, it is conceivable that
+			// this could arrise for the Receive method. If two subsequent
+			// dials are performed from the same friend port (which should theoretically
+			// be prohibited by the host machine, but could be circumvented by a crafty
+			// attacket), it is possible that
+			// the same port and IP numbers for a TCP connection could be accepted twice
+			// (this possibility depends on how this machine runs its TCP listener),
+			// leading to two Receive methods running for the same friend port
+			// Since I am not 100 % sure that such a scenario is impossible, we check
+			// here to prevent nil pointer errors below
+			if _, ok := pktMap[drop.port]; !ok {
 				continue
 			}
+
+			// if the keepNext flag is false, we just drop the full channel
+			// Otherwise we will employ the algorithm shown below
+			// to keep any packets after the first stored SYN packet
+			// so as to potentially hold on to a second message that is arriving
+			if !drop.keepNext {
+				delete(pktMap, drop.port)
+				continue
+			}
+
 			// Once the Receive method is done, it no longer
 			// needs to receive packets from the given friend port
 			// and the go channel for receiving such packets may be
@@ -782,7 +807,7 @@ loop:
 		dropLoop:
 			for {
 				select {
-				case p := <-pktMap[friendPort].pktChan:
+				case p := <-pktMap[drop.port].pktChan:
 					if p.tcph.SYN {
 						hasSYN = true
 					}
@@ -796,9 +821,9 @@ loop:
 			// If a SYN packet was found, replace the empty channel with
 			// the new channel that has stored all packets from the SYN packet onward
 			if hasSYN {
-				pktMap[friendPort] = &newStore
+				pktMap[drop.port] = &newStore
 			} else {
-				delete(pktMap, friendPort)
+				delete(pktMap, drop.port)
 			}
 		case <-cancel:
 			break loop
@@ -861,8 +886,8 @@ func (r *portRouter) getPktChan(port uint16, cancel chan bool) (chan packet, err
 	var reply chan chan packet = make(chan chan packet)
 	select {
 	case r.requestPortChan <- portRequest{
-		friendPort: port,
-		reply:      reply,
+		port:  port,
+		reply: reply,
 	}:
 	case <-cancel:
 		return nil, errors.New("Receive Cancelled")
@@ -883,9 +908,9 @@ func (r *portRouter) getPktChan(port uint16, cancel chan bool) (chan packet, err
 }
 
 // Function to drop the resources accosiated with storing packets from a given port
-func (r *portRouter) donePktChan(port uint16, cancel chan bool) {
+func (r *portRouter) donePktChan(port uint16, keepNext bool, cancel chan bool) {
 	select {
-	case r.dropPortChan <- port:
+	case r.dropPortChan <- dropRequest{port: port, keepNext: keepNext}:
 	case <-cancel:
 	}
 }
