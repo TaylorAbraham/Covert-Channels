@@ -39,7 +39,7 @@ type portRequest struct {
 	// The friendPort retrieved from the open TCP connection
 	// in the Receive method
 	friendPort uint16
-	// A go channel to allow the packetRouter
+	// A go channel to allow the portRouter
 	// to provide the desired packet go channel to the Receive method
 	reply chan chan packet
 }
@@ -95,19 +95,13 @@ type Channel struct {
 	// guarantee that the Close() signal is only mediated by this channel
 	cancel chan bool
 
-	// The following go channels must not be closed
-	recvChan chan packet
 	// A go channel for receiving TCP acks from the socket we are sending messages to
 	// This allows us to find the Ack and Seq numbers
-	replyChan  chan packet
+	replyChan     chan packet
+	receiveRouter portRouter
+	sendRouter    portRouter
+
 	acceptChan chan acceptedConn
-	// Allows the receive method to request a go channel for receiving from the
-	// desired friend port
-	requestPortChan chan portRequest
-	// A channel to signal to the packetRouter loop that
-	// a given message has been completely received from the given friend port,
-	// and that the storage space for that friend port may be dropped
-	dropPortChan chan uint16
 }
 
 type TcpEncoder interface {
@@ -145,13 +139,21 @@ func (id *IDEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte) (ip
 func MakeChannel(conf Config) (*Channel, error) {
 	c := &Channel{conf: conf,
 		cancel: make(chan bool),
-		// Buffered channels are used to limit the possible data that may be stored
-		recvChan:  make(chan packet, 1024),
-		replyChan: make(chan packet, 1024),
+
 		// Only 32 connections can be accepted before they begin to be dropped
-		acceptChan:      make(chan acceptedConn, maxAccept),
-		requestPortChan: make(chan portRequest),
-		dropPortChan:    make(chan uint16)}
+		acceptChan: make(chan acceptedConn, maxAccept),
+
+		receiveRouter: portRouter{
+			pktRecvChan:     make(chan packet, 1024),
+			requestPortChan: make(chan portRequest),
+			dropPortChan:    make(chan uint16),
+		},
+		sendRouter: portRouter{
+			pktRecvChan:     make(chan packet, 1024),
+			requestPortChan: make(chan portRequest),
+			dropPortChan:    make(chan uint16),
+		},
+	}
 
 	if c.conf.Encoder == nil {
 		c.conf.Encoder = &IDEncoder{}
@@ -174,14 +176,28 @@ func MakeChannel(conf Config) (*Channel, error) {
 	}
 
 	// A loop to read incoming packets and routing them to the appropriate destination
-	go c.readLoop()
+	go c.readLoop(c.receiveRouter.pktRecvChan, c.sendRouter.pktRecvChan)
 	// A loop to accept incoming tcp connection
 	go c.acceptLoop()
 	// A loop to separate out incoming packets for the Receive method (i.e. not the replies to the Send method)
-	// based on their friend IP
-	go c.packetRouter()
+	// based on their src port
+	go c.receiveRouter.run(true, c.cancel)
 
 	return c, nil
+}
+
+type portRouter struct {
+	// pktRecvChan must be a buffered channel to
+	// allow the readLoop to keep reading even while the router processes
+	// sorting the packets by port
+	pktRecvChan chan packet
+	// Allows a caller to request a go channel for receiving from the
+	// desired friend port
+	requestPortChan chan portRequest
+	// A channel to signal to the portRouter loop that
+	// a given message has been completely received from the given friend port,
+	// and that the storage space for that friend port may be dropped
+	dropPortChan chan uint16
 }
 
 func (c *Channel) Close() error {
@@ -276,33 +292,14 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 	defer ac.conn.Close()
 
 	// Once a TCP connection is accepted,
-	// we must retrieve a go channel from the packetRouter loop
+	// we must retrieve a go channel from the portRouter loop
 	// that only provides packets from the desired friendPort
-	// This code requests the specific friendPort
-	// by providing a go channel to allow packetRouter to
-	// reply with the go packet channel
-	var reply chan chan packet = make(chan chan packet)
-	select {
-	case c.requestPortChan <- portRequest{
-		friendPort: ac.friendPort,
-		reply:      reply,
-	}:
-	case <-c.cancel:
-		return 0, errors.New("Receive Cancelled")
+	recvPktChan, err := c.receiveRouter.getPktChan(ac.friendPort, c.cancel)
+	if err != nil {
+		return 0, err
 	}
 
-	var recvPktChan chan packet
-	// If the above select successfully sent a request on requestPortChan, then we will
-	// then we will always get a reply on the reply go chan
-	// There is thus no need to select on the cancel go channel
-	recvPktChan = <-reply
-	// If nil is returned, it means there was not sufficient space
-	// to store a go channel for this friend port
-	if recvPktChan == nil {
-		return 0, errors.New("Insufficent space to receive packets from this friend port")
-	}
-
-	// Once we are done receiving the message we let the packetRouter loop
+	// Once we are done receiving the message we let the portRouter loop
 	// know that it no longer needs to store space for this friend port
 	// This will be called before the ac.conn.Close() defer above
 	// due to go defer execution order
@@ -310,13 +307,8 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 	// increases the risk that trailing packets could arrive
 	// after resources for packets from this friendport
 	// are dropped
-	// This issue is discussed and handled further in the packetRouter loop
-	defer func() {
-		select {
-		case c.dropPortChan <- ac.friendPort:
-		case <-c.cancel:
-		}
-	}()
+	// This issue is discussed and handled further in the portRouter loop
+	defer c.receiveRouter.donePktChan(ac.friendPort, c.cancel)
 
 	// Exit when the fin packet is received
 	for !fin {
@@ -440,7 +432,7 @@ func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
 empty:
 	for {
 		select {
-		case <-c.replyChan:
+		case <-c.sendRouter.pktRecvChan:
 		default:
 			break empty
 		}
@@ -470,7 +462,7 @@ empty:
 	}
 
 	// Wait for the SYN/ACK packet
-	err = waitPacket(c.replyChan, time.Second*5, func(p packet) (bool, error) {
+	err = waitPacket(c.sendRouter.pktRecvChan, time.Second*5, func(p packet) (bool, error) {
 		// We empty packets from the channel until we get the SYN/ACK packet
 		// from the 3-way handshake. This packet can be used to retrieve
 		// the seq and ack numbers
@@ -574,7 +566,9 @@ func createCM(sip, dip [4]byte) ipv4.ControlMessage {
 // Incoming packets are analysed to confirm that they
 // have the expected source IP address (Our friend's IP address)
 // Based on the port numbers, we
-func (c *Channel) readLoop() {
+// The receiver chan is for packets destined to calls to the Receive method
+// The sender chan is for packets destined to calls to the Send method
+func (c *Channel) readLoop(recieverChan chan packet, senderChan chan packet) {
 	var (
 		buf [1024]byte
 		l   *log.Logger = log.New(os.Stderr, "", log.Flags())
@@ -601,13 +595,12 @@ func (c *Channel) readLoop() {
 				// We must route accordingly
 				if tcph.DstPort == layers.TCPPort(c.conf.OriginReceivePort) {
 					// If the port number is to our receive port, then it is potentially
-					// an incomming message.
-					// We confirm by checking the port number based on the port of the open connection
-					// in the Receive method
-					pckChan = c.recvChan
+					// an incomming message, so we route it to the Receive methods
+					pckChan = recieverChan
 				} else if tcph.SrcPort == layers.TCPPort(c.conf.FriendReceivePort) {
-					// Otherwise, ff the packet is from our friend's receive port, then it is likely an ACK to a packet we sent
-					pckChan = c.replyChan
+					// Otherwise, if the packet is from our friend's receive port, then it is likely an ACK to a packet we sent
+					// and we route it to the Send methods
+					pckChan = senderChan
 				} else {
 					continue
 				}
@@ -677,10 +670,146 @@ type pktStore struct {
 	pktChan chan packet
 }
 
+// Messages could be received from multiple friend ports in quick succession
+// if the send method is called repeatedly.
+// This method takes the incoming packets from the recvChan
+// and groups them based on their source port (the friend port)
+// That way we can hold those different messages separately
+// and handle them one at a time.
+// The Receive method sends along the requestPortChan go channels
+// to retrieve a go channel that will provide packets received from
+// the desired friend port
+// If useSrcPort is true then packets are routed based on their source port
+// Otherwise they are routed based on their destination port
+func (r *portRouter) run(useSrcPort bool, cancel chan bool) {
+	var (
+		pktMap map[uint16]*pktStore = make(map[uint16]*pktStore)
+		l      *log.Logger          = log.New(os.Stderr, "", log.Flags())
+	)
+
+loop:
+	for {
+		select {
+		// The Receive method requests a channel to report
+		// packets coming from the desired friend port
+		case request := <-r.requestPortChan:
+			if _, ok := pktMap[request.friendPort]; ok {
+				pktMap[request.friendPort].hasRead = true
+				request.reply <- pktMap[request.friendPort].pktChan
+			} else if len(pktMap) < maxAccept || dropUnused(pktMap) {
+				pktMap[request.friendPort] = &pktStore{
+					hasRead: true,
+					pktChan: make(chan packet, maxStorePacket),
+				}
+				request.reply <- pktMap[request.friendPort].pktChan
+			} else {
+				// else packetChan is nil
+				request.reply <- nil
+			}
+		case p := <-r.pktRecvChan:
+			var friendPort uint16
+			if useSrcPort {
+				friendPort = uint16(p.tcph.SrcPort)
+			} else {
+				friendPort = uint16(p.tcph.DstPort)
+			}
+			if _, ok := pktMap[friendPort]; ok {
+				// we have already stored packets for this friend port
+				// or are waiting for packets on this friend port (by
+				// creating the channel with the requestPortChan in the Receive method)
+				// We will send the packet on this go channel
+			} else if p.tcph.SYN {
+
+				// If a go channel has not already been setup for this friend port,
+				// we check if the initial packet is a SYN packet
+				// All TCP messages should start with the SYN packet of a three way handshake,
+				// so we restrict creating the go channel until the SYN packet is received
+				// This helps us protect against any trailing packets from the prceeding message that
+				// arrive after the Receive method has terminated and the go channel has been removed
+				// by the dropPortChan below
+				// It helps prevent us from having trailing resources.
+
+				// If we have room to store this packet go channel or we can clear space for the channel
+				if len(pktMap) < maxAccept || dropUnused(pktMap) {
+					pktMap[friendPort] = &pktStore{
+						hasRead: false,
+						pktChan: make(chan packet, maxStorePacket),
+					}
+				} else {
+					// There is not room to store the packet,
+					// since all of he go channels are actively
+					// being read by a Receive method
+					l.Println("Too many connections: Dropped Packet")
+					continue
+				}
+			} else {
+				// If a SYN packet is not the first packet in the stream, we drop it silently
+				// Such a situation is very common based on experimental results,
+				// so it is not worth reporting
+				continue
+			}
+
+			// Send the packet on the channel
+			select {
+			case pktMap[friendPort].pktChan <- p:
+			case <-time.After(time.Millisecond * 200):
+				l.Println("Too many packets: Dropped Packet")
+			}
+		case friendPort := <-r.dropPortChan:
+			if _, ok := pktMap[friendPort]; !ok {
+				continue
+			}
+			// Once the Receive method is done, it no longer
+			// needs to receive packets from the given friend port
+			// and the go channel for receiving such packets may be
+			// dropped to make room for other incoming messages from
+			// different friend ports
+
+			// First, we check that there are no syn packets in the queue for this
+			// friend port.
+			// Although the sender should not generally send messages using the same
+			// port multiple times in quick succession, it is theoretically possible
+			// to do so, and we want to avoid dropping the second message if possible
+			// Empty the go channel of all packets, checking for SYN packets
+
+			var (
+				hasSYN   bool
+				newStore pktStore = pktStore{
+					hasRead: false,
+					pktChan: make(chan packet, maxStorePacket),
+				}
+			)
+		dropLoop:
+			for {
+				select {
+				case p := <-pktMap[friendPort].pktChan:
+					if p.tcph.SYN {
+						hasSYN = true
+					}
+					if hasSYN {
+						newStore.pktChan <- p
+					}
+				default:
+					break dropLoop
+				}
+			}
+			// If a SYN packet was found, replace the empty channel with
+			// the new channel that has stored all packets from the SYN packet onward
+			if hasSYN {
+				pktMap[friendPort] = &newStore
+			} else {
+				delete(pktMap, friendPort)
+			}
+		case <-cancel:
+			break loop
+		}
+	}
+}
+
 func dropUnused(pktMap map[uint16]*pktStore) bool {
 
 	// Everytime a new packet arrives it is added to the pktMap
-	// in packetRouter so that it may be read by the Receive method
+	// in portRouter so that it may be read by the Receive method
 	// when appropriate.
 	// This raises a problem, as packet that are not part of a valid
 	// message may arrive but be stored in the pktMap
@@ -725,129 +854,38 @@ func dropUnused(pktMap map[uint16]*pktStore) bool {
 	}
 }
 
-// Messages could be received from multiple friend ports in quick succession
-// if the send method is called repeatedly.
-// This method takes the incoming packets from the recvChan
-// and groups them based on their source port (the friend port)
-// That way we can hold those different messages separately
-// and handle them one at a time.
-// The Receive method sends along the requestPortChan go channels
-// to retrieve a go channel that will provide packets received from
-// the desired friend port
-func (c *Channel) packetRouter() {
-	var (
-		pktMap map[uint16]*pktStore = make(map[uint16]*pktStore)
-		l      *log.Logger          = log.New(os.Stderr, "", log.Flags())
-	)
+func (r *portRouter) getPktChan(port uint16, cancel chan bool) (chan packet, error) {
+	// This code requests the specific friendPort
+	// by providing a go channel to allow portRouter to
+	// reply with the go packet channel
+	var reply chan chan packet = make(chan chan packet)
+	select {
+	case r.requestPortChan <- portRequest{
+		friendPort: port,
+		reply:      reply,
+	}:
+	case <-cancel:
+		return nil, errors.New("Receive Cancelled")
+	}
 
-loop:
-	for {
-		select {
-		// The Receive method requests a channel to report
-		// packets coming from the desired friend port
-		case request := <-c.requestPortChan:
-			if _, ok := pktMap[request.friendPort]; ok {
-				pktMap[request.friendPort].hasRead = true
-				request.reply <- pktMap[request.friendPort].pktChan
-			} else if len(pktMap) < maxAccept || dropUnused(pktMap) {
-				pktMap[request.friendPort] = &pktStore{
-					hasRead: true,
-					pktChan: make(chan packet, maxStorePacket),
-				}
-				request.reply <- pktMap[request.friendPort].pktChan
-			} else {
-				// else packetChan is nil
-				request.reply <- nil
-			}
-		case p := <-c.recvChan:
+	var recvPktChan chan packet
+	// If the above select successfully sent a request on requestPortChan, then we will
+	// then we will always get a reply on the reply go chan
+	// There is thus no need to select on the cancel go channel
+	recvPktChan = <-reply
+	// If nil is returned, it means there was not sufficient space
+	// to store a go channel for this friend port
+	if recvPktChan == nil {
+		return nil, errors.New("Insufficent space to receive packets from this friend port")
+	} else {
+		return recvPktChan, nil
+	}
+}
 
-			friendPort := uint16(p.tcph.SrcPort)
-			if _, ok := pktMap[friendPort]; ok {
-				// we have already stored packets for this friend port
-				// or are waiting for packets on this friend port (by
-				// creating the channel with the requestPortChan in the Receive method)
-				// We will send the packet on this go channel
-			} else if p.tcph.SYN {
-
-				// If a go channel has not already been setup for this friend port,
-				// we check if the initial packet is a SYN packet
-				// All TCP messages should start with the SYN packet of a three way handshake,
-				// so we restrict creating the go channel until the SYN packet is received
-				// This helps us protect against any trailing packets from the prceeding message that
-				// arrive after the Receive method has terminated and the go channel has been removed
-				// by the dropPortChan below
-				// It helps prevent us from having trailing resources.
-
-				// If we have room to store this packet go channel or we can clear space for the channel
-				if len(pktMap) < maxAccept || dropUnused(pktMap) {
-					pktMap[friendPort] = &pktStore{
-						hasRead: false,
-						pktChan: make(chan packet, maxStorePacket),
-					}
-				} else {
-					// There is not room to store the packet,
-					// since all of he go channels are actively
-					// being read by a Receive method
-					l.Println("Too many connections: Dropped Packet")
-					continue
-				}
-			} else {
-				// If a SYN packet is not the first packet in the stream, we drop it silently
-				// Such a situation is very common based on experimental results,
-				// so it is not worth reporting
-				continue
-			}
-
-			// Send the packet on the channel
-			select {
-			case pktMap[friendPort].pktChan <- p:
-			case <-time.After(time.Millisecond * 200):
-				l.Println("Too many packets: Dropped Packet")
-			}
-		case friendPort := <-c.dropPortChan:
-			// Once the Receive method is done, it no longer
-			// needs to receive packets from the given friend port
-			// and the go channel for receiving such packets may be
-			// dropped to make room for other incoming messages from
-			// different friend ports
-
-			// First, we check that there are no syn packets in the queue for this
-			// friend port.
-			// Although the sender should not generally send messages using the same
-			// port multiple times in quick succession, it is theoretically possible
-			// to do so, and we want to avoid dropping the second message if possible
-			// Empty the go channel of all packets, checking for SYN packets
-
-			var (
-				hasSYN   bool
-				newStore pktStore = pktStore{
-					hasRead: false,
-					pktChan: make(chan packet, maxStorePacket),
-				}
-			)
-		dropLoop:
-			for {
-				select {
-				case p := <-pktMap[friendPort].pktChan:
-					if p.tcph.SYN {
-						hasSYN = true
-					}
-					if hasSYN {
-						newStore.pktChan <- p
-					}
-				default:
-					break dropLoop
-				}
-			}
-			// If a SYN packet was found, replace the empty channel with
-			// the new channel that has stored all packets from the SYN packet onward
-			if hasSYN {
-				pktMap[friendPort] = &newStore
-			} else {
-				delete(pktMap, friendPort)
-			}
-		case <-c.cancel:
-			break loop
-		}
+// Function to drop the resources accosiated with storing packets from a given port
+func (r *portRouter) donePktChan(port uint16, cancel chan bool) {
+	select {
+	case r.dropPortChan <- port:
+	case <-cancel:
 	}
 }
