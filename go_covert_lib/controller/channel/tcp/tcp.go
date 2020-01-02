@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -24,9 +25,10 @@ const maxAccept = 32
 // many packets should be stored
 const maxStorePacket = 512
 
+// We make the fields public to facilitate logging
 type packet struct {
-	ipv4h ipv4.Header
-	tcph  layers.TCP
+	Ipv4h ipv4.Header
+	Tcph  layers.TCP
 }
 
 type acceptedConn struct {
@@ -47,6 +49,21 @@ type portRequest struct {
 type dropRequest struct {
 	port     uint16
 	keepNext bool
+}
+
+type syncPktMap struct {
+	mutex  *sync.Mutex
+	pktMap map[uint16][]packet
+}
+
+func MakeSyncMap() *syncPktMap {
+	return &syncPktMap{pktMap: make(map[uint16][]packet), mutex: &sync.Mutex{}}
+}
+
+func (smap *syncPktMap) Add(k uint16, v packet) {
+	smap.mutex.Lock()
+	smap.pktMap[k] = append(smap.pktMap[k], v)
+	smap.mutex.Unlock()
 }
 
 // This covert channel is formed by two peers.
@@ -70,18 +87,24 @@ type dropRequest struct {
 // rate that messages could be sent. Using a random sender port completely
 // alleviates this risk.
 type Config struct {
+	// For debugging purposes, log all packets that are sent or received
+	logPackets        bool
 	FriendIP          [4]byte
 	OriginIP          [4]byte
 	FriendReceivePort uint16
 	OriginReceivePort uint16
 	Encoder           TcpEncoder
-	// The TCP dial timeout for the three way handshake in the the send method
+	// The TCP dial timeout for the three way handshake in the the Send method
 	DialTimeout time.Duration
-	// The intra-packet read timeout.
+	// The TCP accept timeout for the three way handshake in the the Receive method
+	AcceptTimeout time.Duration
+	// The intra-packet read timeout. Set zero for no timeout.
 	// The receive method will block until a three way handshake
 	// is complete and the listener returns, and will only exit with a
 	// read timeout if the intra-packet delay is too large.
 	ReadTimeout time.Duration
+	// The timeout for writing the packet to a raw socket. Set zero for no timeout.
+	WriteTimeout time.Duration
 }
 
 // A TCP covert channel
@@ -107,6 +130,13 @@ type Channel struct {
 	sendRouter    portRouter
 
 	acceptChan chan acceptedConn
+
+	// For debugging purposes, log all packets received and sent
+	sendPktLog    *syncPktMap
+	receivePktLog *syncPktMap
+
+	// We make the mutex a pointer to avoid the risk of copying
+	writeMutex *sync.Mutex
 }
 
 type TcpEncoder interface {
@@ -158,6 +188,11 @@ func MakeChannel(conf Config) (*Channel, error) {
 			requestPortChan: make(chan portRequest),
 			dropPortChan:    make(chan dropRequest),
 		},
+
+		sendPktLog:    MakeSyncMap(),
+		receivePktLog: MakeSyncMap(),
+
+		writeMutex: &sync.Mutex{},
 	}
 
 	if c.conf.Encoder == nil {
@@ -278,7 +313,7 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 	)
 
 	// Check if we should timeout
-	if c.conf.DialTimeout == 0 {
+	if c.conf.AcceptTimeout == 0 {
 		select {
 		case ac = <-c.acceptChan:
 		// Check if the covert channel has been closed
@@ -291,7 +326,7 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 		// Check if the covert channel has been closed
 		case <-c.cancel:
 			return 0, errors.New("Receive Cancelled")
-		case <-time.After(c.conf.DialTimeout):
+		case <-time.After(c.conf.AcceptTimeout):
 			return 0, errors.New("Accept timeout")
 		}
 	}
@@ -325,6 +360,9 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 		// If no valid packet is received within timeout of the previous valid packet
 		// we exit with an error
 		err = waitPacket(recvPktChan, c.conf.ReadTimeout, func(p packet) (bool, error) {
+			if c.conf.logPackets {
+				c.receivePktLog.Add(ac.friendPort, p)
+			}
 			var (
 				valid bool
 				err   error
@@ -357,21 +395,21 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 		receivedBytes []byte
 	)
 	// Verify that the source port is the one associated with this connection
-	if layers.TCPPort(friendPort) != p.tcph.SrcPort {
+	if layers.TCPPort(friendPort) != p.Tcph.SrcPort {
 		// Incorrect source Port
-	} else if handshake == 0 && p.tcph.SYN {
+	} else if handshake == 0 && p.Tcph.SYN {
 		// three way handshake SYN
 		handshake = 1
 		valid = true
-	} else if handshake == 1 && p.tcph.ACK {
+	} else if handshake == 1 && p.Tcph.ACK {
 		// three way handshake ACK
 		//          ack = d.tcph.Ack
 		//          seq = d.tcph.Seq
 		handshake = 2
-	} else if p.tcph.RST {
+	} else if p.Tcph.RST {
 		// If rst packet is sent we quit
 		err = errors.New("RST packet")
-	} else if p.tcph.SYN {
+	} else if p.Tcph.SYN {
 		// During testing I found that a hung receiver connection
 		// could still be dialed a second time from the sender
 		// I.e. the tcp dial operation could be performed in the sender method
@@ -384,13 +422,13 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 	} else if handshake != 2 {
 		// Covert message not started since we have not yet reached the packets
 		// making up the three way handshake
-	} else if p.tcph.FIN {
+	} else if p.Tcph.FIN {
 		valid = true
 		// FIN - done message
 		fin = true
 	} else {
 		// Normal transmission packet
-		if receivedBytes, err = c.conf.Encoder.GetByte(p.ipv4h, p.tcph); err != nil {
+		if receivedBytes, err = c.conf.Encoder.GetByte(p.Ipv4h, p.Tcph); err != nil {
 			err = errors.New("Decode Error")
 		} else {
 			valid = true
@@ -466,9 +504,9 @@ func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
 		// We empty packets from the channel until we get the SYN/ACK packet
 		// from the 3-way handshake. This packet can be used to retrieve
 		// the seq and ack numbers
-		if layers.TCPPort(originPort) == p.tcph.DstPort && p.tcph.ACK && p.tcph.SYN {
-			seq = p.tcph.Ack
-			ack = p.tcph.Seq + 1
+		if layers.TCPPort(originPort) == p.Tcph.DstPort && p.Tcph.ACK && p.Tcph.SYN {
+			seq = p.Tcph.Ack
+			ack = p.Tcph.Seq + 1
 			return true, nil
 		}
 		return false, nil
@@ -488,10 +526,15 @@ func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
 		if ipv4h, tcph, rem, err = c.conf.Encoder.SetByte(ipv4h, tcph, rem); err != nil {
 			return n, err
 		}
-		if wbuf, err = createTCPHeader(tcph, seq, ack, c.conf.OriginIP, c.conf.FriendIP, originPort, c.conf.FriendReceivePort); err != nil {
+		if wbuf, tcph, err = createTCPHeader(tcph, seq, ack, c.conf.OriginIP, c.conf.FriendIP, originPort, c.conf.FriendReceivePort); err != nil {
 			return n, err
 		}
-		if err = c.rawConn.WriteTo(&ipv4h, wbuf, &cm); err != nil {
+
+		if c.conf.logPackets {
+			c.sendPktLog.Add(originPort, packet{Ipv4h: ipv4h, Tcph: tcph})
+		}
+
+		if err = c.sendPacket(&ipv4h, wbuf, &cm); err != nil {
 			return n, err
 		}
 		n = uint64(len(data) - len(rem))
@@ -499,7 +542,29 @@ func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
 	return n, err
 }
 
-func createTCPHeader(tcph layers.TCP, seq, ack uint32, sip, dip [4]byte, sport, dport uint16) ([]byte, error) {
+// Based on some experimental results, it appears that it is not necessarily
+// safe to perform simultaneous writes to the same raw socket
+// This is because originally the WriteTo method was called directly
+// with no writeMutex locking and multiple concurrent calls to the Send method.
+// Without the lock, errors were fairly common, with the message not being properly
+// transmitted and received.
+// When the writeLock was introduced the frequency of errors seemed to decrease.
+// Note that this does not prove that errors were due to simultaneous writes to the
+// raw socket. Such errors are expected if there is a high volume of incoming TCP traffic
+// to the socket.
+// Nevertheless, from my perspective the frequency of errors did appear to be very noticably greater
+// when no lock was present.
+func (c *Channel) sendPacket(h *ipv4.Header, b []byte, cm *ipv4.ControlMessage) error {
+	c.writeMutex.Lock()
+	defer c.writeMutex.Unlock()
+	if c.conf.WriteTimeout != 0 {
+		c.rawConn.SetWriteDeadline(time.Now().Add(c.conf.WriteTimeout))
+	}
+	return c.rawConn.WriteTo(h, b, cm)
+}
+
+// We return the tcph header so that it can be logged if needed for debugging
+func createTCPHeader(tcph layers.TCP, seq, ack uint32, sip, dip [4]byte, sport, dport uint16) ([]byte, layers.TCP, error) {
 
 	iph := layers.IPv4{
 		SrcIP: sip[:],
@@ -520,7 +585,7 @@ func createTCPHeader(tcph layers.TCP, seq, ack uint32, sip, dip [4]byte, sport, 
 	tcph.Window = 65495
 
 	if err := tcph.SetNetworkLayerForChecksum(&iph); err != nil {
-		return nil, err
+		return nil, tcph, err
 	}
 
 	sb := gopacket.NewSerializeBuffer()
@@ -531,10 +596,10 @@ func createTCPHeader(tcph layers.TCP, seq, ack uint32, sip, dip [4]byte, sport, 
 
 	// This will compute proper checksums
 	if err := tcph.SerializeTo(sb, op); err != nil {
-		return nil, err
+		return nil, tcph, err
 	}
 
-	return sb.Bytes(), nil
+	return sb.Bytes(), tcph, nil
 }
 
 // Creates the ip header message
@@ -606,8 +671,8 @@ func (c *Channel) readLoop(recieverChan chan packet, senderChan chan packet) {
 				}
 
 				select {
-				case pckChan <- packet{ipv4h: *h, tcph: tcph}:
-				case <-time.After(time.Millisecond * 200):
+				case pckChan <- packet{Ipv4h: *h, Tcph: tcph}:
+				default:
 					l.Println("Too many packets: Dropped Packet")
 				}
 			}
@@ -693,32 +758,32 @@ loop:
 		// The Receive method requests a channel to report
 		// packets coming from the desired friend port
 		case request := <-r.requestPortChan:
+			var pktChan chan packet = nil // I am making it explicit that this should start as nil
 			if _, ok := pktMap[request.port]; ok {
 				pktMap[request.port].hasRead = true
-				request.reply <- pktMap[request.port].pktChan
+				pktChan = pktMap[request.port].pktChan
 			} else if len(pktMap) < maxAccept || dropUnused(pktMap) {
 				pktMap[request.port] = &pktStore{
 					hasRead: true,
 					pktChan: make(chan packet, maxStorePacket),
 				}
-				request.reply <- pktMap[request.port].pktChan
-			} else {
-				// else packetChan is nil
-				request.reply <- nil
+				pktChan = pktMap[request.port].pktChan
 			}
+			// else packetChan is nil
+			request.reply <- pktChan
 		case p := <-r.pktRecvChan:
 			var friendPort uint16
 			if useSrcPort {
-				friendPort = uint16(p.tcph.SrcPort)
+				friendPort = uint16(p.Tcph.SrcPort)
 			} else {
-				friendPort = uint16(p.tcph.DstPort)
+				friendPort = uint16(p.Tcph.DstPort)
 			}
 			if _, ok := pktMap[friendPort]; ok {
 				// we have already stored packets for this friend port
 				// or are waiting for packets on this friend port (by
 				// creating the channel with the requestPortChan in the Receive method)
 				// We will send the packet on this go channel
-			} else if p.tcph.SYN {
+			} else if p.Tcph.SYN {
 
 				// If a go channel has not already been setup for this friend port,
 				// we check if the initial packet is a SYN packet
@@ -752,7 +817,7 @@ loop:
 			// Send the packet on the channel
 			select {
 			case pktMap[friendPort].pktChan <- p:
-			case <-time.After(time.Millisecond * 200):
+			default:
 				l.Println("Too many packets: Dropped Packet")
 			}
 		case drop := <-r.dropPortChan:
@@ -808,7 +873,7 @@ loop:
 			for {
 				select {
 				case p := <-pktMap[drop.port].pktChan:
-					if p.tcph.SYN {
+					if p.Tcph.SYN {
 						hasSYN = true
 					}
 					if hasSYN {

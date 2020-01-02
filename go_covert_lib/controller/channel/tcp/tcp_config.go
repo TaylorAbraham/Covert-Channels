@@ -13,7 +13,9 @@ type ConfigClient struct {
 	OriginReceivePort config.U16Param
 	Encoder           config.SelectParam
 	DialTimeout       config.U64Param
+	AcceptTimeout     config.U64Param
 	ReadTimeout       config.U64Param
+	WriteTimeout      config.U64Param
 }
 
 func GetDefault() ConfigClient {
@@ -23,8 +25,10 @@ func GetDefault() ConfigClient {
 		FriendReceivePort: config.MakeU16(8123, [2]uint16{0, 65535}, config.Display{Description: "Your friends tcp receive Port. Their send port is chosen randomly."}),
 		OriginReceivePort: config.MakeU16(8124, [2]uint16{0, 65535}, config.Display{Description: "Your tcp receive Port. Send port is chosen randomly."}),
 		Encoder:           config.MakeSelect("id", []string{"id"}, config.Display{Description: "The encoding mechanism to use for this protocol."}),
-		DialTimeout:       config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The dial timeout for the 3 way handshake in the write method in milliseconds. Zero for no timeout."}),
-		ReadTimeout:       config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The intra-packet read timeout for the receive method in milliseconds. Zero for no timeout."}),
+		DialTimeout:       config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The dial timeout for the Send method in milliseconds. Zero for no timeout."}),
+		AcceptTimeout:     config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The accept timeout for the Receive method in milliseconds. Zero for no timeout."}),
+		ReadTimeout:       config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The intra-packet read timeout for the receive method in milliseconds. Zero for no timeout."}),
+		WriteTimeout:      config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The a timeout for writing packets to the raw socket, in milliseconds. Zero for no timeout."}),
 	}
 }
 
@@ -45,7 +49,9 @@ func ToChannel(cc ConfigClient) (*Channel, error) {
 	c.OriginReceivePort = cc.OriginReceivePort.Value
 
 	c.DialTimeout = time.Duration(cc.DialTimeout.Value) * time.Millisecond
+	c.AcceptTimeout = time.Duration(cc.AcceptTimeout.Value) * time.Millisecond
 	c.ReadTimeout = time.Duration(cc.ReadTimeout.Value) * time.Millisecond
+	c.WriteTimeout = time.Duration(cc.WriteTimeout.Value) * time.Millisecond
 
 	switch cc.Encoder.Value {
 	case "id":
