@@ -4,8 +4,8 @@ import (
 	"./channel/ipv4tcp"
 	"./channel/tcp"
 	"./config"
-	"./processor/none"
 	"./processor/caesar"
+	"./processor/none"
 	"encoding/json"
 	"errors"
 	"github.com/gorilla/websocket"
@@ -66,7 +66,7 @@ func DefaultConfig() configData {
 
 func defaultProcessor() processorData {
 	return processorData{
-		None: none.GetDefault(),
+		None:   none.GetDefault(),
 		Caesar: caesar.GetDefault(),
 	}
 }

@@ -5,8 +5,8 @@ import (
 	"./channel/ipv4tcp"
 	"./channel/tcp"
 	"./processor"
-	"./processor/none"
 	"./processor/caesar"
+	"./processor/none"
 	"github.com/gorilla/websocket"
 	"sync"
 )
@@ -56,7 +56,7 @@ type channelData struct {
 }
 
 type processorData struct {
-	None none.ConfigClient
+	None   none.ConfigClient
 	Caesar caesar.ConfigClient
 }
 

@@ -7,7 +7,7 @@ type Caesar struct {
 func (c *Caesar) Process(data []byte) ([]byte, error) {
 	var newData []byte = make([]byte, len(data))
 	for i := range newData {
-			newData[i] = data[i] + byte(c.Shift)
+		newData[i] = data[i] + byte(c.Shift)
 	}
 	return newData[:], nil
 }
@@ -15,7 +15,7 @@ func (c *Caesar) Process(data []byte) ([]byte, error) {
 func (c *Caesar) Unprocess(data []byte) ([]byte, error) {
 	var newData []byte = make([]byte, len(data))
 	for i := range newData {
-			newData[i] = data[i] - byte(c.Shift)
+		newData[i] = data[i] - byte(c.Shift)
 	}
 	return newData[:], nil
 }

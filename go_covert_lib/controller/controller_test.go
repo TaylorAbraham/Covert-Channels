@@ -149,10 +149,10 @@ func TestWithProcessor(t *testing.T) {
 	conf.Channel.Data.Ipv4tcp.OriginPort.Value = 8091
 	conf.Processors = []processorConfig{
 		processorConfig{
-			Type : "Caesar", Data : defaultProcessor(),
+			Type: "Caesar", Data: defaultProcessor(),
 		},
 		processorConfig{
-			Type : "Caesar", Data : defaultProcessor(),
+			Type: "Caesar", Data: defaultProcessor(),
 		},
 	}
 	conf.Processors[0].Data.Caesar.Shift.Value = -1
@@ -192,10 +192,10 @@ func TestWithProcessorNoUnprocess(t *testing.T) {
 	conf.Channel.Data.Ipv4tcp.OriginPort.Value = 8091
 	conf.Processors = []processorConfig{
 		processorConfig{
-			Type : "Caesar", Data : defaultProcessor(),
+			Type: "Caesar", Data: defaultProcessor(),
 		},
 		processorConfig{
-			Type : "Caesar", Data : defaultProcessor(),
+			Type: "Caesar", Data: defaultProcessor(),
 		},
 	}
 	conf.Processors[0].Data.Caesar.Shift.Value = -1

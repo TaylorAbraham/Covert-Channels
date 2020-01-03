@@ -6,10 +6,10 @@ import (
 )
 
 func TestEncodeDecode(t *testing.T) {
-	encodeDecode(t, Caesar{ Shift : 0 },   []byte{1,2,3,4,5}, []byte{1,2,3,4,5})
-	encodeDecode(t, Caesar{ Shift : 5 },   []byte{1,2,3,4,5}, []byte{6,7,8,9,10})
-	encodeDecode(t, Caesar{ Shift : -10 }, []byte{1,2,3,4,5}, []byte{247, 248, 249, 250, 251})
-	encodeDecode(t, Caesar{ Shift : 25 }, []byte{}, []byte{})
+	encodeDecode(t, Caesar{Shift: 0}, []byte{1, 2, 3, 4, 5}, []byte{1, 2, 3, 4, 5})
+	encodeDecode(t, Caesar{Shift: 5}, []byte{1, 2, 3, 4, 5}, []byte{6, 7, 8, 9, 10})
+	encodeDecode(t, Caesar{Shift: -10}, []byte{1, 2, 3, 4, 5}, []byte{247, 248, 249, 250, 251})
+	encodeDecode(t, Caesar{Shift: 25}, []byte{}, []byte{})
 }
 
 func encodeDecode(t *testing.T, c Caesar, b, expected []byte) {

@@ -6,8 +6,8 @@ import (
 	"./channel/tcp"
 	"./config"
 	"./processor"
-	"./processor/none"
 	"./processor/caesar"
+	"./processor/none"
 	"encoding/json"
 	"errors"
 )
