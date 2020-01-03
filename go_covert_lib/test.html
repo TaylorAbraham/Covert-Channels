@@ -59,11 +59,14 @@
             var val = data[key].Value;
             var input;
             switch (data[key].Type) {
+              case "i8":
+                input = $("<input>").attr("type","number").attr({ min : data[key].Range[0], max : data[key].Range[1]}).val(val);
+                break;
               case "u16":
-                input = $("<input>").attr("type","number").val(val);
+                input = $("<input>").attr("type","number").attr({ min : data[key].Range[0], max : data[key].Range[1]}).val(val);
                 break;
               case "u64":
-                input = $("<input>").attr("type","number").val(val);
+                input = $("<input>").attr("type","number").attr({ min : data[key].Range[0], max : data[key].Range[1]}).val(val);
                 break;
               case "bool":
                 input = $("<input>").attr("type","checkbox").prop('checked', val).val(val);

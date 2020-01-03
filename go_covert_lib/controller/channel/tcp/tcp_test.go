@@ -26,6 +26,10 @@ import (
 // investigate further to identify any other potential bugs in the covert channel.
 // Even with a video playing over the network, the above error is relatively uncommon,
 // so an increase in frequence of the error should also be investigated.
+// Keep in mind that the TestMultipleSend or TestMultipleSendTimeout tests are used to
+// assess the performance when the covert channel is approaching (but not exceeding)
+// its maximum storage capacity for number of connections. Thus they are not representative
+// of the typical behaviour, where there should only be one connection at a time.
 
 var sconf Config = Config{
 	FriendIP:          [4]byte{127, 0, 0, 1},
@@ -49,6 +53,7 @@ var sconfTimeout Config = Config{
 	DialTimeout:       time.Second,
 	AcceptTimeout:     time.Second,
 	ReadTimeout:       time.Second,
+	WriteTimeout:      time.Second,
 }
 
 var rconfTimeout Config = Config{
@@ -59,6 +64,7 @@ var rconfTimeout Config = Config{
 	DialTimeout:       time.Second,
 	AcceptTimeout:     time.Second,
 	ReadTimeout:       time.Second,
+	WriteTimeout:      time.Second,
 }
 
 func TestReceiveSend(t *testing.T) {

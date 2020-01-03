@@ -7,6 +7,7 @@ import (
 	"./config"
 	"./processor"
 	"./processor/none"
+	"./processor/caesar"
 	"encoding/json"
 	"errors"
 )
@@ -127,6 +128,10 @@ func (ctr *Controller) retrieveProcessor(pconf processorConfig) (processor.Proce
 	switch newConf.Type {
 	case "None":
 		if p, err = none.ToProcessor(newConf.Data.None); err != nil {
+			return nil, nil, err
+		}
+	case "Caesar":
+		if p, err = caesar.ToProcessor(newConf.Data.Caesar); err != nil {
 			return nil, nil, err
 		}
 	default:

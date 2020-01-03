@@ -6,6 +6,7 @@ import (
 	"./channel/tcp"
 	"./processor"
 	"./processor/none"
+	"./processor/caesar"
 	"github.com/gorilla/websocket"
 	"sync"
 )
@@ -56,6 +57,7 @@ type channelData struct {
 
 type processorData struct {
 	None none.ConfigClient
+	Caesar caesar.ConfigClient
 }
 
 type Layers struct {

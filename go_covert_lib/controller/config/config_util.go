@@ -16,6 +16,13 @@ type Display struct {
 	Group       string
 }
 
+type I8Param struct {
+	Type    string
+	Value   int8
+	Range   [2]int8
+	Display Display
+}
+
 type U16Param struct {
 	Type    string
 	Value   uint16
@@ -49,6 +56,14 @@ type IPV4Param struct {
 	// To convert to the proper IP address that can be used later on use GetValue
 	Value   string
 	Display Display
+}
+
+func (p I8Param) Validate() error {
+	if p.Value >= p.Range[0] && p.Value <= p.Range[1] {
+		return nil
+	} else {
+		return errors.New("I8 value out of range")
+	}
 }
 
 func (p U16Param) Validate() error {
@@ -98,6 +113,9 @@ func (p *IPV4Param) GetValue() ([4]byte, error) {
 
 func MakeIPV4(value string, display Display) IPV4Param {
 	return IPV4Param{"ipv4", value, display}
+}
+func MakeI8(value int8, rng [2]int8, display Display) I8Param {
+	return I8Param{"i8", value, rng, display}
 }
 func MakeU16(value uint16, rng [2]uint16, display Display) U16Param {
 	return U16Param{"u16", value, rng, display}
