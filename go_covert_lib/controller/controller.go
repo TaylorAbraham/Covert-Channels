@@ -64,17 +64,17 @@ func DefaultConfig() configData {
 	}
 }
 
-func defaultProcessor() processorData {
-	return processorData{
-		None:   none.GetDefault(),
-		Caesar: caesar.GetDefault(),
-	}
-}
-
 func defaultChannel() channelData {
 	return channelData{
 		Ipv4tcp: ipv4tcp.GetDefault(),
 		Tcp:     tcp.GetDefault(),
+	}
+}
+
+func defaultProcessor() processorData {
+	return processorData{
+		None:   none.GetDefault(),
+		Caesar: caesar.GetDefault(),
 	}
 }
 

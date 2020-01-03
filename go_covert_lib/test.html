@@ -64,7 +64,7 @@
       }
 
       function createProcessorSpan(configData, index, processors){
-        var parent = $("<span>");
+        var parent = $("<div>").css({ 'border-color' : 'black', 'border-style' : 'solid', padding : "10px", margin : "10px" });
         var remove = $("<button>-</button>");
         remove.on("click", function(index, processors){
           processors.splice(index, 1);
@@ -173,9 +173,10 @@
           console.log(event.data);
 					if(event.data) {
             var data = JSON.parse(event.data);
-            writeResponse(event.data);
             if (data.OpCode === "config"){
-                handleConfig(data);
+              handleConfig(data);
+            } else {
+              writeResponse(event.data);
             }
           }
 				};
@@ -190,7 +191,7 @@
       <input type="button" onclick="sendConfig()">Config</input>
     </div>
     <div><input type="text" id="message"></input></div>
-    <div><textarea id="response" cols="100" rows="10"></textarea></div>
+    <div><h2>Console</h2><textarea id="response" cols="100" rows="10"></textarea></div>
     <h1>Processor</h1>
     <div><button type="button" onclick="addProcessor()">+</button></div>
     <div id="processors"></div>
