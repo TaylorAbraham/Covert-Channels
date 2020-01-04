@@ -92,7 +92,7 @@ func TestReceiveSend(t *testing.T) {
 	for _, input := range inputs {
 		go func() {
 			var data [15]byte
-			nr, rErr = rch.Receive(data[:], nil)
+			nr, rErr = rch.Receive(data[:])
 			select {
 			case c <- data[:nr]:
 			case <-time.After(time.Second * 5):
@@ -142,7 +142,7 @@ func TestReceiveSendSelf(t *testing.T) {
 	for _, input := range inputs {
 		go func() {
 			var data [15]byte
-			nr, rErr = ch.Receive(data[:], nil)
+			nr, rErr = ch.Receive(data[:])
 			select {
 			case c <- data[:nr]:
 			case <-time.After(time.Second * 5):
@@ -186,7 +186,7 @@ func TestReceiveOverflow(t *testing.T) {
 
 	go func() {
 		var data [5]byte
-		nr, rErr = rch.Receive(data[:], nil)
+		nr, rErr = rch.Receive(data[:])
 		select {
 		case c <- data[:nr]:
 		case <-time.After(time.Second * 5):
@@ -274,7 +274,7 @@ func runMultiTest(t *testing.T, sconf, rconf Config) {
 		go func() {
 			var data [1024]byte
 			var rOut opOutput
-			nr, err := rch.Receive(data[:], nil)
+			nr, err := rch.Receive(data[:])
 			rOut.err = err
 			rOut.data = data[:nr]
 			select {
@@ -288,7 +288,7 @@ func runMultiTest(t *testing.T, sconf, rconf Config) {
 		// Test simultaneous sends
 		go func(input []byte) {
 			var sOut opOutput
-			nr, err := sch.Send(input, nil)
+			nr, err := sch.Send(input)
 			sOut.err = err
 			sOut.sent = nr
 			sOut.size = uint64(len(input))
@@ -398,13 +398,13 @@ func TestStress(t *testing.T) {
 			// specified above
 			var data [700]byte
 			data[0] = byte(i)
-			rch.Receive(data[:], nil)
+			rch.Receive(data[:])
 			done <- i
 		}(i)
 	}
 
 	for _, input := range inputs {
-		sch.Send(input, nil)
+		sch.Send(input)
 	}
 
 	if err := sch.Close(); err != nil {
@@ -456,7 +456,7 @@ func TestReceiveNone(t *testing.T) {
 }
 */
 func sendAndCheck(t *testing.T, input []byte, sch *Channel) {
-	n, err := sch.Send(input, nil)
+	n, err := sch.Send(input)
 	if err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}

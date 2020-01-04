@@ -44,7 +44,7 @@ func TestProtocolDelimiter(t *testing.T) {
 	for _, input := range inputs {
 		go func() {
 			var data [15]byte
-			nr, rErr = rch.Receive(data[:], nil)
+			nr, rErr = rch.Receive(data[:])
 			c <- string(data[:nr])
 		}()
 
@@ -79,7 +79,7 @@ func TestProtocolDelimiterOverflow(t *testing.T) {
 
 	go func() {
 		var data [5]byte
-		nr, rErr = rch.Receive(data[:], nil)
+		nr, rErr = rch.Receive(data[:])
 		c <- string(data[:nr])
 	}()
 
@@ -104,7 +104,7 @@ func TestReceiveNone(t *testing.T) {
 	var nr uint64
 
 	var data [5]byte
-	nr, err = rch.Receive(data[0:0], nil)
+	nr, err = rch.Receive(data[0:0])
 	if err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
@@ -114,7 +114,7 @@ func TestReceiveNone(t *testing.T) {
 }
 
 func sendAndCheck(t *testing.T, input string, sch *Channel) {
-	n, err := sch.Send([]byte(input), nil)
+	n, err := sch.Send([]byte(input))
 	if err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}

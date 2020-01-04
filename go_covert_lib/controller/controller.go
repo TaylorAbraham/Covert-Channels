@@ -163,7 +163,7 @@ func (ctr *Controller) handleWrite(b []byte) error {
 			return errors.New("Unable to process outgoing message: " + err.Error())
 		}
 	}
-	if n, err := ctr.layers.channel.Send(data, nil); err != nil {
+	if n, err := ctr.layers.channel.Send(data); err != nil {
 		return errors.New("Write fail: Wrote " + strconv.FormatUint(n, 10) + "bytes out of " + strconv.FormatUint(uint64(len(b)), 10) + ": " + err.Error())
 	} else {
 		return nil
@@ -178,7 +178,7 @@ func (ctr *Controller) handleRead() ([]byte, error) {
 		data   []byte
 	)
 
-	if n, err := ctr.layers.channel.Receive(buffer[:], nil); err != nil {
+	if n, err := ctr.layers.channel.Receive(buffer[:]); err != nil {
 		return nil, errors.New("Read fail: Read " + strconv.FormatUint(n, 10) + " bytes out of " + strconv.FormatUint(uint64(len(buffer)), 10) + " available bytes: " + err.Error())
 	} else {
 		data = buffer[:n]

@@ -299,7 +299,7 @@ func waitPacket(pktChan chan packet, timeout time.Duration, f func(p packet) (bo
 	}
 }
 
-func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
+func (c *Channel) Receive(data []byte) (uint64, error) {
 
 	var (
 		ac acceptedConn
@@ -446,7 +446,7 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 	return n, handshake, valid, fin, err
 }
 
-func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
+func (c *Channel) Send(data []byte) (uint64, error) {
 
 	nd := net.Dialer{
 		Timeout: c.conf.DialTimeout,

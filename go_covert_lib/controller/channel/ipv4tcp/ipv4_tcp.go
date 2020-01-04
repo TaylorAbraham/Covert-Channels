@@ -137,10 +137,9 @@ func MakeChannel(conf Config) (*Channel, error) {
 // If the channel is in protocol delimiter mode then this function
 // will return as soon as it receives the proper delimiter.
 // Otherwise, it will wait until the buffer is filled.
-// The optional progress chan has not yet been implemented.
 // We return the number of bytes received even if an error is encountered,
 // in which case data will have valid received bytes up to that point.
-func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
+func (c *Channel) Receive(data []byte) (uint64, error) {
 
 	if len(data) == 0 {
 		return 0, nil
@@ -241,16 +240,10 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 
 // Send a covert message
 // data is the entire message that will be sent.
-// The optional progress chan can be used to alert the user as to the progress
-// of message transmission. This is useful if the user has set the GetDelay
-// function for the channel. The channel should be buffered, otherwise the
-// update will be skipped if it is not immediately read.
 // The GetDelay function can be used to set a large
-// inter packet delay to help obscure the communication. In that case
-// the progress channel will fire whenever the number of sent bytes has risen
-// by at least 1 percent.
+// inter packet delay to help obscure the communication.
 // We return the number of bytes sent even if an error is encountered
-func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
+func (c *Channel) Send(data []byte) (uint64, error) {
 	// We make it clear that the error always starts as nil
 	var err error = nil
 
@@ -265,7 +258,6 @@ func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
 		p            []byte
 		cm           *ipv4.ControlMessage
 		wait         time.Duration
-		sendPercent  uint64 = 0
 	)
 
 	// The source and destination depend on whether or not we are in bounce mode
@@ -286,21 +278,6 @@ func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
 
 		if err = c.writeConn(h, p, cm); err != nil {
 			return num, err
-		}
-
-		if progress != nil {
-			var currPercent uint64 = uint64(float64(num) / float64(len(data)))
-			if currPercent > sendPercent {
-				sendPercent = currPercent
-				// We send the update along the channel
-				// To avoid deadlock we skip if the channel
-				// is not ready to receive.
-				// As such, the channel should be buffered.
-				select {
-				case progress <- currPercent:
-				default:
-				}
-			}
 		}
 
 		// If the user did not supply a GetDelay function,
