@@ -68,7 +68,8 @@ func openConn(addr string, port string, ctr *Controller, t *testing.T) (chan []b
 		if err = ctr.Shutdown(); err != nil {
 			t.Errorf("Unexpected controller close error: %s", err.Error())
 		}
-		ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelFn()
 		srv.Shutdown(ctx)
 	}()
 

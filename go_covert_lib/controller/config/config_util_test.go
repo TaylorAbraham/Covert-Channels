@@ -55,7 +55,7 @@ type s10 struct {
 	Prm2 int
 }
 
-var ptr *s1 = &s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}
+var ptr *s1 = &s1{Prm: MakeU16(5, [2]uint16{0, 10}, Display{})}
 
 var tests []testCase = []testCase{
 	testCase{1, true, "Config is not a struct"},
@@ -64,41 +64,41 @@ var tests []testCase = []testCase{
 	testCase{&ptr, true, "Config is not a struct"},
 
 	// Ensure it works on pointers
-	testCase{&s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}, false, ""},
+	testCase{&s1{Prm: MakeU16(5, [2]uint16{0, 10}, Display{})}, false, ""},
 
-	testCase{s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}, false, ""},
-	testCase{s1{Prm: MakeU16(5, [2]uint16{7, 10}, "")}, true, "Prm : U16 value out of range"},
+	testCase{s1{Prm: MakeU16(5, [2]uint16{0, 10}, Display{})}, false, ""},
+	testCase{s1{Prm: MakeU16(5, [2]uint16{7, 10}, Display{})}, true, "Prm : U16 value out of range"},
 
-	testCase{s2{Prm: MakeU64(5, [2]uint64{0, 10}, "")}, false, ""},
-	testCase{s2{Prm: MakeU64(5, [2]uint64{7, 10}, "")}, true, "Prm : U64 value out of range"},
+	testCase{s2{Prm: MakeU64(5, [2]uint64{0, 10}, Display{})}, false, ""},
+	testCase{s2{Prm: MakeU64(5, [2]uint64{7, 10}, Display{})}, true, "Prm : U64 value out of range"},
 
-	testCase{s3{Prm: MakeBool(true, "")}, false, ""},
-	testCase{s3{Prm: MakeBool(false, "")}, false, ""},
+	testCase{s3{Prm: MakeBool(true, Display{})}, false, ""},
+	testCase{s3{Prm: MakeBool(false, Display{})}, false, ""},
 
-	testCase{s4{Prm: MakeSelect("yes", []string{"yes", "no"}, "")}, false, ""},
-	testCase{s4{Prm: MakeSelect("yes", []string{}, "")}, true, "Prm : Select value not in list"},
-	testCase{s4{Prm: MakeSelect("not", []string{"yes", "no"}, "")}, true, "Prm : Select value not in list"},
+	testCase{s4{Prm: MakeSelect("yes", []string{"yes", "no"}, Display{})}, false, ""},
+	testCase{s4{Prm: MakeSelect("yes", []string{}, Display{})}, true, "Prm : Select value not in list"},
+	testCase{s4{Prm: MakeSelect("not", []string{"yes", "no"}, Display{})}, true, "Prm : Select value not in list"},
 
-	testCase{s5{Prm: MakeIPV4("1.2.3.4", "")}, false, ""},
-	testCase{s5{Prm: MakeIPV4("1.2.3.4.5", "")}, true, "Prm : Invalid IPV4 address"},
+	testCase{s5{Prm: MakeIPV4("1.2.3.4", Display{})}, false, ""},
+	testCase{s5{Prm: MakeIPV4("1.2.3.4.5", Display{})}, true, "Prm : Invalid IPV4 address"},
 
-	testCase{s6{Prm1: MakeSelect("yes", []string{"yes", "no"}, ""),
-		Prm2: MakeIPV4("1.2.3.4", ""),
-		Prm3: MakeBool(false, ""),
-		Prm4: MakeU16(5, [2]uint16{0, 10}, "")}, false, ""},
-	testCase{s6{Prm1: MakeSelect("yes", []string{"yes", "no"}, ""),
-		Prm2: MakeIPV4("1:2:3:4:5:6", ""),
-		Prm3: MakeBool(false, ""),
-		Prm4: MakeU16(5, [2]uint16{0, 10}, "")}, true, "Prm2 : Invalid IPV4 address"},
+	testCase{s6{Prm1: MakeSelect("yes", []string{"yes", "no"}, Display{}),
+		Prm2: MakeIPV4("1.2.3.4", Display{}),
+		Prm3: MakeBool(false, Display{}),
+		Prm4: MakeU16(5, [2]uint16{0, 10}, Display{})}, false, ""},
+	testCase{s6{Prm1: MakeSelect("yes", []string{"yes", "no"}, Display{}),
+		Prm2: MakeIPV4("1:2:3:4:5:6", Display{}),
+		Prm3: MakeBool(false, Display{}),
+		Prm4: MakeU16(5, [2]uint16{0, 10}, Display{})}, true, "Prm2 : Invalid IPV4 address"},
 
-	testCase{s7{Prm1: MakeSelect("yes", []string{"yes", "no"}, ""),
-		prm2: MakeIPV4("1:2:3:4:5:6", "")}, true, "prm2 : Could not retrieve unexported field"},
+	testCase{s7{Prm1: MakeSelect("yes", []string{"yes", "no"}, Display{}),
+		prm2: MakeIPV4("1:2:3:4:5:6", Display{})}, true, "prm2 : Could not retrieve unexported field"},
 
-	testCase{s8{Prm1: MakeSelect("yes", []string{"yes", "no"}, "")}, true, "Prm2 : Invalid struct field type"},
+	testCase{s8{Prm1: MakeSelect("yes", []string{"yes", "no"}, Display{})}, true, "Prm2 : Invalid struct field type"},
 
 	testCase{s9{}, false, ""},
 
-	testCase{s10{Prm1: MakeSelect("yes", []string{"yes", "no"}, "")}, true, "Prm2 : Invalid struct field type"},
+	testCase{s10{Prm1: MakeSelect("yes", []string{"yes", "no"}, Display{})}, true, "Prm2 : Invalid struct field type"},
 }
 
 func TestValidate(t *testing.T) {
@@ -196,8 +196,8 @@ func TestCopyValueErrors(t *testing.T) {
 }
 
 func TestCopyValueU16(t *testing.T) {
-	var sVal1 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}
-	var sVal2 s1 = s1{Prm: MakeU16(6, [2]uint16{0, 10}, "")}
+	var sVal1 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, Display{})}
+	var sVal2 s1 = s1{Prm: MakeU16(6, [2]uint16{0, 10}, Display{})}
 
 	if sVal1.Prm.Value == sVal2.Prm.Value {
 		t.Errorf("Expected values to not match : Found %d", sVal2.Prm.Value)
@@ -211,8 +211,8 @@ func TestCopyValueU16(t *testing.T) {
 }
 
 func TestCopyValueU16Ptr(t *testing.T) {
-	var sVal1 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}
-	var sVal2 s1 = s1{Prm: MakeU16(6, [2]uint16{0, 10}, "")}
+	var sVal1 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, Display{})}
+	var sVal2 s1 = s1{Prm: MakeU16(6, [2]uint16{0, 10}, Display{})}
 
 	if sVal1.Prm.Value == sVal2.Prm.Value {
 		t.Errorf("Expected values to not match : Found %d", sVal2.Prm.Value)
@@ -226,8 +226,8 @@ func TestCopyValueU16Ptr(t *testing.T) {
 }
 
 func TestCopyValueSameValue(t *testing.T) {
-	var sVal1 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}
-	var sVal2 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}
+	var sVal1 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, Display{})}
+	var sVal2 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, Display{})}
 
 	err := CopyValue(&sVal1, sVal2)
 	if err != nil {
@@ -238,8 +238,8 @@ func TestCopyValueSameValue(t *testing.T) {
 }
 
 func TestCopyValueU64(t *testing.T) {
-	var sVal1 s2 = s2{Prm: MakeU64(0, [2]uint64{0, 10}, "")}
-	var sVal2 s2 = s2{Prm: MakeU64(10, [2]uint64{0, 10}, "")}
+	var sVal1 s2 = s2{Prm: MakeU64(0, [2]uint64{0, 10}, Display{})}
+	var sVal2 s2 = s2{Prm: MakeU64(10, [2]uint64{0, 10}, Display{})}
 
 	if sVal1.Prm.Value == sVal2.Prm.Value {
 		t.Errorf("Expected values to not match : Found %d", sVal2.Prm.Value)
@@ -253,8 +253,8 @@ func TestCopyValueU64(t *testing.T) {
 }
 
 func TestCopyValueBool(t *testing.T) {
-	var sVal1 s3 = s3{Prm: MakeBool(true, "")}
-	var sVal2 s3 = s3{Prm: MakeBool(false, "")}
+	var sVal1 s3 = s3{Prm: MakeBool(true, Display{})}
+	var sVal2 s3 = s3{Prm: MakeBool(false, Display{})}
 
 	if sVal1.Prm.Value == sVal2.Prm.Value {
 		t.Errorf("Expected values to not match : Found %s", strconv.FormatBool(sVal2.Prm.Value))
@@ -268,8 +268,8 @@ func TestCopyValueBool(t *testing.T) {
 }
 
 func TestCopyValueSelect(t *testing.T) {
-	var sVal1 s4 = s4{Prm: MakeSelect("yes", []string{"yes", "no"}, "")}
-	var sVal2 s4 = s4{Prm: MakeSelect("no", []string{"yes", "no"}, "")}
+	var sVal1 s4 = s4{Prm: MakeSelect("yes", []string{"yes", "no"}, Display{})}
+	var sVal2 s4 = s4{Prm: MakeSelect("no", []string{"yes", "no"}, Display{})}
 
 	if sVal1.Prm.Value == sVal2.Prm.Value {
 		t.Errorf("Expected values to not match : Found %s", sVal2.Prm.Value)
@@ -283,8 +283,8 @@ func TestCopyValueSelect(t *testing.T) {
 }
 
 func TestCopyValueIPV4(t *testing.T) {
-	var sVal1 s5 = s5{Prm: MakeIPV4("1.2.3.4", "")}
-	var sVal2 s5 = s5{Prm: MakeIPV4("4.3.2.1", "")}
+	var sVal1 s5 = s5{Prm: MakeIPV4("1.2.3.4", Display{})}
+	var sVal2 s5 = s5{Prm: MakeIPV4("4.3.2.1", Display{})}
 
 	if sVal1.Prm.Value == sVal2.Prm.Value {
 		t.Errorf("Expected values to not match : Found %s", sVal2.Prm.Value)
@@ -298,14 +298,14 @@ func TestCopyValueIPV4(t *testing.T) {
 }
 
 func TestCopyValueMultiValue(t *testing.T) {
-	var sVal1 s6 = s6{Prm1: MakeSelect("yes", []string{"yes", "no"}, ""),
-		Prm2: MakeIPV4("1.2.3.4", ""),
-		Prm3: MakeBool(true, ""),
-		Prm4: MakeU16(5, [2]uint16{0, 10}, "")}
-	var sVal2 s6 = s6{Prm1: MakeSelect("no", []string{"yes", "no"}, ""),
-		Prm2: MakeIPV4("4.3.2.1", ""),
-		Prm3: MakeBool(false, ""),
-		Prm4: MakeU16(6, [2]uint16{0, 10}, "")}
+	var sVal1 s6 = s6{Prm1: MakeSelect("yes", []string{"yes", "no"}, Display{}),
+		Prm2: MakeIPV4("1.2.3.4", Display{}),
+		Prm3: MakeBool(true, Display{}),
+		Prm4: MakeU16(5, [2]uint16{0, 10}, Display{})}
+	var sVal2 s6 = s6{Prm1: MakeSelect("no", []string{"yes", "no"}, Display{}),
+		Prm2: MakeIPV4("4.3.2.1", Display{}),
+		Prm3: MakeBool(false, Display{}),
+		Prm4: MakeU16(6, [2]uint16{0, 10}, Display{})}
 
 	err := CopyValue(&sVal1, sVal2)
 	// We test the values explicitely here
