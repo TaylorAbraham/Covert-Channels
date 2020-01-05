@@ -41,6 +41,7 @@
 
       function handleConfig(data) {
         config = data;
+        $("#channel").empty();
         $("#channel").append(createConfigDiv(data.Channel));
         createProcessors(data.Processors);
       }
