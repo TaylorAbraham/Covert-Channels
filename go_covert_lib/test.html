@@ -7,10 +7,11 @@
         console.log("open");
         var cmd = JSON.stringify({
           OpCode : "open",
-          Processor     : config.Processor,
-          Channel       : config.Channel,
-          ProcessorType : config.ProcessorType,
-          ChannelType   : config.ChannelType
+          Processors   : config.Processors,
+          Channel      : {
+            Type : config.Channel.Type,
+            Data : config.Channel.Data
+          }
         });
         console.log(cmd);
         sock.send(cmd,{binary:true});
@@ -40,15 +41,65 @@
 
       function handleConfig(data) {
         config = data;
-        handleConfigKeys("processor", data.Processor[data.ProcessorType]);
-        handleConfigKeys("channel", data.Channel[data.ChannelType]);
+        $("#channel").empty();
+        $("#channel").append(createConfigDiv(data.Channel));
+        createProcessors(data.Processors);
       }
 
-      function handleConfigKeys(section, data) {
-        var el = $("#" + section);
-        el.empty();
+      function deepCopy(o) {
+        return JSON.parse(JSON.stringify(o));
+      }
+
+      function addProcessor() {
+        var data = deepCopy(config.Default.Processor);
+        var type = Object.keys(data)[0];
+        config.Processors.push({ Type : type, Data : data });
+        createProcessors(config.Processors);
+      }
+
+      function createProcessors(processors){
+        $("#processors").empty();
+        processors.forEach(function (c, index) {
+          $("#processors").append(createProcessorSpan(c, index, processors));
+        });
+      }
+
+      function createProcessorSpan(configData, index, processors){
+        var parent = $("<div>").css({ 'border-color' : 'black', 'border-style' : 'solid', padding : "10px", margin : "10px" });
+        var remove = $("<button>-</button>");
+        remove.on("click", function(index, processors){
+          processors.splice(index, 1);
+          createProcessors(processors);
+        }.bind(null, index, processors));
+        var conf = createConfigDiv(configData);
+        return parent.append(remove).append(conf);
+      }
+
+      function createConfigDiv(configData) {
+        var parent = $("<div>");
+        var sel    = $("<select>");
+        var confDiv = $("<div>");
+        parent.append(sel).append(confDiv);
+
+        sel.on("change", selectConfig.bind(sel, configData, confDiv));
+        for (key in configData.Data) {
+          if (configData.Data.hasOwnProperty(key)) {
+            sel.append($("<option>").attr('value', key).html(key));
+          }
+        }
+        sel.val(configData.Type).change();
+        return parent;
+      }
+
+      function selectConfig(configData, parent) {
+        console.log(event);
+        configData.Type = this.val();
+        var tbl = handleConfigKeys(configData.Data[this.val()])
+        parent.empty().append(tbl);
+      }
+
+      function handleConfigKeys(data) {
         var tbl = $("<table>");
-        tbl.appendTo(el);
         for (var key in data) {
           if (data.hasOwnProperty(key)) {
             var tr = $("<tr></tr>")
@@ -59,11 +110,14 @@
             var val = data[key].Value;
             var input;
             switch (data[key].Type) {
+              case "i8":
+                input = $("<input>").attr("type","number").attr({ min : data[key].Range[0], max : data[key].Range[1]}).val(val);
+                break;
               case "u16":
-                input = $("<input>").attr("type","number").val(val);
+                input = $("<input>").attr("type","number").attr({ min : data[key].Range[0], max : data[key].Range[1]}).val(val);
                 break;
               case "u64":
-                input = $("<input>").attr("type","number").val(val);
+                input = $("<input>").attr("type","number").attr({ min : data[key].Range[0], max : data[key].Range[1]}).val(val);
                 break;
               case "bool":
                 input = $("<input>").attr("type","checkbox").prop('checked', val).val(val);
@@ -82,7 +136,7 @@
             input.on('input', function (obj) {
               if (obj.Type === "bool") {
                 obj.Value = this.prop('checked');
-              } else if (obj.Type == "u16" || obj.Type == "u64") {
+              } else if (obj.Type == "u16" || obj.Type == "u64" || obj.Type == "i8") {
                 obj.Value = Number(this.val());
               } else {
                 obj.Value = this.val();
@@ -92,16 +146,17 @@
             td.append(input);
             td.appendTo(tr);
 
-            var desc = $('<div>').attr('title', data[key].Description).css('width','10px').css('height','10px').css({'background-color' : 'red'});
+            var desc = $('<div>').attr('title', data[key].Display.Description).css('width','10px').css('height','10px').css({'background-color' : 'red'});
             td = $('<td>').append(desc);
             td.appendTo(tr);
           }
         }
+        return tbl;
       }
 
       $(document).ready(function() {
 
-        var address = prompt ('Please enter the address to connect to. [Example Below]', 'localhost:8090');
+        var address = prompt ('Please enter the address to connect to. [Example Below]', 'localhost:3000');
 				sock = new WebSocket('ws://' + address + '/api/ws');
 
         sock.binaryType = 'arraybuffer';
@@ -119,9 +174,10 @@
           console.log(event.data);
 					if(event.data) {
             var data = JSON.parse(event.data);
-            writeResponse(event.data);
             if (data.OpCode === "config"){
-                handleConfig(data);
+              handleConfig(data);
+            } else {
+              writeResponse(event.data);
             }
           }
 				};
@@ -136,10 +192,11 @@
       <input type="button" onclick="sendConfig()">Config</input>
     </div>
     <div><input type="text" id="message"></input></div>
-    <div><textarea id="response" cols="100" rows="10"></textarea></div>
+    <div><h2>Console</h2><textarea id="response" cols="100" rows="10"></textarea></div>
     <h1>Processor</h1>
-    <div id="processor"></div>
+    <div><button type="button" onclick="addProcessor()">+</button></div>
+    <div id="processors"></div>
     <h1>Channel</h1>
-    <div id="channel"></div>
+    <span id="channel"></span>
   </body>
 </html>

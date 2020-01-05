@@ -1,4 +1,4 @@
-package ipv4TCP
+package ipv4tcp
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	Buffer = 0
+	Buffer   = 0
 	Protocol = 1
 )
 
@@ -26,7 +26,7 @@ type Config struct {
 	// The configuration of an ipv4_tcp_sequence covert channel
 	// This structure recognizes three IP-port pairs, the friend, the origin, and an optional bounce.
 	// The friend is the node you are sending messages to.
-	// The origin is where messages are send when they reach you.
+	// The origin is where messages are sent from when they reach you.
 	// If there in bounce mode, the bounce address and port are used by you to bounce
 	// messages to your friend (or for your friend to bounce messages to you)
 	// thus avoiding direct communication between you ande your friend.
@@ -66,7 +66,7 @@ type TcpEncoder interface {
 	// We use the prevSequence to indicate duplicate packets arriving
 	// on from the bouncer socket. It is this function's responsibility
 	// to ensure that any modifications to the tcp header ensure that the
-	// new sequence number is different than the previos sequence number
+	// new sequence number is different than the previous sequence number
 	SetByte(tcph layers.TCP, b byte, prevSequence uint32) (layers.TCP, error)
 	GetByte(tcph layers.TCP, bounce bool) (byte, error)
 }
@@ -125,6 +125,7 @@ func MakeChannel(conf Config) (*Channel, error) {
 
 	c.rawConn, err = ipv4.NewRawConn(conn)
 	if err != nil {
+		conn.Close()
 		return nil, err
 	}
 
@@ -136,10 +137,9 @@ func MakeChannel(conf Config) (*Channel, error) {
 // If the channel is in protocol delimiter mode then this function
 // will return as soon as it receives the proper delimiter.
 // Otherwise, it will wait until the buffer is filled.
-// The optional progress chan has not yet been implemented.
 // We return the number of bytes received even if an error is encountered,
 // in which case data will have valid received bytes up to that point.
-func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
+func (c *Channel) Receive(data []byte) (uint64, error) {
 
 	if len(data) == 0 {
 		return 0, nil
@@ -240,16 +240,10 @@ func (c *Channel) Receive(data []byte, progress chan<- uint64) (uint64, error) {
 
 // Send a covert message
 // data is the entire message that will be sent.
-// The optional progress chan can be used to alert the user as to the progress
-// of message transmission. This is useful if the user has set the GetDelay
-// function for the channel. The channel should be buffered, otherwise the
-// update will be skipped if it is not immediately read.
 // The GetDelay function can be used to set a large
-// inter packet delay to help obscure the communication. In that case
-// the progress channel will fire whenever the number of sent bytes has risen
-// by at least 1 percent.
+// inter packet delay to help obscure the communication.
 // We return the number of bytes sent even if an error is encountered
-func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
+func (c *Channel) Send(data []byte) (uint64, error) {
 	// We make it clear that the error always starts as nil
 	var err error = nil
 
@@ -264,7 +258,6 @@ func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
 		p            []byte
 		cm           *ipv4.ControlMessage
 		wait         time.Duration
-		sendPercent  uint64 = 0
 	)
 
 	// The source and destination depend on whether or not we are in bounce mode
@@ -285,21 +278,6 @@ func (c *Channel) Send(data []byte, progress chan<- uint64) (uint64, error) {
 
 		if err = c.writeConn(h, p, cm); err != nil {
 			return num, err
-		}
-
-		if progress != nil {
-			var currPercent uint64 = uint64(float64(num) / float64(len(data)))
-			if currPercent > sendPercent {
-				sendPercent = currPercent
-				// We send the update along the channel
-				// To avoid deadlock we skip if the channel
-				// is not ready to receive.
-				// As such, the channel should be buffered.
-				select {
-				case progress <- currPercent:
-				default:
-				}
-			}
 		}
 
 		// If the user did not supply a GetDelay function,
@@ -347,7 +325,7 @@ func (c *Channel) Close() error {
 	// The write operation allows the user to specify
 	// a delay between packets
 	// We can't just rely on the raw connection being
-	// close, we must also be able to cancel this delay,
+	// closed, we must also be able to cancel this delay,
 	// which is done with the writeCancel method
 	select {
 	case <-c.writeCancel:
