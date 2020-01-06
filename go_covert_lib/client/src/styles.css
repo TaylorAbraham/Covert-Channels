@@ -62,7 +62,7 @@
 /* Style the checkmark/indicator */
 .check-container .checkmark:after {
     left: 9px;
-    top: 5px;
+    top: 4px;
     width: 8px;
     height: 14px;
     border: solid white;
