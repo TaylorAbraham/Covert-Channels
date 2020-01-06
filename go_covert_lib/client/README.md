@@ -1,11 +1,10 @@
-Covert Client
-==============
+# Covert Client
 
-# Setup
+## Setup
 
-The client is served by the server, but it must be built first. You may build the client by running
+The client is served by the server, but dependencies must be installed and the client must be built first. You may do both by running
 ```
-npm install # Installs necessary dependencies
+npm install
 npm run build
 ```
 
@@ -20,8 +19,8 @@ Now the build script can be run in a terminal via
 ./client_watch.sh
 ```
 
-# Making changes
+## Making changes
 
-For styling, refer to [the bootstrap style guides](https://getbootstrap.com/docs/4.0/utilities).
+For styling, refer to [the bootstrap style guides](https://getbootstrap.com/docs/4.0/utilities/position/). There are many pages in the stlye guide available under "Utilities" on the left-hand sidebar
 
 Make sure to fix any linting errors before committing.
