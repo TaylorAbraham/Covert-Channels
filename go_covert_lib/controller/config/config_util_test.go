@@ -50,7 +50,12 @@ type s8 struct {
 
 type s9 struct{}
 
-var ptr *s1 = &s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}
+type s10 struct {
+	Prm1 SelectParam
+	Prm2 int
+}
+
+var ptr *s1 = &s1{Prm: MakeU16(5, [2]uint16{0, 10}, Display{})}
 
 var tests []testCase = []testCase{
 	testCase{1, true, "Config is not a struct"},
@@ -59,39 +64,41 @@ var tests []testCase = []testCase{
 	testCase{&ptr, true, "Config is not a struct"},
 
 	// Ensure it works on pointers
-	testCase{&s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}, false, ""},
+	testCase{&s1{Prm: MakeU16(5, [2]uint16{0, 10}, Display{})}, false, ""},
 
-	testCase{s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}, false, ""},
-	testCase{s1{Prm: MakeU16(5, [2]uint16{7, 10}, "")}, true, "Prm : U16 value out of range"},
+	testCase{s1{Prm: MakeU16(5, [2]uint16{0, 10}, Display{})}, false, ""},
+	testCase{s1{Prm: MakeU16(5, [2]uint16{7, 10}, Display{})}, true, "Prm : U16 value out of range"},
 
-	testCase{s2{Prm: MakeU64(5, [2]uint64{0, 10}, "")}, false, ""},
-	testCase{s2{Prm: MakeU64(5, [2]uint64{7, 10}, "")}, true, "Prm : U64 value out of range"},
+	testCase{s2{Prm: MakeU64(5, [2]uint64{0, 10}, Display{})}, false, ""},
+	testCase{s2{Prm: MakeU64(5, [2]uint64{7, 10}, Display{})}, true, "Prm : U64 value out of range"},
 
-	testCase{s3{Prm: MakeBool(true, "")}, false, ""},
-	testCase{s3{Prm: MakeBool(false, "")}, false, ""},
+	testCase{s3{Prm: MakeBool(true, Display{})}, false, ""},
+	testCase{s3{Prm: MakeBool(false, Display{})}, false, ""},
 
-	testCase{s4{Prm: MakeSelect("yes", []string{"yes", "no"}, "")}, false, ""},
-	testCase{s4{Prm: MakeSelect("yes", []string{}, "")}, true, "Prm : Select value not in list"},
-	testCase{s4{Prm: MakeSelect("not", []string{"yes", "no"}, "")}, true, "Prm : Select value not in list"},
+	testCase{s4{Prm: MakeSelect("yes", []string{"yes", "no"}, Display{})}, false, ""},
+	testCase{s4{Prm: MakeSelect("yes", []string{}, Display{})}, true, "Prm : Select value not in list"},
+	testCase{s4{Prm: MakeSelect("not", []string{"yes", "no"}, Display{})}, true, "Prm : Select value not in list"},
 
-	testCase{s5{Prm: MakeIPV4("1.2.3.4", "")}, false, ""},
-	testCase{s5{Prm: MakeIPV4("1.2.3.4.5", "")}, true, "Prm : Invalid IPV4 address"},
+	testCase{s5{Prm: MakeIPV4("1.2.3.4", Display{})}, false, ""},
+	testCase{s5{Prm: MakeIPV4("1.2.3.4.5", Display{})}, true, "Prm : Invalid IPV4 address"},
 
-	testCase{s6{Prm1: MakeSelect("yes", []string{"yes", "no"}, ""),
-		Prm2: MakeIPV4("1.2.3.4", ""),
-		Prm3: MakeBool(false, ""),
-		Prm4: MakeU16(5, [2]uint16{0, 10}, "")}, false, ""},
-	testCase{s6{Prm1: MakeSelect("yes", []string{"yes", "no"}, ""),
-		Prm2: MakeIPV4("1:2:3:4:5:6", ""),
-		Prm3: MakeBool(false, ""),
-		Prm4: MakeU16(5, [2]uint16{0, 10}, "")}, true, "Prm2 : Invalid IPV4 address"},
+	testCase{s6{Prm1: MakeSelect("yes", []string{"yes", "no"}, Display{}),
+		Prm2: MakeIPV4("1.2.3.4", Display{}),
+		Prm3: MakeBool(false, Display{}),
+		Prm4: MakeU16(5, [2]uint16{0, 10}, Display{})}, false, ""},
+	testCase{s6{Prm1: MakeSelect("yes", []string{"yes", "no"}, Display{}),
+		Prm2: MakeIPV4("1:2:3:4:5:6", Display{}),
+		Prm3: MakeBool(false, Display{}),
+		Prm4: MakeU16(5, [2]uint16{0, 10}, Display{})}, true, "Prm2 : Invalid IPV4 address"},
 
-	testCase{s7{Prm1: MakeSelect("yes", []string{"yes", "no"}, ""),
-		prm2: MakeIPV4("1:2:3:4:5:6", "")}, true, "prm2 : Could not retrieve unexported field"},
+	testCase{s7{Prm1: MakeSelect("yes", []string{"yes", "no"}, Display{}),
+		prm2: MakeIPV4("1:2:3:4:5:6", Display{})}, true, "prm2 : Could not retrieve unexported field"},
 
-	testCase{s8{Prm1: MakeSelect("yes", []string{"yes", "no"}, "")}, true, "Prm2 : Invalid struct field type"},
+	testCase{s8{Prm1: MakeSelect("yes", []string{"yes", "no"}, Display{})}, true, "Prm2 : Invalid struct field type"},
 
 	testCase{s9{}, false, ""},
+
+	testCase{s10{Prm1: MakeSelect("yes", []string{"yes", "no"}, Display{})}, true, "Prm2 : Invalid struct field type"},
 }
 
 func TestValidate(t *testing.T) {
@@ -113,18 +120,19 @@ type copyTestCase struct {
 	errorMsg string
 }
 
+type ValStruct struct {
+	Value int
+}
+
+type ValStructInter struct {
+	Value interface{}
+}
+
+type NoValStruct struct {
+	NotValue int
+}
+
 func TestCopyValueErrors(t *testing.T) {
-	type ValStruct struct {
-		Value int
-	}
-
-	type ValStructInter struct {
-		Value interface{}
-	}
-
-	type NoValStruct struct {
-		NotValue int
-	}
 
 	type st1 struct {
 		p1 int
@@ -188,8 +196,8 @@ func TestCopyValueErrors(t *testing.T) {
 }
 
 func TestCopyValueU16(t *testing.T) {
-	var sVal1 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}
-	var sVal2 s1 = s1{Prm: MakeU16(6, [2]uint16{0, 10}, "")}
+	var sVal1 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, Display{})}
+	var sVal2 s1 = s1{Prm: MakeU16(6, [2]uint16{0, 10}, Display{})}
 
 	if sVal1.Prm.Value == sVal2.Prm.Value {
 		t.Errorf("Expected values to not match : Found %d", sVal2.Prm.Value)
@@ -203,8 +211,8 @@ func TestCopyValueU16(t *testing.T) {
 }
 
 func TestCopyValueU16Ptr(t *testing.T) {
-	var sVal1 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}
-	var sVal2 s1 = s1{Prm: MakeU16(6, [2]uint16{0, 10}, "")}
+	var sVal1 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, Display{})}
+	var sVal2 s1 = s1{Prm: MakeU16(6, [2]uint16{0, 10}, Display{})}
 
 	if sVal1.Prm.Value == sVal2.Prm.Value {
 		t.Errorf("Expected values to not match : Found %d", sVal2.Prm.Value)
@@ -218,8 +226,8 @@ func TestCopyValueU16Ptr(t *testing.T) {
 }
 
 func TestCopyValueSameValue(t *testing.T) {
-	var sVal1 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}
-	var sVal2 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, "")}
+	var sVal1 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, Display{})}
+	var sVal2 s1 = s1{Prm: MakeU16(5, [2]uint16{0, 10}, Display{})}
 
 	err := CopyValue(&sVal1, sVal2)
 	if err != nil {
@@ -230,8 +238,8 @@ func TestCopyValueSameValue(t *testing.T) {
 }
 
 func TestCopyValueU64(t *testing.T) {
-	var sVal1 s2 = s2{Prm: MakeU64(0, [2]uint64{0, 10}, "")}
-	var sVal2 s2 = s2{Prm: MakeU64(10, [2]uint64{0, 10}, "")}
+	var sVal1 s2 = s2{Prm: MakeU64(0, [2]uint64{0, 10}, Display{})}
+	var sVal2 s2 = s2{Prm: MakeU64(10, [2]uint64{0, 10}, Display{})}
 
 	if sVal1.Prm.Value == sVal2.Prm.Value {
 		t.Errorf("Expected values to not match : Found %d", sVal2.Prm.Value)
@@ -245,8 +253,8 @@ func TestCopyValueU64(t *testing.T) {
 }
 
 func TestCopyValueBool(t *testing.T) {
-	var sVal1 s3 = s3{Prm: MakeBool(true, "")}
-	var sVal2 s3 = s3{Prm: MakeBool(false, "")}
+	var sVal1 s3 = s3{Prm: MakeBool(true, Display{})}
+	var sVal2 s3 = s3{Prm: MakeBool(false, Display{})}
 
 	if sVal1.Prm.Value == sVal2.Prm.Value {
 		t.Errorf("Expected values to not match : Found %s", strconv.FormatBool(sVal2.Prm.Value))
@@ -260,8 +268,8 @@ func TestCopyValueBool(t *testing.T) {
 }
 
 func TestCopyValueSelect(t *testing.T) {
-	var sVal1 s4 = s4{Prm: MakeSelect("yes", []string{"yes", "no"}, "")}
-	var sVal2 s4 = s4{Prm: MakeSelect("no", []string{"yes", "no"}, "")}
+	var sVal1 s4 = s4{Prm: MakeSelect("yes", []string{"yes", "no"}, Display{})}
+	var sVal2 s4 = s4{Prm: MakeSelect("no", []string{"yes", "no"}, Display{})}
 
 	if sVal1.Prm.Value == sVal2.Prm.Value {
 		t.Errorf("Expected values to not match : Found %s", sVal2.Prm.Value)
@@ -275,8 +283,8 @@ func TestCopyValueSelect(t *testing.T) {
 }
 
 func TestCopyValueIPV4(t *testing.T) {
-	var sVal1 s5 = s5{Prm: MakeIPV4("1.2.3.4", "")}
-	var sVal2 s5 = s5{Prm: MakeIPV4("4.3.2.1", "")}
+	var sVal1 s5 = s5{Prm: MakeIPV4("1.2.3.4", Display{})}
+	var sVal2 s5 = s5{Prm: MakeIPV4("4.3.2.1", Display{})}
 
 	if sVal1.Prm.Value == sVal2.Prm.Value {
 		t.Errorf("Expected values to not match : Found %s", sVal2.Prm.Value)
@@ -290,14 +298,14 @@ func TestCopyValueIPV4(t *testing.T) {
 }
 
 func TestCopyValueMultiValue(t *testing.T) {
-	var sVal1 s6 = s6{Prm1: MakeSelect("yes", []string{"yes", "no"}, ""),
-		Prm2: MakeIPV4("1.2.3.4", ""),
-		Prm3: MakeBool(true, ""),
-		Prm4: MakeU16(5, [2]uint16{0, 10}, "")}
-	var sVal2 s6 = s6{Prm1: MakeSelect("no", []string{"yes", "no"}, ""),
-		Prm2: MakeIPV4("4.3.2.1", ""),
-		Prm3: MakeBool(false, ""),
-		Prm4: MakeU16(6, [2]uint16{0, 10}, "")}
+	var sVal1 s6 = s6{Prm1: MakeSelect("yes", []string{"yes", "no"}, Display{}),
+		Prm2: MakeIPV4("1.2.3.4", Display{}),
+		Prm3: MakeBool(true, Display{}),
+		Prm4: MakeU16(5, [2]uint16{0, 10}, Display{})}
+	var sVal2 s6 = s6{Prm1: MakeSelect("no", []string{"yes", "no"}, Display{}),
+		Prm2: MakeIPV4("4.3.2.1", Display{}),
+		Prm3: MakeBool(false, Display{}),
+		Prm4: MakeU16(6, [2]uint16{0, 10}, Display{})}
 
 	err := CopyValue(&sVal1, sVal2)
 	// We test the values explicitely here
@@ -341,5 +349,179 @@ func TestNoUpdateUnlessAllValid(t *testing.T) {
 		t.Errorf("Expected %d: Found %d", s1.P2.NotValue, 2)
 	} else if s1.P3.Value != 3 {
 		t.Errorf("Expected %d: Found %d", s1.P3.Value, 3)
+	}
+}
+
+type copySetTestCase struct {
+	c1       interface{}
+	c2       interface{}
+	fields   []string
+	error    bool
+	errorMsg string
+}
+
+func TestCopySet(t *testing.T) {
+
+	type conf1 struct {
+		P1 ValStruct
+	}
+
+	type conf2 struct {
+		P2 ValStruct
+	}
+
+	type noConf struct {
+		P3 NoValStruct
+	}
+
+	type st1 struct{}
+	type st2 struct {
+		C1 int
+	}
+	type st3 struct {
+		C1 conf1
+	}
+	type st4 struct {
+		C1 conf1
+		C2 conf2
+	}
+	type st5 struct {
+		C1 conf1
+		C2 conf2
+		C3 noConf
+	}
+
+	var (
+		intVal int
+		sVal1  st1
+		sVal2  st2
+		sVal3  st3
+		sVal4  st4
+		sVal5  st5
+	)
+
+	var copyTests []copySetTestCase = []copySetTestCase{
+		copySetTestCase{1, 2, nil, true, "Initial config must be pointer"},
+		copySetTestCase{&intVal, 2, nil, true, "Configs must be struct"},
+		copySetTestCase{sVal1, sVal1, nil, true, "Initial config must be pointer"},
+		copySetTestCase{&sVal1, sVal1, nil, false, ""},
+		copySetTestCase{&sVal1, sVal1, []string{"C1"}, true, "C1 : field not in struct"},
+		copySetTestCase{&sVal2, sVal2, []string{}, false, ""},
+		copySetTestCase{&sVal2, sVal2, nil, true, "C1 : Configs must be struct"},
+		copySetTestCase{&sVal3, sVal3, nil, false, ""},
+		copySetTestCase{&sVal3, sVal3, []string{"C1"}, false, ""},
+		copySetTestCase{&sVal3, sVal3, []string{"C1", "C2"}, true, "C2 : field not in struct"},
+		copySetTestCase{&sVal4, sVal4, nil, false, ""},
+		copySetTestCase{&sVal4, sVal4, []string{"C2"}, false, ""},
+		copySetTestCase{&sVal4, sVal4, []string{"C1", "C2"}, false, ""},
+		copySetTestCase{&sVal3, sVal4, nil, true, "Configs must be same type"},
+		copySetTestCase{&sVal5, sVal5, []string{}, false, ""},
+		copySetTestCase{&sVal5, sVal5, []string{"C1", "C2"}, false, ""},
+		copySetTestCase{&sVal5, sVal5, nil, true, "C3 : P3 : struct must contain Value field"},
+	}
+
+	for i, v := range copyTests {
+		if err := CopyValueSet(v.c1, v.c2, v.fields); v.error && err == nil {
+			t.Errorf("Case %d : Expected error %s", i, v.errorMsg)
+		} else if v.error && err != nil && v.errorMsg != err.Error() {
+			t.Errorf("Case %d : Expected error %s: Found %s", i, v.errorMsg, err.Error())
+		} else if !v.error && err != nil {
+			t.Errorf("Case %d : Expected no error: Found %s", i, err.Error())
+		}
+	}
+}
+
+func TestSetCopy(t *testing.T) {
+
+	type conf1 struct {
+		P1 ValStruct
+	}
+	type conf2 struct {
+		P1 ValStruct
+	}
+
+	type st struct {
+		C1 conf1
+		C2 conf2
+	}
+
+	var s1 st = st{C1: conf1{P1: ValStruct{Value: 1}}, C2: conf2{P1: ValStruct{Value: 1}}}
+	var s2 st = st{C1: conf1{P1: ValStruct{Value: 2}}, C2: conf2{P1: ValStruct{Value: 2}}}
+
+	err := CopyValueSet(&s1, s2, []string{})
+	if err != nil {
+		t.Errorf("Unexpected error %s", err.Error())
+	} else if s1.C1.P1.Value != 1 && s2.C1.P1.Value != 2 {
+		t.Errorf("Expected %d: Found %d", 1, s1.C1.P1.Value)
+	} else if s1.C2.P1.Value != 1 && s2.C2.P1.Value != 2 {
+		t.Errorf("Expected %d: Found %d", 1, s1.C1.P1.Value)
+	}
+
+	err = CopyValueSet(&s1, s2, nil)
+	if err != nil {
+		t.Errorf("Unexpected error %s", err.Error())
+	} else if s1.C1.P1.Value != s2.C1.P1.Value {
+		t.Errorf("Expected %d: Found %d", s2.C1.P1.Value, s1.C1.P1.Value)
+	} else if s1.C2.P1.Value != s2.C2.P1.Value {
+		t.Errorf("Expected %d: Found %d", s2.C2.P1.Value, s1.C1.P1.Value)
+	}
+
+	s1 = st{C1: conf1{P1: ValStruct{Value: 1}}, C2: conf2{P1: ValStruct{Value: 1}}}
+	s2 = st{C1: conf1{P1: ValStruct{Value: 2}}, C2: conf2{P1: ValStruct{Value: 2}}}
+
+	err = CopyValueSet(&s1, s2, []string{"C1"})
+	if err != nil {
+		t.Errorf("Unexpected error %s", err.Error())
+	} else if s1.C1.P1.Value != s2.C1.P1.Value {
+		t.Errorf("Expected %d: Found %d", 1, s1.C1.P1.Value)
+	} else if s1.C2.P1.Value != 1 && s2.C2.P1.Value != 2 {
+		t.Errorf("Expected %d: Found %d", 1, s1.C1.P1.Value)
+	}
+
+	s1 = st{C1: conf1{P1: ValStruct{Value: 1}}, C2: conf2{P1: ValStruct{Value: 1}}}
+	s2 = st{C1: conf1{P1: ValStruct{Value: 2}}, C2: conf2{P1: ValStruct{Value: 2}}}
+
+	err = CopyValueSet(&s1, s2, []string{"C1", "C2"})
+	if err != nil {
+		t.Errorf("Unexpected error %s", err.Error())
+	} else if s1.C1.P1.Value != 1 && s2.C1.P1.Value != 2 {
+		t.Errorf("Expected %d: Found %d", 1, s1.C1.P1.Value)
+	} else if s1.C2.P1.Value != 1 && s2.C2.P1.Value != 2 {
+		t.Errorf("Expected %d: Found %d", 1, s1.C1.P1.Value)
+	}
+}
+
+func TestSetNoUpdateUnlessAllValid(t *testing.T) {
+
+	type conf1 struct {
+		P1 ValStruct
+	}
+	type noConf struct {
+		P2 NoValStruct
+	}
+	type conf2 struct {
+		P1 ValStruct
+	}
+
+	type st struct {
+		C1 conf1
+		C2 noConf
+		C3 conf2
+	}
+
+	var s1 st = st{C1: conf1{P1: ValStruct{Value: 1}}}
+	var s2 st = st{C1: conf1{P1: ValStruct{Value: 2}}}
+
+	err := CopyValueSet(&s1, s2, []string{"C1", "C2"})
+	if err == nil {
+		t.Errorf("Expected error")
+	} else if err.Error() != "C2 : P2 : struct must contain Value field" {
+		t.Errorf("Expected error %s: Found %s", "C2 : P2 : struct must contain Value field", err.Error())
+	} else if s1.C1.P1.Value != 1 {
+		t.Errorf("Expected %d: Found %d", s1.C1.P1.Value, 1)
+	} else if s1.C2.P2.NotValue != 0 {
+		t.Errorf("Expected %d: Found %d", s1.C2.P2.NotValue, 0)
+	} else if s2.C1.P1.Value != 2 {
+		t.Errorf("Expected %d: Found %d", s2.C1.P1.Value, 3)
 	}
 }

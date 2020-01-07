@@ -2,8 +2,10 @@ package controller
 
 import (
 	"./channel"
-	"./channel/ipv4TCP"
+	"./channel/ipv4tcp"
+	"./channel/tcp"
 	"./processor"
+	"./processor/caesar"
 	"./processor/none"
 	"github.com/gorilla/websocket"
 	"sync"
@@ -26,31 +28,41 @@ type messageType struct {
 	Message string
 }
 
-type configType struct {
-	OpCode        string
-	ChannelType   string
-	ProcessorType string
+type defaultConfig struct {
+	Processor processorData
+	Channel   channelData
 }
 
 type configData struct {
-	OpCode        string
-	ChannelType   string
-	ProcessorType string
-	Processor     processorData
-	Channel       channelData
+	OpCode     string
+	Default    defaultConfig
+	Processors []processorConfig
+	Channel    channelConfig
+}
+
+type processorConfig struct {
+	Type string
+	Data processorData
+}
+
+type channelConfig struct {
+	Type string
+	Data channelData
 }
 
 type channelData struct {
-	Ipv4TCP ipv4TCP.ConfigClient
+	Ipv4tcp ipv4tcp.ConfigClient
+	Tcp     tcp.ConfigClient
 }
 
 type processorData struct {
-	None none.ConfigClient
+	None   none.ConfigClient
+	Caesar caesar.ConfigClient
 }
 
 type Layers struct {
-	processor processor.Processor
-	channel   channel.Channel
+	processors []processor.Processor
+	channel    channel.Channel
 
 	// Chans for handling closing of the covert channel
 	readClose     chan interface{}
