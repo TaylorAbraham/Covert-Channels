@@ -48,7 +48,7 @@ type U64Param struct {
 // whole floating point number when sent to the server.
 // This type is used to transport the 64 bit integer as a string in the configuration.
 // This allows the exact number to be sent to the server, preventing the number from being changed.
-// This param type should be used whenever an exact, large 64 bit number is required (for example, 
+// This param type should be used whenever an exact, large 64 bit number is required (for example,
 // encryption keys).
 type ExactU64Param struct {
 	Type    string
@@ -74,6 +74,13 @@ type IPV4Param struct {
 	// To support the range of IP addresses, this is a string
 	// To convert to the proper IP address that can be used later on use GetValue
 	Value   string
+	Display Display
+}
+
+type HexKeyParam struct {
+	Type string
+	Value []byte
+	Range []int
 	Display Display
 }
 
@@ -132,7 +139,7 @@ func (p IPV4Param) Validate() error {
 	return err
 }
 
-func (p *IPV4Param) GetValue() ([4]byte, error) {
+func (p IPV4Param) GetValue() ([4]byte, error) {
 	var buf [4]byte
 	if ip := net.ParseIP(p.Value); ip != nil {
 		if ip4 := ip.To4(); ip4 != nil && len(ip4) == 4 {
@@ -141,6 +148,15 @@ func (p *IPV4Param) GetValue() ([4]byte, error) {
 		}
 	}
 	return buf, errors.New("Invalid IPV4 address")
+}
+
+func (p HexKeyParam) Validate() error {
+	for _, l := range p.Range {
+		if len(p.Value) == l {
+			return nil
+		}
+	}
+	return errors.New("Invalid key length")
 }
 
 func MakeI8(value int8, rng [2]int8, display Display) I8Param {
@@ -163,6 +179,10 @@ func MakeBool(value bool, display Display) BoolParam {
 }
 func MakeIPV4(value string, display Display) IPV4Param {
 	return IPV4Param{"ipv4", value, display}
+}
+
+func MakeHexKey(value []byte, rng []int, display Display) HexKeyParam {
+	return HexKeyParam{"hexkey", value, rng, display}
 }
 
 func Validate(c interface{}) error {
