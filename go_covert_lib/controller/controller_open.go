@@ -7,6 +7,7 @@ import (
 	"./config"
 	"./processor"
 	"./processor/caesar"
+	"./processor/advancedEncryptionStandard"
 	"./processor/none"
 	"encoding/json"
 	"errors"
@@ -132,6 +133,10 @@ func (ctr *Controller) retrieveProcessor(pconf processorConfig) (processor.Proce
 		}
 	case "Caesar":
 		if p, err = caesar.ToProcessor(newConf.Data.Caesar); err != nil {
+			return nil, nil, err
+		}
+	case "AdvancedEncryptionStandard":
+		if p, err = advancedEncryptionStandard.ToProcessor(newConf.Data.AdvancedEncryptionStandard); err != nil {
 			return nil, nil, err
 		}
 	default:
