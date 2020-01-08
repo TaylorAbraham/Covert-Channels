@@ -12,6 +12,7 @@ import './styles.css';
 
 const App: React.FC = () => {
     const [textToSend, setTextToSend] = useState("");
+    const [channels, setChannels] = useState([]);
     let ws: WebSocket;
 
     const sendConfig = () => {
@@ -23,18 +24,22 @@ const App: React.FC = () => {
         const address = prompt('Please enter the address to connect to', 'localhost:8080');
         ws = new WebSocket('ws://' + address + '/api/ws');
         ws.binaryType = 'arraybuffer';
-        ws.onopen = function (event) {
+        ws.onopen = (event) => {
             // writeResponse('Auto Connection established');
             sendConfig()
         };
 
-        ws.onerror = function (event) {
+        ws.onerror = (event) => {
             // writeResponse('Auto Connection error');
         };
 
-        ws.onmessage = function (event) {
-            console.log("received message");
-            console.log(event.data);
+        ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            switch (msg.OpCode) {
+                case "config":
+                    console.log("### msg.Default.Channel", msg.Default.Channel);
+                    // setChannels(Object.keys(msg.Default.Channel));
+            }
             // if (event.data) {
             //     var data = JSON.parse(event.data);
             //     if (data.OpCode === "config") {
