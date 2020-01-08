@@ -119,6 +119,9 @@
               case "u64":
                 input = $("<input>").attr("type","number").attr({ min : data[key].Range[0], max : data[key].Range[1]}).val(val);
                 break;
+              case "exactu64":
+                  input = $("<input>").attr("type","number").val(val);
+                  break;
               case "bool":
                 input = $("<input>").attr("type","checkbox").prop('checked', val).val(val);
                 break;

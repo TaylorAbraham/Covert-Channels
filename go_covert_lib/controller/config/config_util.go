@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 	"reflect"
+	"strconv"
 )
 
 type param interface {
@@ -34,6 +35,24 @@ type U64Param struct {
 	Type    string
 	Value   uint64
 	Range   [2]uint64
+	Display Display
+}
+
+// In Javascript the number type is a floating point integer
+// This means that large numbers cannot be represented exactly as integers
+// The inprecision of floating point numbers is fine for small numbers,
+// for large 64 bit integers not all numbers can be represented.
+// The largest safe 64 bit integer is 9007199254740991 (Number.MAX_SAFE_INTEGER, (2^53)-1)
+// (see https://www.wikitechy.com/tutorials/javascript/what-is-javascripts-highest-integer-value-that-a-number-can-go-to-without-losing-precision)
+// If a large 64 bit integer is input in a number input it will be rounded to the nearest
+// whole floating point number when sent to the server.
+// This type is used to transport the 64 bit integer as a string in the configuration.
+// This allows the exact number to be sent to the server, preventing the number from being changed.
+// This param type should be used whenever an exact, large 64 bit number is required (for example, 
+// encryption keys).
+type ExactU64Param struct {
+	Type    string
+	Value   string
 	Display Display
 }
 
@@ -82,6 +101,19 @@ func (p U64Param) Validate() error {
 	}
 }
 
+func (p ExactU64Param) Validate() error {
+	_, err := p.GetValue()
+	return err
+}
+
+func (p ExactU64Param) GetValue() (uint64, error) {
+	if n, err := strconv.ParseUint(p.Value, 10, 64); err == nil {
+		return n, nil
+	} else {
+		return 0, err
+	}
+}
+
 func (p BoolParam) Validate() error {
 	return nil
 }
@@ -111,9 +143,6 @@ func (p *IPV4Param) GetValue() ([4]byte, error) {
 	return buf, errors.New("Invalid IPV4 address")
 }
 
-func MakeIPV4(value string, display Display) IPV4Param {
-	return IPV4Param{"ipv4", value, display}
-}
 func MakeI8(value int8, rng [2]int8, display Display) I8Param {
 	return I8Param{"i8", value, rng, display}
 }
@@ -123,11 +152,17 @@ func MakeU16(value uint16, rng [2]uint16, display Display) U16Param {
 func MakeU64(value uint64, rng [2]uint64, display Display) U64Param {
 	return U64Param{"u64", value, rng, display}
 }
+func MakeExactU64(value uint64, display Display) ExactU64Param {
+	return ExactU64Param{"exactu64", strconv.FormatUint(value, 10), display}
+}
 func MakeSelect(value string, rng []string, display Display) SelectParam {
 	return SelectParam{"select", value, rng, display}
 }
 func MakeBool(value bool, display Display) BoolParam {
 	return BoolParam{"bool", value, display}
+}
+func MakeIPV4(value string, display Display) IPV4Param {
+	return IPV4Param{"ipv4", value, display}
 }
 
 func Validate(c interface{}) error {
