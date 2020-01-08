@@ -3,6 +3,7 @@ package config
 import (
 	"strconv"
 	"testing"
+	"bytes"
 )
 
 type testCase struct {
@@ -523,5 +524,59 @@ func TestSetNoUpdateUnlessAllValid(t *testing.T) {
 		t.Errorf("Expected %d: Found %d", s1.C2.P2.NotValue, 0)
 	} else if s2.C1.P1.Value != 2 {
 		t.Errorf("Expected %d: Found %d", s2.C1.P1.Value, 3)
+	}
+}
+
+func TestExactU64(t *testing.T) {
+
+	eU64 := MakeExactU64(12345, Display{})
+
+	if eU64.Value != "12345" {
+		t.Errorf("Expected %s; found %s", "12345", eU64.Value)
+	} else if eU64.Validate() != nil {
+		t.Errorf("Expected successful validation")
+	} else if n, err := eU64.GetValue(); err != nil {
+		t.Errorf("Expected no error; found %s", err.Error())
+	} else if n != 12345 {
+		t.Errorf("Expected %d; found %d", 12345, n)
+	}
+
+	eU64.Value = "123451234512345123451234512345"
+
+	if eU64.Validate() == nil {
+		t.Errorf("Expected unsuccessful validation")
+	} else if n, err := eU64.GetValue(); err == nil {
+		t.Errorf("Expected error from GetValue")
+	} else if err.Error() != "strconv.ParseUint: parsing \"123451234512345123451234512345\": value out of range" {
+		t.Errorf("Expected error %s; found %s", "strconv.ParseUint: parsing \"123451234512345123451234512345\": value out of range", err.Error())
+	} else if n != 0 {
+		t.Errorf("Expected %d for invalid value; found %d", 0, n)
+	}
+
+}
+
+func TestHexKey(t *testing.T) {
+
+	hKey := MakeHexKey([]byte{1,2,3,4}, []int{2, 4}, Display{})
+
+	if hKey.Validate() != nil {
+		t.Errorf("Expected no error; found %s", hKey.Validate().Error())
+	} else if !bytes.Equal(hKey.Value, []byte{1,2,3,4}) {
+		t.Errorf("Expected found %v; found %v", []byte{1,2,3,4}, hKey.Value)
+	}
+
+	hKey.Value = []byte{1,2}
+
+	if hKey.Validate() != nil {
+		t.Errorf("Expected no error; found %s", hKey.Validate().Error())
+	} else if !bytes.Equal(hKey.Value, []byte{1,2}) {
+		t.Errorf("Expected found %v; found %v", []byte{1,2}, hKey.Value)
+	}
+
+	hKey.Value = []byte{1,2,3}
+	if hKey.Validate() == nil {
+		t.Errorf("Expected error")
+	} else if hKey.Validate().Error() != "Invalid key length" {
+		t.Errorf("Expected error %s; found %s", "Invalid key length", hKey.Validate().Error())
 	}
 }
