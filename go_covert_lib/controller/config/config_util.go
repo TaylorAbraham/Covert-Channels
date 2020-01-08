@@ -38,6 +38,18 @@ type U64Param struct {
 	Display Display
 }
 
+// In Javascript the number type is a floating point integer
+// This means that large numbers cannot be represented exactly as integers
+// The inprecision of floating point numbers is fine for small numbers,
+// for large 64 bit integers not all numbers can be represented.
+// The largest safe 64 bit integer is 9007199254740991 (Number.MAX_SAFE_INTEGER, (2^53)-1)
+// (see https://www.wikitechy.com/tutorials/javascript/what-is-javascripts-highest-integer-value-that-a-number-can-go-to-without-losing-precision)
+// If a large 64 bit integer is input in a number input it will be rounded to the nearest
+// whole floating point number when sent to the server.
+// This type is used to transport the 64 bit integer as a string in the configuration.
+// This allows the exact number to be sent to the server, preventing the number from being changed.
+// This param type should be used whenever an exact, large 64 bit number is required (for example, 
+// encryption keys).
 type ExactU64Param struct {
 	Type    string
 	Value   string
