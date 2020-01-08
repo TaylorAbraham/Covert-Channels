@@ -1,22 +1,18 @@
 package advancedEncryptionStandard
 
 import (
-	"math"
-	"encoding/binary"
 	"../../config"
 )
 
 type ConfigClient struct {
-	Key config.U32Param
+	Key config.HexKeyParam
 }
 
 func GetDefault() ConfigClient {
 	return ConfigClient {
-		Key: config.MakeU32(0, [2]uint64{0, math.MaxUint32}, config.Display{Description: "The shared secret key used for symmtric encryption."})}
+		Key: config.MakeHexKey(make([]byte, 32), []int{16, 24, 32}, config.Display{Description: "The shared secret key used for symmtric encryption."})}
 } 
 
 func ToProcessor(aes ConfigClient) (*AdvancedEncryptionStandard, error) {
-	byteArray := make([]byte, 32)
-	binary.LittleEndian.PutUint64(byteArray, aes.Key.Value)
-	return &AdvancedEncryptionStandard{key: byteArray}, nil
+	return &AdvancedEncryptionStandard{key: aes.Key.Value}, nil
 }
