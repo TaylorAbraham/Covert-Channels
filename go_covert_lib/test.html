@@ -99,6 +99,7 @@
       }
 
       function handleConfigKeys(data) {
+        console.log(data);
         var tbl = $("<table>");
         for (var key in data) {
           if (data.hasOwnProperty(key)) {
@@ -133,14 +134,43 @@
                 input.val(data[key].Value);
                 break;
               case "ipv4":
-                  input = $("<input>").attr("type","text").val(val);
-                  break;
+                input = $("<input>").attr("type","text").val(val);
+                break;
+              case "hexkey":
+                var str = "";
+                // Byte arrays in go are converted to base 64 in json
+                // We must convert back to a byte array
+                var sval = atob(val);
+                console.log(val);
+                // Inspired by https://stackoverflow.com/questions/14603205/how-to-convert-hex-string-into-a-bytes-array-and-a-bytes-array-in-the-hex-string
+                for (var i = 0; i < sval.length; i++) {
+                  var c = sval.charCodeAt(i).toString(16);
+                  str += c.length === 1 ? "0" + c: c;
+                }
+                input = $("<input>").attr("type","text").val(str);
+                break;
             }
             input.on('input', function (obj) {
               if (obj.Type === "bool") {
                 obj.Value = this.prop('checked');
               } else if (obj.Type == "u16" || obj.Type == "u64" || obj.Type == "i8") {
                 obj.Value = Number(this.val());
+              } else if (obj.Type === "hexkey") {
+                var str = this.val(), key = [];
+                // Inspired by https://stackoverflow.com/questions/14603205/how-to-convert-hex-string-into-a-bytes-array-and-a-bytes-array-in-the-hex-string
+                var regex = /^([a-fA-F0-9][a-fA-F0-9])*$/;
+                if (str.match(regex) !== null) {
+                  while (str.length > 0) {
+                    key.push(parseInt(str.substring(0, 2), 16));
+                    str = str.substring(2);
+                  }
+                  obj.Value = key;
+                  this.css({ 'border-color' : 'black' });
+                } else {
+                  this.css({ 'border-color' : 'red' });
+                }
+    bytes.push(parseInt(hex.substr(c, 2), 16));
+    return bytes;
               } else {
                 obj.Value = this.val();
               }

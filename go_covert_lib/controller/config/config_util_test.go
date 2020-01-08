@@ -3,6 +3,7 @@ package config
 import (
 	"strconv"
 	"testing"
+	"bytes"
 )
 
 type testCase struct {
@@ -552,4 +553,30 @@ func TestExactU64(t *testing.T) {
 		t.Errorf("Expected %d for invalid value; found %d", 0, n)
 	}
 
+}
+
+func TestHexKey(t *testing.T) {
+
+	hKey := MakeHexKey([]byte{1,2,3,4}, []int{2, 4}, Display{})
+
+	if hKey.Validate() != nil {
+		t.Errorf("Expected no error; found %s", hKey.Validate().Error())
+	} else if !bytes.Equal(hKey.Value, []byte{1,2,3,4}) {
+		t.Errorf("Expected found %v; found %v", []byte{1,2,3,4}, hKey.Value)
+	}
+
+	hKey.Value = []byte{1,2}
+
+	if hKey.Validate() != nil {
+		t.Errorf("Expected no error; found %s", hKey.Validate().Error())
+	} else if !bytes.Equal(hKey.Value, []byte{1,2}) {
+		t.Errorf("Expected found %v; found %v", []byte{1,2}, hKey.Value)
+	}
+
+	hKey.Value = []byte{1,2,3}
+	if hKey.Validate() == nil {
+		t.Errorf("Expected error")
+	} else if hKey.Validate().Error() != "Invalid key length" {
+		t.Errorf("Expected error %s; found %s", "Invalid key length", hKey.Validate().Error())
+	}
 }
