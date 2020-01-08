@@ -61,7 +61,7 @@ of message transmission:
 
 # Example
 
-To run this example you will need to install rust. 
+To run this example you will need to install rust.
 Instructions for installing can be found online.
 
 This demo can be run on a single machine. Build
