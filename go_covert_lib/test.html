@@ -141,7 +141,6 @@
                 // Byte arrays in go are converted to base 64 in json
                 // We must convert back to a byte array
                 var sval = atob(val);
-                console.log(val);
                 // Inspired by https://stackoverflow.com/questions/14603205/how-to-convert-hex-string-into-a-bytes-array-and-a-bytes-array-in-the-hex-string
                 for (var i = 0; i < sval.length; i++) {
                   var c = sval.charCodeAt(i).toString(16);
