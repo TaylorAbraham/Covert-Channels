@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 	"reflect"
+	"strconv"
 )
 
 type param interface {
@@ -34,6 +35,12 @@ type U64Param struct {
 	Type    string
 	Value   uint64
 	Range   [2]uint64
+	Display Display
+}
+
+type ExactU64Param struct {
+	Type    string
+	Value   string
 	Display Display
 }
 
@@ -82,6 +89,19 @@ func (p U64Param) Validate() error {
 	}
 }
 
+func (p ExactU64Param) Validate() error {
+	_, err := p.GetValue()
+	return err
+}
+
+func (p ExactU64Param) GetValue() (uint64, error) {
+	if n, err := strconv.ParseUint(p.Value, 10, 64); err == nil {
+		return n, nil
+	} else {
+		return 0, err
+	}
+}
+
 func (p BoolParam) Validate() error {
 	return nil
 }
@@ -111,9 +131,6 @@ func (p *IPV4Param) GetValue() ([4]byte, error) {
 	return buf, errors.New("Invalid IPV4 address")
 }
 
-func MakeIPV4(value string, display Display) IPV4Param {
-	return IPV4Param{"ipv4", value, display}
-}
 func MakeI8(value int8, rng [2]int8, display Display) I8Param {
 	return I8Param{"i8", value, rng, display}
 }
@@ -123,11 +140,17 @@ func MakeU16(value uint16, rng [2]uint16, display Display) U16Param {
 func MakeU64(value uint64, rng [2]uint64, display Display) U64Param {
 	return U64Param{"u64", value, rng, display}
 }
+func MakeExactU64(value uint64, display Display) ExactU64Param {
+	return ExactU64Param{"exactu64", strconv.FormatUint(value, 10), display}
+}
 func MakeSelect(value string, rng []string, display Display) SelectParam {
 	return SelectParam{"select", value, rng, display}
 }
 func MakeBool(value bool, display Display) BoolParam {
 	return BoolParam{"bool", value, display}
+}
+func MakeIPV4(value string, display Display) IPV4Param {
+	return IPV4Param{"ipv4", value, display}
 }
 
 func Validate(c interface{}) error {
