@@ -4,15 +4,21 @@ import Dropdown from 'react-bootstrap/Dropdown';
 import FormControl from 'react-bootstrap/FormControl';
 import './styles.css';
 
+// Matches just the "127.0.0.1:8080" portion of the address
+const addressRegex = /[a-zA-Z0-9.]+:[\d]+/g;
+const ws = new WebSocket(`ws://${window.location.href.match(addressRegex)[0]}/api/ws`);
+// TODO: The below exists for easy personal debugging
+// const ws = new WebSocket('ws://localhost:8080/api/ws');
+
 /**
  * IMPORTANT NOTE: For styling, refer to https://getbootstrap.com/docs/4.0/utilities/position/
  */
-
 const App = () => {
   const [textToSend, setTextToSend] = useState('');
+  const [processors, setProcessors] = useState([]);
+  const [processor, setProcessor] = useState({});
   const [channels, setChannels] = useState([]);
-  const [channel, setChannel] = useState('');
-  let ws; // The websocket connection to the server
+  const [channel, setChannel] = useState({});
 
   const sendConfig = () => {
     const cmd = JSON.stringify({ OpCode: 'config' });
@@ -20,9 +26,6 @@ const App = () => {
   };
 
   useEffect(() => {
-    // Matches just the "127.0.0.1:8080" portion of the address
-    const addressRegex = /[a-zA-Z0-9.]+:[\d]+/g;
-    ws = new WebSocket(`ws://${window.location.href.match(addressRegex)[0]}/api/ws`);
     ws.binaryType = 'arraybuffer';
     ws.onopen = (event) => {
       sendConfig();
@@ -36,7 +39,8 @@ const App = () => {
       const msg = JSON.parse(event.data);
       switch (msg.OpCode) {
         case 'config':
-          setChannels(Object.keys(msg.Default.Channel));
+          setChannels(msg.Default.Channel);
+          setProcessors(msg.Default.Processor);
           break;
         default:
             // TODO:
@@ -67,17 +71,21 @@ const App = () => {
           className="w-25"
           variant="outline-primary"
         >
-          {channel || 'Select a Channel'}
+          {channel.value || 'Select a Channel'}
         </Dropdown.Toggle>
 
         <Dropdown.Menu className="w-25">
           {
-            channels.map(chan => (
+            Object.keys(channels).map(chan => (
               <Dropdown.Item
                 as="option"
-                active={chan === channel}
-                onClick={e => setChannel(e.target.value)}
+                active={chan === channel.value}
+                onClick={e => setChannel({
+                  value: e.target.value,
+                  properties: channels[chan],
+                })}
                 value={chan}
+                key={chan}
               >
                 {chan}
               </Dropdown.Item>
