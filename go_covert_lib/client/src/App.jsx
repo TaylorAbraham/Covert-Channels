@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Button from 'react-bootstrap/Button';
-import Form from 'react-bootstrap/Form';
 import FormControl from 'react-bootstrap/FormControl';
 import InputGroup from 'react-bootstrap/InputGroup';
-import FormCheck from 'react-bootstrap/FormCheck';
 import './styles.css';
 
 /**
@@ -13,12 +11,12 @@ import './styles.css';
 const App = () => {
     const [textToSend, setTextToSend] = useState("");
     const [channels, setChannels] = useState([]);
-    let ws;
+    let ws; // The websocket connection to the server
 
     const sendConfig = () => {
         const cmd = JSON.stringify({OpCode : "config"});
         ws.send(cmd);
-    }
+    };
 
     useEffect(() => {
         // Matches just the "127.0.0.1:8080" portion of the address
@@ -26,29 +24,19 @@ const App = () => {
         ws = new WebSocket('ws://' + window.location.href.match(addressRegex)[0] + '/api/ws');
         ws.binaryType = 'arraybuffer';
         ws.onopen = (event) => {
-            // writeResponse('Auto Connection established');
-            sendConfig()
+            sendConfig();
         };
 
         ws.onerror = (event) => {
-            // writeResponse('Auto Connection error');
+            // TODO:
         };
 
         ws.onmessage = (event) => {
             const msg = JSON.parse(event.data);
             switch (msg.OpCode) {
                 case "config":
-                    console.log("### msg.Default.Channel", msg.Default.Channel);
-                    // setChannels(Object.keys(msg.Default.Channel));
+                    setChannels(Object.keys(msg.Default.Channel));
             }
-            // if (event.data) {
-            //     var data = JSON.parse(event.data);
-            //     if (data.OpCode === "config") {
-            //         handleConfig(data);
-            //     } else {
-            //         writeResponse(event.data);
-            //     }
-            // }
         };
     }, []);
 
