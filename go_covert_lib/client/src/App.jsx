@@ -10,10 +10,10 @@ import './styles.css';
  * IMPORTANT NOTE: For styling, refer to https://getbootstrap.com/docs/4.0/utilities/position/
  */
 
-const App: React.FC = () => {
+const App = () => {
     const [textToSend, setTextToSend] = useState("");
     const [channels, setChannels] = useState([]);
-    let ws: WebSocket;
+    let ws;
 
     const sendConfig = () => {
         const cmd = JSON.stringify({OpCode : "config"});
@@ -21,8 +21,9 @@ const App: React.FC = () => {
     }
 
     useEffect(() => {
-        const address = prompt('Please enter the address to connect to', 'localhost:8080');
-        ws = new WebSocket('ws://' + address + '/api/ws');
+        // Matches just the "127.0.0.1:8080" portion of the address
+        const addressRegex = /[a-zA-Z0-9\.]+:[\d]+/g;
+        ws = new WebSocket('ws://' + window.location.href.match(addressRegex)[0] + '/api/ws');
         ws.binaryType = 'arraybuffer';
         ws.onopen = (event) => {
             // writeResponse('Auto Connection established');
