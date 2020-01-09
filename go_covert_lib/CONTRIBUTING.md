@@ -11,6 +11,19 @@ I make an issue to fix a bug with the "write" button. My issue shows up as #14, 
 
 `14/fix-write-button`
 
+## Commit Guidelines
+Be sure to prefix every commit with your issue number. For example, `[14] Lint race condition fix`
+
+This section is a lot more optional, but in general please follow general commit message practices. Common guidelines outlined here: https://chris.beams.io/posts/git-commit/
+In summary,
+1. Separate subject from body with a blank line (if you have a body, which is optional)
+2. Limit the subject line to 50 characters
+3. Capitalize the subject line
+4. Do not end the subject line with a period
+5. Use the imperative mood in the subject line
+6. Wrap the body at 72 characters
+7. Use the body to explain what and why vs. how
+
 ## PR Guidelines
 You may open a PR at any time once the first commit has been made. If the PR is not yet ready for review or merge, simply add the "WIP" (Work In Progress) label to it. Putting it up early allows other developers to see what you are working on and how far along it is, as well as allowing for architectural or design errors to be caught early on.
 
@@ -36,16 +49,3 @@ git merge master
 Continuing on our example from before, our PR could be named
 
 `[14] Fix async race condition with the write button`
-
-## Commit Guidelines
-Be sure to prefix every commit with your issue number. For example, `[14] Lint race condition fix`
-
-This section is a lot more optional, but in general please follow general commit message practices. Common guidelines outlined here: https://chris.beams.io/posts/git-commit/
-In summary,
-1. Separate subject from body with a blank line (if you have a body, which is optional)
-2. Limit the subject line to 50 characters
-3. Capitalize the subject line
-4. Do not end the subject line with a period
-5. Use the imperative mood in the subject line
-6. Wrap the body at 72 characters
-7. Use the body to explain what and why vs. how
