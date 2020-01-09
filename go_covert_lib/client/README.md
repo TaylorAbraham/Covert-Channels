@@ -8,6 +8,10 @@ npm install
 npm run build
 ```
 
+The client can then be accessed from the same IP as the Go server. I.E. http://localhost:8080
+
+## Setup for Development
+
 If you are making changes to the frontend, rather than re-building the frontend every time, you may use the client watch script to automatically trigger a build each time changes are made. First run the one-time setup by allowing execution and installing inotify-tools:
 ```
 chmod +x client_watch.sh
@@ -18,6 +22,8 @@ Now the build script can be run in a terminal via
 ```
 ./client_watch.sh
 ```
+
+**Please have the ESLint extension installed for your code editor**
 
 ## Making changes
 
