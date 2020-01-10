@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import Button from 'react-bootstrap/Button';
 import Dropdown from 'react-bootstrap/Dropdown';
 import FormControl from 'react-bootstrap/FormControl';
+
+import IPInput from './ui-components/IPInput';
 import './styles.css';
 
 // Matches just the "127.0.0.1:8080" portion of the address
 const addressRegex = /[a-zA-Z0-9.]+:[\d]+/g;
-const ws = new WebSocket(`ws://${window.location.href.match(addressRegex)[0]}/api/ws`);
+// const ws = new WebSocket(`ws://${window.location.href.match(addressRegex)[0]}/api/ws`);
 // TODO: The below exists for easy personal debugging
-// const ws = new WebSocket('ws://localhost:8080/api/ws');
+const ws = new WebSocket('ws://localhost:8080/api/ws');
 
 /**
  * IMPORTANT NOTE: For styling, refer to https://getbootstrap.com/docs/4.0/utilities/position/
@@ -93,6 +95,7 @@ const App = () => {
           }
         </Dropdown.Menu>
       </Dropdown>
+      <IPInput label="Friend's IP" default="127.0.0.1" />
       <Button variant="success" className="m-1 w-25">Open Covert Channel</Button>
       <Button variant="danger" className="m-1 w-25">Close Covert Channel</Button>
     </div>
