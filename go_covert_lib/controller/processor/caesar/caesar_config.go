@@ -11,7 +11,7 @@ type ConfigClient struct {
 func GetDefault() ConfigClient {
 	return ConfigClient{
 		// Julius Caesar crossed the Rubicon in 49 AD
-		Shift: config.MakeI8(49, [2]int8{-128, 127}, config.Display{Description: "The shift for the Caesar cypher."})}
+		Shift: config.MakeI8(49, [2]int8{-128, 127}, config.Display{Description: "The shift for the Caesar cypher", Name: "Shift"})}
 }
 
 func ToProcessor(cc ConfigClient) (*Caesar, error) {
