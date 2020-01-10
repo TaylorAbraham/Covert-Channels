@@ -5,6 +5,7 @@ import FormControl from 'react-bootstrap/FormControl';
 import Spinner from 'react-bootstrap/Spinner';
 
 import IPInput from './ui-components/IPInput';
+import PortInput from './ui-components/PortInput';
 import './styles.css';
 
 /**
@@ -44,9 +45,11 @@ const App = () => {
     // const ws = new WebSocket('ws://localhost:8080/api/ws');
     ws.binaryType = 'arraybuffer';
     ws.onopen = _e => sendConfig(ws);
-    ws.onerror = _e => console.log('UNIMPLEMENTED'); //TODO:
+    ws.onerror = _e => console.log('UNIMPLEMENTED'); // TODO:
     ws.onmessage = e => handleMessage(JSON.parse(e.data));
   }, []);
+
+  console.log("### config", config);
 
   return isLoading ? (
     <div className="spinner-container">
@@ -83,10 +86,13 @@ const App = () => {
               <Dropdown.Item
                 as="option"
                 active={chan === channel.value}
-                onClick={e => setChannel({
-                  value: e.target.value,
-                  properties: channels[chan],
-                })}
+                onClick={(e) => {
+                  setChannel({
+                    value: e.target.value,
+                    properties: channels[chan],
+                  });
+                  setConfig(channels[chan]);
+                }}
                 value={chan}
                 key={chan}
               >
@@ -96,7 +102,30 @@ const App = () => {
           }
         </Dropdown.Menu>
       </Dropdown>
-      <IPInput label="Friend's IP" default="127.0.0.1" />
+      {Object.keys(config).map((key) => {
+        const opt = config[key];
+        // TODO: Grouping logic
+        switch (opt.Type) {
+          case 'ipv4':
+            return (
+              <IPInput
+                label={opt.Display.Name}
+                default="127.0.0.1"
+                key={key}
+              />
+            );
+          case 'u16':
+            return (
+              <PortInput
+                label={opt.Display.Name}
+                default="127.0.0.1"
+                key={key}
+              />
+            );
+          default:
+            return (<div key={key}>UNIMPLEMENTED</div>);
+        }
+      })}
       <Button variant="success" className="m-1 w-25">Open Covert Channel</Button>
       <Button variant="danger" className="m-1 w-25">Close Covert Channel</Button>
     </div>

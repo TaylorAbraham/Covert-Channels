@@ -4,7 +4,7 @@ import FormControl from 'react-bootstrap/FormControl';
 import InputGroup from 'react-bootstrap/InputGroup';
 
 
-const IPInput = (props) => {
+const PortInput = (props) => {
   const { label } = props;
   return (
     <InputGroup className="m-1 w-25">
@@ -12,14 +12,14 @@ const IPInput = (props) => {
         <InputGroup.Text className="input-text">{label}</InputGroup.Text>
       </InputGroup.Prepend>
       <FormControl
-        placeholder="127.0.0.1"
+        placeholder="8080"
       />
     </InputGroup>
   );
 };
 
-IPInput.propTypes = {
+PortInput.propTypes = {
   label: PropTypes.string.isRequired,
 };
 
-export default IPInput;
+export default PortInput;
