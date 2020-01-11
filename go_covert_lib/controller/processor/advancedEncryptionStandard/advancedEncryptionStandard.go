@@ -4,7 +4,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"errors"
-	"fmt"
 )
 
 const padIndex = 7;
@@ -17,15 +16,10 @@ type AdvancedEncryptionStandard struct {
 func(c *AdvancedEncryptionStandard) Process(data []byte) ([]byte, error) {
 	data = Pad(data)
 
-	fmt.Print("Checkpoint1")
 	block, err := aes.NewCipher(c.key)
 	if err != nil {
-		fmt.Print("Checkpoint2")
 		return nil, err
-		fmt.Print("Checkpoint3")
 	}
-
-	fmt.Print("Checkpoint4")
 
 	var cipherText []byte
 	selectedMode := c.mode
@@ -61,7 +55,6 @@ func CBCEncrypter(block cipher.Block, data []byte) ([]byte) {
 func CFBEncrypter(block cipher.Block, data []byte) ([]byte) {
 	cipherText := make([]byte, aes.BlockSize+len(data))
 	iv := cipherText[:aes.BlockSize]
-	data = data[aes.BlockSize:]
 
 	stream := cipher.NewCFBEncrypter(block, iv)
 	stream.XORKeyStream(cipherText[aes.BlockSize:], data)
