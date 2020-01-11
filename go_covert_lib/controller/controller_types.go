@@ -59,7 +59,7 @@ type channelData struct {
 type processorData struct {
 	None   none.ConfigClient
 	Caesar caesar.ConfigClient
-	AdvancedEncryptionStandard advancedEncryptionStandard.ConfigClient
+	SymmetricEncryption advancedEncryptionStandard.ConfigClient
 }
 
 type Layers struct {

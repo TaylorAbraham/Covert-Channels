@@ -76,7 +76,7 @@ func defaultProcessor() processorData {
 	return processorData{
 		None:   none.GetDefault(),
 		Caesar: caesar.GetDefault(),
-		AdvancedEncryptionStandard: advancedEncryptionStandard.GetDefault(),
+		SymmetricEncryption: advancedEncryptionStandard.GetDefault(),
 	}
 }
 

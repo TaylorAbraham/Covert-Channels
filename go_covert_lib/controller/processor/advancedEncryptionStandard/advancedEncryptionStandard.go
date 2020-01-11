@@ -3,20 +3,43 @@ package advancedEncryptionStandard
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/des"
 	"errors"
 )
 
 const padIndex = 7;
+//const blockSize := algorithm == "Advanced Encryption Standard (AES)" ? 16 : 8
 
 type AdvancedEncryptionStandard struct {
+	algorithm string
 	mode string
 	key []byte
 }
 
 func(c *AdvancedEncryptionStandard) Process(data []byte) ([]byte, error) {
 	data = Pad(data)
+	algorithm := c.algorithm
+	 
+	var (
+		blockSize int
+		block cipher.Block
+		err error
+	)
 
-	block, err := aes.NewCipher(c.key)
+	switch algorithm {
+	case "Advanced Encryption Standard (AES)":
+		block, err = aes.NewCipher(c.key)
+		blockSize = 16
+	case "Data Encryption Standard (DES)":
+		block, err = des.NewCipher(c.key)
+		blockSize = 8
+	case "Triple Data Encryption Standard (3DES)":
+		block, err = des.NewTripleDESCipher(c.key)
+		blockSize = 8
+	default: 
+		return nil, errors.New("Undefined algorithm selected")
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -30,11 +53,11 @@ func(c *AdvancedEncryptionStandard) Process(data []byte) ([]byte, error) {
 			return nil, errors.New("Unable to encrypt in Galosis Counter Mode (GCM)")
 		}
 	case "Cipher Block Chaining (CBC)":
-		cipherText = CBCEncrypter(block, data)
+		cipherText = CBCEncrypter(block, data, blockSize)
 	case "Cipher Feedback (CFB)":
-		cipherText = CFBEncrypter(block, data)
+		cipherText = CFBEncrypter(block, data, blockSize)
 	case "Counter (CTR)":
-		cipherText = CTREncrypter(block, data)
+		cipherText = CTREncrypter(block, data, blockSize)
 	default: 
 		return nil, errors.New("Undefined mode selected")
 	}
@@ -42,22 +65,22 @@ func(c *AdvancedEncryptionStandard) Process(data []byte) ([]byte, error) {
 	return cipherText[:], nil
 }
 
-func CBCEncrypter(block cipher.Block, data []byte) ([]byte) {
-	cipherText := make([]byte, aes.BlockSize+len(data))
-	iv := cipherText[:aes.BlockSize]
+func CBCEncrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
+	cipherText := make([]byte, blockSize+len(data))
+	iv := cipherText[:blockSize]
 
 	mode := cipher.NewCBCEncrypter(block, iv)
-	mode.CryptBlocks(cipherText[aes.BlockSize:], data)
+	mode.CryptBlocks(cipherText[blockSize:], data)
 
 	return cipherText[:]
 }
 
-func CFBEncrypter(block cipher.Block, data []byte) ([]byte) {
-	cipherText := make([]byte, aes.BlockSize+len(data))
-	iv := cipherText[:aes.BlockSize]
+func CFBEncrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
+	cipherText := make([]byte, blockSize+len(data))
+	iv := cipherText[:blockSize]
 
 	stream := cipher.NewCFBEncrypter(block, iv)
-	stream.XORKeyStream(cipherText[aes.BlockSize:], data)
+	stream.XORKeyStream(cipherText[blockSize:], data)
 
 	return cipherText[:]
 }
@@ -75,12 +98,12 @@ func GCMEncrypter(block cipher.Block, data []byte) ([]byte) {
 	return cipherText[:]
 }
 
-func CTREncrypter(block cipher.Block, data []byte) ([]byte) {
-	cipherText := make([]byte, aes.BlockSize+len(data))
-	iv := cipherText[:aes.BlockSize]
+func CTREncrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
+	cipherText := make([]byte, blockSize+len(data))
+	iv := cipherText[:blockSize]
 
 	stream := cipher.NewCTR(block, iv)
-	stream.XORKeyStream(cipherText[aes.BlockSize:], data)
+	stream.XORKeyStream(cipherText[blockSize:], data)
 
 	return cipherText[:]
 }
@@ -111,7 +134,28 @@ func UnPad(data []byte) ([]byte) {
 }
 
 func(c *AdvancedEncryptionStandard) Unprocess(data []byte) ([]byte, error) {
-	block, err := aes.NewCipher(c.key)
+	algorithm := c.algorithm
+
+	var (
+		blockSize int
+		block cipher.Block
+		err error
+	)
+
+	switch algorithm {
+	case "Advanced Encryption Standard (AES)":
+		block, err = aes.NewCipher(c.key)
+		blockSize = 16
+	case "Data Encryption Standard (DES)":
+		block, err = des.NewCipher(c.key)
+		blockSize = 8
+	case "Triple Data Encryption Standard (3DES)":
+		block, err = des.NewTripleDESCipher(c.key)
+		blockSize = 8
+	default: 
+		return nil, errors.New("Undefined algorithm selected")
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -124,11 +168,11 @@ func(c *AdvancedEncryptionStandard) Unprocess(data []byte) ([]byte, error) {
 			return nil, errors.New("Unable to decrypt in Galosis Counter Mode (GCM)")
 		}
 	case "Cipher Block Chaining (CBC)":
-		data = CBCDecrypter(block, data)
+		data = CBCDecrypter(block, data, blockSize)
 	case "Cipher Feedback (CFB)":
-		data = CFBDecrypter(block, data)
+		data = CFBDecrypter(block, data, blockSize)
 	case "Counter (CTR)":
-		data = CTRDecrypter(block, data)
+		data = CTRDecrypter(block, data, blockSize)
 	default: 
 		return nil, errors.New("Undefined mode selected")
 	}
@@ -138,9 +182,9 @@ func(c *AdvancedEncryptionStandard) Unprocess(data []byte) ([]byte, error) {
 	return data[:], nil
 } 
 
-func CBCDecrypter(block cipher.Block, data []byte) ([]byte) {
-	iv := data[:aes.BlockSize]
-	data = data[aes.BlockSize:]
+func CBCDecrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
+	iv := data[:blockSize]
+	data = data[blockSize:]
 
 	mode := cipher.NewCBCDecrypter(block, iv)
 	mode.CryptBlocks(data, data)
@@ -148,9 +192,9 @@ func CBCDecrypter(block cipher.Block, data []byte) ([]byte) {
 	return data[:]
 }
 
-func CFBDecrypter(block cipher.Block, data []byte) ([]byte) {
-	iv := data[:aes.BlockSize]
-	data = data[aes.BlockSize:]
+func CFBDecrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
+	iv := data[:blockSize]
+	data = data[blockSize:]
 	
 	stream := cipher.NewCFBDecrypter(block, iv)
 	stream.XORKeyStream(data, data)
@@ -158,11 +202,11 @@ func CFBDecrypter(block cipher.Block, data []byte) ([]byte) {
 	return data[:]
 }
 
-func CTRDecrypter(block cipher.Block, data []byte) ([]byte) {
+func CTRDecrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
 	plaintext := make([]byte, len(data))
-	iv := data[:aes.BlockSize]
+	iv := data[:blockSize]
 	stream := cipher.NewCTR(block, iv)
-	stream.XORKeyStream(plaintext, data[aes.BlockSize:])
+	stream.XORKeyStream(plaintext, data[blockSize:])
 
 	return plaintext[:]
 }
