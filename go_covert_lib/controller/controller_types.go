@@ -6,7 +6,7 @@ import (
 	"./channel/tcp"
 	"./processor"
 	"./processor/caesar"
-	"./processor/advancedEncryptionStandard"
+	"./processor/symmetricEncryption"
 	"./processor/none"
 	"github.com/gorilla/websocket"
 	"sync"
@@ -59,7 +59,7 @@ type channelData struct {
 type processorData struct {
 	None   none.ConfigClient
 	Caesar caesar.ConfigClient
-	SymmetricEncryption advancedEncryptionStandard.ConfigClient
+	SymmetricEncryption symmetricEncryption.ConfigClient
 }
 
 type Layers struct {

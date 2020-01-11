@@ -7,7 +7,7 @@ import (
 	"./config"
 	"./processor"
 	"./processor/caesar"
-	"./processor/advancedEncryptionStandard"
+	"./processor/symmetricEncryption"
 	"./processor/none"
 	"encoding/json"
 	"errors"
@@ -136,7 +136,7 @@ func (ctr *Controller) retrieveProcessor(pconf processorConfig) (processor.Proce
 			return nil, nil, err
 		}
 	case "SymmetricEncryption":
-		if p, err = advancedEncryptionStandard.ToProcessor(newConf.Data.SymmetricEncryption); err != nil {
+		if p, err = symmetricEncryption.ToProcessor(newConf.Data.SymmetricEncryption); err != nil {
 			return nil, nil, err
 		}
 	default:

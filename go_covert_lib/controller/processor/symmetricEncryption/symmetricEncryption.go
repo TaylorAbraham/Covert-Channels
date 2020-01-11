@@ -1,4 +1,4 @@
-package advancedEncryptionStandard
+package symmetricEncryption
 
 import (
 	"crypto/aes"
@@ -7,15 +7,19 @@ import (
 	"errors"
 )
 
+// padding is done by having 7 zero's at the start followed by the length of 
+// the original message, the contents of the message, followed by a series of
+// zero's to fill the block size requirements of the symmetric encryption 
+// algorithm 
 const padIndex = 7
 
-type AdvancedEncryptionStandard struct {
+type SymmetricEncryption struct {
 	algorithm string
 	mode      string
 	key       []byte
 }
 
-func (c *AdvancedEncryptionStandard) Process(data []byte) ([]byte, error) {
+func (c *SymmetricEncryption) Process(data []byte) ([]byte, error) {
 	data = Pad(data)
 	algorithm := c.algorithm
 
@@ -25,6 +29,7 @@ func (c *AdvancedEncryptionStandard) Process(data []byte) ([]byte, error) {
 		err       error
 	)
 
+	// based on the users choice of symmetric algorithm create a cipher
 	switch algorithm {
 	case "Advanced Encryption Standard (AES)":
 		block, err = aes.NewCipher(c.key)
@@ -43,13 +48,15 @@ func (c *AdvancedEncryptionStandard) Process(data []byte) ([]byte, error) {
 		return nil, err
 	}
 
+	// based on the users choice of the mode of operation encrypt in that mode
 	var cipherText []byte
 	selectedMode := c.mode
 	switch selectedMode {
 	case "Galois Counter Mode (GCM)":
 		cipherText = GCMEncrypter(block, data)
 		if cipherText == nil {
-			return nil, errors.New("Unable to encrypt in Galosis Counter Mode (GCM)")
+			return nil, errors.New("Unable to encrypt in Galosis 
+									Counter Mode (GCM)")
 		}
 	case "Cipher Block Chaining (CBC)":
 		cipherText = CBCEncrypter(block, data, blockSize)
@@ -62,6 +69,19 @@ func (c *AdvancedEncryptionStandard) Process(data []byte) ([]byte, error) {
 	}
 
 	return cipherText[:], nil
+}
+
+func GCMEncrypter(block cipher.Block, data []byte) []byte {
+	nonce := make([]byte, 12)
+
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil
+	}
+
+	cipherText := aesgcm.Seal(nil, nonce, data, nil)
+
+	return cipherText[:]
 }
 
 func CBCEncrypter(block cipher.Block, data []byte, blockSize int) []byte {
@@ -84,19 +104,6 @@ func CFBEncrypter(block cipher.Block, data []byte, blockSize int) []byte {
 	return cipherText[:]
 }
 
-func GCMEncrypter(block cipher.Block, data []byte) []byte {
-	nonce := make([]byte, 12)
-
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil
-	}
-
-	cipherText := aesgcm.Seal(nil, nonce, data, nil)
-
-	return cipherText[:]
-}
-
 func CTREncrypter(block cipher.Block, data []byte, blockSize int) []byte {
 	cipherText := make([]byte, blockSize+len(data))
 	iv := cipherText[:blockSize]
@@ -108,6 +115,10 @@ func CTREncrypter(block cipher.Block, data []byte, blockSize int) []byte {
 }
 
 func Pad(data []byte) []byte {
+	// padding is done by having 7 zero's at the start followed by the length 
+	// of the original message, the contents of the message, followed by a 
+	// series of zero's to fill the block size requirements of the symmetric  
+	// encryption algorithm 
 	lenOfData := len(data)
 	data = append(data, 0)
 	copy(data[1:], data)
@@ -132,7 +143,7 @@ func UnPad(data []byte) []byte {
 	return data[:lenOfData]
 }
 
-func (c *AdvancedEncryptionStandard) Unprocess(data []byte) ([]byte, error) {
+func (c *SymmetricEncryption) Unprocess(data []byte) ([]byte, error) {
 	algorithm := c.algorithm
 
 	var (
@@ -141,6 +152,7 @@ func (c *AdvancedEncryptionStandard) Unprocess(data []byte) ([]byte, error) {
 		err       error
 	)
 
+	// based on the users choice of symmetric algorithm create a cipher
 	switch algorithm {
 	case "Advanced Encryption Standard (AES)":
 		block, err = aes.NewCipher(c.key)
@@ -159,12 +171,14 @@ func (c *AdvancedEncryptionStandard) Unprocess(data []byte) ([]byte, error) {
 		return nil, err
 	}
 
+	// based on the users choice of the mode of operation encrypt in that mode
 	selectedMode := c.mode
 	switch selectedMode {
 	case "Galois Counter Mode (GCM)":
 		data = GCMDecrypter(block, data)
 		if data == nil {
-			return nil, errors.New("Unable to decrypt in Galosis Counter Mode (GCM)")
+			return nil, errors.New("Unable to decrypt in Galosis 
+									Counter Mode (GCM)")
 		}
 	case "Cipher Block Chaining (CBC)":
 		data = CBCDecrypter(block, data, blockSize)
@@ -179,6 +193,18 @@ func (c *AdvancedEncryptionStandard) Unprocess(data []byte) ([]byte, error) {
 	data = UnPad(data)
 
 	return data[:], nil
+}
+
+func GCMDecrypter(block cipher.Block, data []byte) []byte {
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil
+	}
+
+	nonce := make([]byte, 12)
+	plaintext, err := aesgcm.Open(nil, nonce, data, nil)
+
+	return plaintext[:]
 }
 
 func CBCDecrypter(block cipher.Block, data []byte, blockSize int) []byte {
@@ -206,18 +232,6 @@ func CTRDecrypter(block cipher.Block, data []byte, blockSize int) []byte {
 	iv := data[:blockSize]
 	stream := cipher.NewCTR(block, iv)
 	stream.XORKeyStream(plaintext, data[blockSize:])
-
-	return plaintext[:]
-}
-
-func GCMDecrypter(block cipher.Block, data []byte) []byte {
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil
-	}
-
-	nonce := make([]byte, 12)
-	plaintext, err := aesgcm.Open(nil, nonce, data, nil)
 
 	return plaintext[:]
 }
