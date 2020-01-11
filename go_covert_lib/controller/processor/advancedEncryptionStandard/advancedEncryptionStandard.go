@@ -7,23 +7,22 @@ import (
 	"errors"
 )
 
-const padIndex = 7;
-//const blockSize := algorithm == "Advanced Encryption Standard (AES)" ? 16 : 8
+const padIndex = 7
 
 type AdvancedEncryptionStandard struct {
 	algorithm string
-	mode string
-	key []byte
+	mode      string
+	key       []byte
 }
 
-func(c *AdvancedEncryptionStandard) Process(data []byte) ([]byte, error) {
+func (c *AdvancedEncryptionStandard) Process(data []byte) ([]byte, error) {
 	data = Pad(data)
 	algorithm := c.algorithm
-	 
+
 	var (
 		blockSize int
-		block cipher.Block
-		err error
+		block     cipher.Block
+		err       error
 	)
 
 	switch algorithm {
@@ -36,7 +35,7 @@ func(c *AdvancedEncryptionStandard) Process(data []byte) ([]byte, error) {
 	case "Triple Data Encryption Standard (3DES)":
 		block, err = des.NewTripleDESCipher(c.key)
 		blockSize = 8
-	default: 
+	default:
 		return nil, errors.New("Undefined algorithm selected")
 	}
 
@@ -58,14 +57,14 @@ func(c *AdvancedEncryptionStandard) Process(data []byte) ([]byte, error) {
 		cipherText = CFBEncrypter(block, data, blockSize)
 	case "Counter (CTR)":
 		cipherText = CTREncrypter(block, data, blockSize)
-	default: 
+	default:
 		return nil, errors.New("Undefined mode selected")
 	}
 
 	return cipherText[:], nil
 }
 
-func CBCEncrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
+func CBCEncrypter(block cipher.Block, data []byte, blockSize int) []byte {
 	cipherText := make([]byte, blockSize+len(data))
 	iv := cipherText[:blockSize]
 
@@ -75,7 +74,7 @@ func CBCEncrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
 	return cipherText[:]
 }
 
-func CFBEncrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
+func CFBEncrypter(block cipher.Block, data []byte, blockSize int) []byte {
 	cipherText := make([]byte, blockSize+len(data))
 	iv := cipherText[:blockSize]
 
@@ -85,10 +84,10 @@ func CFBEncrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
 	return cipherText[:]
 }
 
-func GCMEncrypter(block cipher.Block, data []byte) ([]byte) {
+func GCMEncrypter(block cipher.Block, data []byte) []byte {
 	nonce := make([]byte, 12)
 
-	aesgcm, err := cipher.NewGCM(block) 
+	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return nil
 	}
@@ -98,7 +97,7 @@ func GCMEncrypter(block cipher.Block, data []byte) ([]byte) {
 	return cipherText[:]
 }
 
-func CTREncrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
+func CTREncrypter(block cipher.Block, data []byte, blockSize int) []byte {
 	cipherText := make([]byte, blockSize+len(data))
 	iv := cipherText[:blockSize]
 
@@ -108,7 +107,7 @@ func CTREncrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
 	return cipherText[:]
 }
 
-func Pad(data []byte) ([]byte) {
+func Pad(data []byte) []byte {
 	lenOfData := len(data)
 	data = append(data, 0)
 	copy(data[1:], data)
@@ -123,23 +122,23 @@ func Pad(data []byte) ([]byte) {
 	for len(data)%aes.BlockSize != 0 {
 		data = append(data, 0)
 	}
-	
+
 	return data[:]
 }
 
-func UnPad(data []byte) ([]byte) {
+func UnPad(data []byte) []byte {
 	lenOfData := data[padIndex]
 	data = data[padIndex+1:]
 	return data[:lenOfData]
 }
 
-func(c *AdvancedEncryptionStandard) Unprocess(data []byte) ([]byte, error) {
+func (c *AdvancedEncryptionStandard) Unprocess(data []byte) ([]byte, error) {
 	algorithm := c.algorithm
 
 	var (
 		blockSize int
-		block cipher.Block
-		err error
+		block     cipher.Block
+		err       error
 	)
 
 	switch algorithm {
@@ -152,7 +151,7 @@ func(c *AdvancedEncryptionStandard) Unprocess(data []byte) ([]byte, error) {
 	case "Triple Data Encryption Standard (3DES)":
 		block, err = des.NewTripleDESCipher(c.key)
 		blockSize = 8
-	default: 
+	default:
 		return nil, errors.New("Undefined algorithm selected")
 	}
 
@@ -173,16 +172,16 @@ func(c *AdvancedEncryptionStandard) Unprocess(data []byte) ([]byte, error) {
 		data = CFBDecrypter(block, data, blockSize)
 	case "Counter (CTR)":
 		data = CTRDecrypter(block, data, blockSize)
-	default: 
+	default:
 		return nil, errors.New("Undefined mode selected")
 	}
 
 	data = UnPad(data)
 
 	return data[:], nil
-} 
+}
 
-func CBCDecrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
+func CBCDecrypter(block cipher.Block, data []byte, blockSize int) []byte {
 	iv := data[:blockSize]
 	data = data[blockSize:]
 
@@ -192,17 +191,17 @@ func CBCDecrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
 	return data[:]
 }
 
-func CFBDecrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
+func CFBDecrypter(block cipher.Block, data []byte, blockSize int) []byte {
 	iv := data[:blockSize]
 	data = data[blockSize:]
-	
+
 	stream := cipher.NewCFBDecrypter(block, iv)
 	stream.XORKeyStream(data, data)
 
 	return data[:]
 }
 
-func CTRDecrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
+func CTRDecrypter(block cipher.Block, data []byte, blockSize int) []byte {
 	plaintext := make([]byte, len(data))
 	iv := data[:blockSize]
 	stream := cipher.NewCTR(block, iv)
@@ -211,12 +210,12 @@ func CTRDecrypter(block cipher.Block, data []byte, blockSize int) ([]byte) {
 	return plaintext[:]
 }
 
-func GCMDecrypter(block cipher.Block, data []byte) ([]byte) {
+func GCMDecrypter(block cipher.Block, data []byte) []byte {
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return nil
 	}
-	
+
 	nonce := make([]byte, 12)
 	plaintext, err := aesgcm.Open(nil, nonce, data, nil)
 
