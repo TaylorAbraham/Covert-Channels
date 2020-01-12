@@ -142,6 +142,7 @@ func toMessage(opcode string, data string) []byte {
 
 // Handle the config command
 func (ctr *Controller) handleConfig() ([]byte, error) {
+	ctr.config.OpCode = "config"
 	if data, err := json.Marshal(ctr.config); err != nil {
 		return nil, err
 	} else {
@@ -208,14 +209,24 @@ loop:
 		default:
 			data, err := ctr.handleRead()
 			if err != nil {
+				// First, check if we are closing the covert channel
+				// If so, then that is the likely explanation of the error
+				// and we don't neet to report it
 				select {
-				case ctr.wsSend <- toMessage("error", err.Error()):
-					// If there has been a read error wait
-					// to avoid a constant stream of data
-					// to the UI
-					time.Sleep(time.Second)
-					// If we have closed we return immediately
-				case <-ctr.layers.readClose:
+					case <-ctr.layers.readClose:
+					default:
+						// Else we try to report the error
+						// This select also includes the readClose
+						// to handle the case where the server is being shutdown
+						select {
+						case ctr.wsSend <- toMessage("error", err.Error()):
+							// If there has been a read error wait
+							// to avoid a constant stream of data
+							// to the UI
+							time.Sleep(time.Second)
+							// If we have closed we return immediately
+						case <-ctr.layers.readClose:
+						}
 				}
 			} else {
 				ctr.wsSend <- toMessage("read", string(data))
@@ -228,9 +239,11 @@ loop:
 func (ctr *Controller) handleClose() error {
 	var err error
 	if ctr.layers != nil {
-		err = ctr.layers.channel.Close()
-		// We must wait to ensure that the read loop is complete
+
 		close(ctr.layers.readClose)
+		err = ctr.layers.channel.Close()
+
+		// We must wait to ensure that the read loop is complete
 		// In case closing the channel failed to cause handleRead to return
 		select {
 		case <-ctr.layers.readCloseDone:
