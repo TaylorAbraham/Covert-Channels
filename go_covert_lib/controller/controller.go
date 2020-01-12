@@ -5,9 +5,9 @@ import (
 	"./channel/tcpNormal"
 	"./channel/tcpSyn"
 	"./config"
-	"./processor/advancedEncryptionStandard"
 	"./processor/caesar"
 	"./processor/none"
+	"./processor/symmetricEncryption"
 	"encoding/json"
 	"errors"
 	"github.com/gorilla/websocket"
@@ -78,9 +78,9 @@ func defaultChannel() channelData {
 
 func defaultProcessor() processorData {
 	return processorData{
-		None:   none.GetDefault(),
-		Caesar: caesar.GetDefault(),
-		AdvancedEncryptionStandard: advancedEncryptionStandard.GetDefault(),
+		None:                none.GetDefault(),
+		Caesar:              caesar.GetDefault(),
+		SymmetricEncryption: symmetricEncryption.GetDefault(),
 	}
 }
 
