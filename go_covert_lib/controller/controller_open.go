@@ -2,12 +2,13 @@ package controller
 
 import (
 	"./channel"
-	"./channel/tcpSyn"
 	"./channel/tcpHandshake"
+	"./channel/tcpNormal"
+	"./channel/tcpSyn"
 	"./config"
 	"./processor"
-	"./processor/caesar"
 	"./processor/advancedEncryptionStandard"
+	"./processor/caesar"
 	"./processor/none"
 	"encoding/json"
 	"errors"
@@ -99,6 +100,10 @@ func (ctr *Controller) retrieveChannel(cconf channelConfig) (channel.Channel, *c
 		}
 	case "TcpHandshake":
 		if c, err = tcpHandshake.ToChannel(newConf.Data.TcpHandshake); err != nil {
+			return nil, nil, err
+		}
+	case "TcpNormal":
+		if c, err = tcpNormal.ToChannel(newConf.Data.TcpNormal); err != nil {
 			return nil, nil, err
 		}
 	default:

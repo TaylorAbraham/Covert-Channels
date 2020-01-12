@@ -1,19 +1,20 @@
 package controller
 
 import (
-	"./channel/tcpSyn"
 	"./channel/tcpHandshake"
+	"./channel/tcpNormal"
+	"./channel/tcpSyn"
 	"./config"
-	"./processor/caesar"
 	"./processor/advancedEncryptionStandard"
+	"./processor/caesar"
 	"./processor/none"
 	"encoding/json"
 	"errors"
 	"github.com/gorilla/websocket"
-	"strconv"
-	"time"
 	"log"
 	"os"
+	"strconv"
+	"time"
 )
 
 // Constructor for the controller
@@ -69,8 +70,9 @@ func DefaultConfig() configData {
 
 func defaultChannel() channelData {
 	return channelData{
-		TcpSyn: tcpSyn.GetDefault(),
-		TcpHandshake:     tcpHandshake.GetDefault(),
+		TcpSyn:       tcpSyn.GetDefault(),
+		TcpHandshake: tcpHandshake.GetDefault(),
+		TcpNormal:    tcpNormal.GetDefault(),
 	}
 }
 
@@ -233,7 +235,7 @@ func (ctr *Controller) handleClose() error {
 		select {
 		case <-ctr.layers.readCloseDone:
 		case <-time.After(time.Second * 5):
-			var l      *log.Logger          = log.New(os.Stderr, "", log.Flags())
+			var l *log.Logger = log.New(os.Stderr, "", log.Flags())
 			l.Println("Failed to close read loop. Covert channel did not return from cancel.")
 		}
 		ctr.layers = nil

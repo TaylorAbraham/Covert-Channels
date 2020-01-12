@@ -2,11 +2,12 @@ package controller
 
 import (
 	"./channel"
-	"./channel/tcpSyn"
 	"./channel/tcpHandshake"
+	"./channel/tcpNormal"
+	"./channel/tcpSyn"
 	"./processor"
-	"./processor/caesar"
 	"./processor/advancedEncryptionStandard"
+	"./processor/caesar"
 	"./processor/none"
 	"github.com/gorilla/websocket"
 	"sync"
@@ -52,13 +53,14 @@ type channelConfig struct {
 }
 
 type channelData struct {
-	TcpSyn tcpSyn.ConfigClient
-	TcpHandshake    tcpHandshake.ConfigClient
+	TcpSyn       tcpSyn.ConfigClient
+	TcpHandshake tcpHandshake.ConfigClient
+	TcpNormal    tcpNormal.ConfigClient
 }
 
 type processorData struct {
-	None   none.ConfigClient
-	Caesar caesar.ConfigClient
+	None                       none.ConfigClient
+	Caesar                     caesar.ConfigClient
 	AdvancedEncryptionStandard advancedEncryptionStandard.ConfigClient
 }
 
