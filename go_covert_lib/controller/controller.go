@@ -213,20 +213,20 @@ loop:
 				// If so, then that is the likely explanation of the error
 				// and we don't neet to report it
 				select {
+				case <-ctr.layers.readClose:
+				default:
+					// Else we try to report the error
+					// This select also includes the readClose
+					// to handle the case where the server is being shutdown
+					select {
+					case ctr.wsSend <- toMessage("error", err.Error()):
+						// If there has been a read error wait
+						// to avoid a constant stream of data
+						// to the UI
+						time.Sleep(time.Second)
+						// If we have closed we return immediately
 					case <-ctr.layers.readClose:
-					default:
-						// Else we try to report the error
-						// This select also includes the readClose
-						// to handle the case where the server is being shutdown
-						select {
-						case ctr.wsSend <- toMessage("error", err.Error()):
-							// If there has been a read error wait
-							// to avoid a constant stream of data
-							// to the UI
-							time.Sleep(time.Second)
-							// If we have closed we return immediately
-						case <-ctr.layers.readClose:
-						}
+					}
 				}
 			} else {
 				ctr.wsSend <- toMessage("read", string(data))

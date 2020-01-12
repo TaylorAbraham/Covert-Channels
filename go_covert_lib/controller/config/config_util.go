@@ -78,9 +78,9 @@ type IPV4Param struct {
 }
 
 type HexKeyParam struct {
-	Type string
-	Value []byte
-	Range []int
+	Type    string
+	Value   []byte
+	Range   []int
 	Display Display
 }
 

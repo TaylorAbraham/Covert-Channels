@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/gorilla/websocket"
+	"log"
 	"net/http"
 	"reflect"
 	"testing"
 	"time"
-	"log"
 )
 
 func TestShutdown(t *testing.T) {
@@ -335,35 +335,35 @@ func runMultiChannelWrite(t *testing.T, cl []channelTest) {
 
 func TestMultiChannelWriteMessage(t *testing.T) {
 	cl := []channelTest{
-		channelTest {
-			name : "TcpNormal",
-			f1 : func(conf *configData) {
+		channelTest{
+			name: "TcpNormal",
+			f1: func(conf *configData) {
 				conf.Channel.Data.TcpNormal.FriendReceivePort.Value = 8090
 				conf.Channel.Data.TcpNormal.OriginReceivePort.Value = 8091
 			},
-			f2 : func(conf *configData) {
+			f2: func(conf *configData) {
 				conf.Channel.Data.TcpNormal.FriendReceivePort.Value = 8091
 				conf.Channel.Data.TcpNormal.OriginReceivePort.Value = 8090
 			},
 		},
-		channelTest {
-			name : "TcpHandshake",
-			f1 : func(conf *configData) {
+		channelTest{
+			name: "TcpHandshake",
+			f1: func(conf *configData) {
 				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
 				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
 			},
-			f2 : func(conf *configData) {
+			f2: func(conf *configData) {
 				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
 				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
 			},
 		},
-		channelTest {
-			name : "TcpSyn",
-			f1 : func(conf *configData) {
+		channelTest{
+			name: "TcpSyn",
+			f1: func(conf *configData) {
 				conf.Channel.Data.TcpSyn.FriendPort.Value = 8090
 				conf.Channel.Data.TcpSyn.OriginPort.Value = 8091
 			},
-			f2 : func(conf *configData) {
+			f2: func(conf *configData) {
 				conf.Channel.Data.TcpSyn.FriendPort.Value = 8091
 				conf.Channel.Data.TcpSyn.OriginPort.Value = 8090
 			},
