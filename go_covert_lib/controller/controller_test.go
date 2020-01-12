@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/gorilla/websocket"
-	"log"
 	"net/http"
 	"reflect"
 	"testing"
@@ -263,21 +262,7 @@ func checkConfig(ch chan []byte, expt configData, t *testing.T) configData {
 			t.Errorf("Unexpected unmarshal error: %s", err.Error())
 		} else {
 			if !reflect.DeepEqual(conf, expt) {
-				s1, _ := json.Marshal(conf)
-				s2, _ := json.Marshal(expt)
-				log.Println(string(s1) == string(s2))
-				log.Println(len(s1))
-				log.Println(len(s2))
-				for i := range s1 {
-					if s1[i] != s2[i] {
-						log.Println(i)
-						log.Println(string(s1[i-600:]))
-						log.Println(string(s2[i-600:]))
-						break
-					}
-				}
 				t.Errorf("Configs do not match error: \n%v, \n%v", conf, expt)
-
 			}
 		}
 	case <-time.After(time.Second * 5):
@@ -303,7 +288,6 @@ func runMultiChannelWrite(t *testing.T, cl []channelTest) {
 
 	for i := range cl {
 		write1 <- []byte("{\"OpCode\" : \"config\"}")
-		log.Println(cl[i].name)
 		conf := checkConfig(read1, varCurrConf1, t)
 
 		conf.Channel.Type = cl[i].name
