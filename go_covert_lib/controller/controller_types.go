@@ -2,8 +2,8 @@ package controller
 
 import (
 	"./channel"
-	"./channel/ipv4tcp"
-	"./channel/tcp"
+	"./channel/tcpSyn"
+	"./channel/tcpHandshake"
 	"./processor"
 	"./processor/caesar"
 	"./processor/advancedEncryptionStandard"
@@ -52,8 +52,8 @@ type channelConfig struct {
 }
 
 type channelData struct {
-	Ipv4tcp ipv4tcp.ConfigClient
-	Tcp     tcp.ConfigClient
+	TcpSyn tcpSyn.ConfigClient
+	TcpHandshake    tcpHandshake.ConfigClient
 }
 
 type processorData struct {

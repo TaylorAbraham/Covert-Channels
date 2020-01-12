@@ -2,8 +2,8 @@ package controller
 
 import (
 	"./channel"
-	"./channel/ipv4tcp"
-	"./channel/tcp"
+	"./channel/tcpSyn"
+	"./channel/tcpHandshake"
 	"./config"
 	"./processor"
 	"./processor/caesar"
@@ -93,12 +93,12 @@ func (ctr *Controller) retrieveChannel(cconf channelConfig) (channel.Channel, *c
 	}
 
 	switch newConf.Type {
-	case "Ipv4tcp":
-		if c, err = ipv4tcp.ToChannel(newConf.Data.Ipv4tcp); err != nil {
+	case "TcpSyn":
+		if c, err = tcpSyn.ToChannel(newConf.Data.TcpSyn); err != nil {
 			return nil, nil, err
 		}
-	case "Tcp":
-		if c, err = tcp.ToChannel(newConf.Data.Tcp); err != nil {
+	case "TcpHandshake":
+		if c, err = tcpHandshake.ToChannel(newConf.Data.TcpHandshake); err != nil {
 			return nil, nil, err
 		}
 	default:

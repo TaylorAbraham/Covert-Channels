@@ -116,12 +116,12 @@ func TestRetrieveWriteMessage(t *testing.T) {
 	conf := checkConfig(read1, DefaultConfig(), t)
 
 	conf.OpCode = "open"
-	conf.Channel.Data.Ipv4tcp.FriendPort.Value = 8090
-	conf.Channel.Data.Ipv4tcp.OriginPort.Value = 8091
+	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
+	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
 	writeTestMsg(write1, conf, t)
 
-	conf.Channel.Data.Ipv4tcp.FriendPort.Value = 8091
-	conf.Channel.Data.Ipv4tcp.OriginPort.Value = 8090
+	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
+	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
 	writeTestMsg(write2, conf, t)
 
 	checkMsgType(read1, "open", "Open success", t)
@@ -146,8 +146,8 @@ func TestWithProcessor(t *testing.T) {
 	conf := checkConfig(read1, DefaultConfig(), t)
 
 	conf.OpCode = "open"
-	conf.Channel.Data.Ipv4tcp.FriendPort.Value = 8090
-	conf.Channel.Data.Ipv4tcp.OriginPort.Value = 8091
+	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
+	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
 	conf.Processors = []processorConfig{
 		processorConfig{
 			Type: "Caesar", Data: defaultProcessor(),
@@ -160,8 +160,8 @@ func TestWithProcessor(t *testing.T) {
 	conf.Processors[1].Data.Caesar.Shift.Value = 7
 	writeTestMsg(write1, conf, t)
 
-	conf.Channel.Data.Ipv4tcp.FriendPort.Value = 8091
-	conf.Channel.Data.Ipv4tcp.OriginPort.Value = 8090
+	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
+	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
 	writeTestMsg(write2, conf, t)
 
 	checkMsgType(read1, "open", "Open success", t)
@@ -189,8 +189,8 @@ func TestWithProcessorNoUnprocess(t *testing.T) {
 	conf := checkConfig(read1, DefaultConfig(), t)
 
 	conf.OpCode = "open"
-	conf.Channel.Data.Ipv4tcp.FriendPort.Value = 8090
-	conf.Channel.Data.Ipv4tcp.OriginPort.Value = 8091
+	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
+	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
 	conf.Processors = []processorConfig{
 		processorConfig{
 			Type: "Caesar", Data: defaultProcessor(),
@@ -203,8 +203,8 @@ func TestWithProcessorNoUnprocess(t *testing.T) {
 	conf.Processors[1].Data.Caesar.Shift.Value = 3
 	writeTestMsg(write1, conf, t)
 
-	conf.Channel.Data.Ipv4tcp.FriendPort.Value = 8091
-	conf.Channel.Data.Ipv4tcp.OriginPort.Value = 8090
+	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
+	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
 	conf.Processors = []processorConfig{}
 	writeTestMsg(write2, conf, t)
 

@@ -1,8 +1,8 @@
 package controller
 
 import (
-	"./channel/ipv4tcp"
-	"./channel/tcp"
+	"./channel/tcpSyn"
+	"./channel/tcpHandshake"
 	"./config"
 	"./processor/caesar"
 	"./processor/advancedEncryptionStandard"
@@ -12,6 +12,8 @@ import (
 	"github.com/gorilla/websocket"
 	"strconv"
 	"time"
+	"log"
+	"os"
 )
 
 // Constructor for the controller
@@ -59,7 +61,7 @@ func DefaultConfig() configData {
 		},
 		Processors: []processorConfig{},
 		Channel: channelConfig{
-			Type: "Ipv4tcp",
+			Type: "TcpHandshake",
 			Data: defaultChannel(),
 		},
 	}
@@ -67,8 +69,8 @@ func DefaultConfig() configData {
 
 func defaultChannel() channelData {
 	return channelData{
-		Ipv4tcp: ipv4tcp.GetDefault(),
-		Tcp:     tcp.GetDefault(),
+		TcpSyn: tcpSyn.GetDefault(),
+		TcpHandshake:     tcpHandshake.GetDefault(),
 	}
 }
 
@@ -204,11 +206,15 @@ loop:
 		default:
 			data, err := ctr.handleRead()
 			if err != nil {
-				ctr.wsSend <- toMessage("error", err.Error())
-				// If there has been a read error wait
-				// to avoid a constant stream of data
-				// to the UI
-				time.Sleep(time.Second)
+				select {
+				case ctr.wsSend <- toMessage("error", err.Error()):
+					// If there has been a read error wait
+					// to avoid a constant stream of data
+					// to the UI
+					time.Sleep(time.Second)
+					// If we have closed we return immediately
+				case <-ctr.layers.readClose:
+				}
 			} else {
 				ctr.wsSend <- toMessage("read", string(data))
 			}
@@ -223,7 +229,13 @@ func (ctr *Controller) handleClose() error {
 		err = ctr.layers.channel.Close()
 		// We must wait to ensure that the read loop is complete
 		close(ctr.layers.readClose)
-		<-ctr.layers.readCloseDone
+		// In case closing the channel failed to cause handleRead to return
+		select {
+		case <-ctr.layers.readCloseDone:
+		case <-time.After(time.Second * 5):
+			var l      *log.Logger          = log.New(os.Stderr, "", log.Flags())
+			l.Println("Failed to close read loop. Covert channel did not return from cancel.")
+		}
 		ctr.layers = nil
 	}
 	return err
