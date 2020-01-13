@@ -5,6 +5,7 @@ import (
 	"./channel/ipv4tcp"
 	"./channel/tcp"
 	"./processor"
+	"./processor/asymmetricEncryption"
 	"./processor/caesar"
 	"./processor/symmetricEncryption"
 	"./processor/none"
@@ -60,6 +61,7 @@ type processorData struct {
 	None   none.ConfigClient
 	Caesar caesar.ConfigClient
 	SymmetricEncryption symmetricEncryption.ConfigClient
+	AsymmetricEncryption asymmetricEncryption.ConfigClient
 }
 
 type Layers struct {
