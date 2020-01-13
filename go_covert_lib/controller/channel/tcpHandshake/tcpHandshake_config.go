@@ -20,15 +20,15 @@ type ConfigClient struct {
 
 func GetDefault() ConfigClient {
 	return ConfigClient{
-		FriendIP:          config.MakeIPV4("127.0.0.1", config.Display{Description: "Your friends IP Address."}),
-		OriginIP:          config.MakeIPV4("127.0.0.1", config.Display{Description: "Your IP Address."}),
-		FriendReceivePort: config.MakeU16(8123, [2]uint16{0, 65535}, config.Display{Description: "Your friends tcp receive Port. Their send port is chosen randomly."}),
-		OriginReceivePort: config.MakeU16(8124, [2]uint16{0, 65535}, config.Display{Description: "Your tcp receive Port. Send port is chosen randomly."}),
-		Encoder:           config.MakeSelect("id", []string{"id"}, config.Display{Description: "The encoding mechanism to use for this protocol."}),
-		DialTimeout:       config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The dial timeout for the Send method in milliseconds. Zero for no timeout."}),
-		AcceptTimeout:     config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The accept timeout for the Receive method in milliseconds. Zero for no timeout."}),
-		ReadTimeout:       config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The intra-packet read timeout for the receive method in milliseconds. Zero for no timeout."}),
-		WriteTimeout:      config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The a timeout for writing packets to the raw socket, in milliseconds. Zero for no timeout."}),
+		FriendIP:          config.MakeIPV4("127.0.0.1", config.Display{Description: "Your friend's IP address.", Name: "Friend's IP", Group: "IP Addresses"}),
+		OriginIP:          config.MakeIPV4("127.0.0.1", config.Display{Description: "Your IP address.", Name: "Your IP", Group: "IP Addresses"}),
+		FriendReceivePort: config.MakeU16(8123, [2]uint16{0, 65535}, config.Display{Description: "Your friend's TCP receive port. Their send port is chosen randomly.", Name: "Friend's Receive Port", Group: "Ports"}),
+		OriginReceivePort: config.MakeU16(8124, [2]uint16{0, 65535}, config.Display{Description: "Your TCP receive port. Your send port is chosen randomly.", Name: "Your Receive Port", Group: "Ports"}),
+		DialTimeout:       config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The dial timeout for the send method in milliseconds. Zero for no timeout.", Name: "Dial Timeout", Group: "Timing"}),
+		AcceptTimeout:     config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The accept timeout for the receive method in milliseconds. Zero for no timeout.", Name: "Accept Timeout", Group: "Timing"}),
+		ReadTimeout:       config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The intra-packet read timeout for the receive method in milliseconds. Zero for no timeout.", Name: "Read Timeout", Group: "Timing"}),
+		WriteTimeout:      config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The a timeout for writing packets to the raw socket, in milliseconds. Zero for no timeout.", Name: "Write Timeout", Group: "Timing"}),
+		Encoder:           config.MakeSelect("id", []string{"id"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
 	}
 }
 

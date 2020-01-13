@@ -23,18 +23,18 @@ type ConfigClient struct {
 
 func GetDefault() ConfigClient {
 	return ConfigClient{
-		FriendIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "Your friends IP Address."}),
-		OriginIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "Your IP Address."}),
-		BounceIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "The bouncer IP Address, if any."}),
-		FriendPort:   config.MakeU16(8123, [2]uint16{0, 65535}, config.Display{Description: "Your friends Port."}),
-		OriginPort:   config.MakeU16(8124, [2]uint16{0, 65535}, config.Display{Description: "Your Port."}),
-		BouncePort:   config.MakeU16(0, [2]uint16{0, 65535}, config.Display{Description: "The bouncer Port, if any."}),
-		Bounce:       config.MakeBool(false, config.Display{Description: "Whether or not we are in bounce mode."}),
-		Delimiter:    config.MakeSelect("protocol", []string{"buffer", "protocol"}, config.Display{Description: "The delimiter to use for deciding when to return after having received a message."}),
-		Encoder:      config.MakeSelect("sequence", []string{"sequence"}, config.Display{Description: "The encoding mechanism to use for this protocol."}),
-		GetDelay:     config.MakeSelect("none", []string{"none"}, config.Display{Description: "The function to use for inter byte delay."}),
-		WriteTimeout: config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The Write Timeout in milliseconds."}),
-		ReadTimeout:  config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The Read Timeout in milliseconds."}),
+		FriendIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "Your friend's IP address.", Name: "Friend's IP", Group: "IP Addresses"}),
+		OriginIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "Your IP address.", Name: "Your IP", Group: "IP Addresses"}),
+		FriendPort:   config.MakeU16(8123, [2]uint16{0, 65535}, config.Display{Description: "Your friend's port.", Name: "Friend's Port", Group: "Ports"}),
+		OriginPort:   config.MakeU16(8124, [2]uint16{0, 65535}, config.Display{Description: "Your port.", Name: "Your Port", Group: "Ports"}),
+		Bounce:       config.MakeBool(false, config.Display{Description: "Toggle bounce mode, which spoofs your IP address.", Name: "Bounce", Group: "Bouncing", GroupToggle: true}),
+		BounceIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "The bouncer's IP address.", Name: "Bouncer's IP", Group: "Bouncing"}),
+		BouncePort:   config.MakeU16(0, [2]uint16{0, 65535}, config.Display{Description: "The bouncer's port.", Name: "Bouncer's Port", Group: "Bouncing"}),
+		GetDelay:     config.MakeSelect("none", []string{"none"}, config.Display{Description: "The function to use for inter-byte delay.", Name: "Get Delay", Group: "Timing"}),
+		WriteTimeout: config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The write timeout in milliseconds.", Name: "Write Timeout", Group: "Timing"}),
+		ReadTimeout:  config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The read timeout in milliseconds.", Name: "Read Timeout", Group: "Timing"}),
+		Delimiter:    config.MakeSelect("protocol", []string{"buffer", "protocol"}, config.Display{Description: "The delimiter to use for deciding when to return after having received a message.", Name: "Delimeter", Group: "Settings"}),
+		Encoder:      config.MakeSelect("sequence", []string{"sequence"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
 	}
 }
 
