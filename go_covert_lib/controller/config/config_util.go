@@ -15,6 +15,9 @@ type Display struct {
 	Description string
 	Name        string
 	Group       string
+	// If GroupToggle is set to true on a bool Param, the truthiness of the bool Param
+	// will determine whether the rest of the Group is shown or hidden
+	GroupToggle bool
 }
 
 type I8Param struct {
