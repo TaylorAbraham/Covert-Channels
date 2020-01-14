@@ -20,16 +20,16 @@ const App = () => {
   const [config, setConfig] = useState({});
   const [isLoading, setLoading] = useState(true);
   const [ws, setWS] = useState(null);
-  const [systemMessages, setSystemMessages] = useState('');
+  const [systemMessages, setSystemMessages] = useState([]);
 
   const sendInitialConfig = (localWS) => {
     const cmd = JSON.stringify({ OpCode: 'config' });
     localWS.send(cmd, { binary: true });
   };
 
-  useEffect(function addSystemMessage(newMsg) {
-    setSystemMessages(`${systemMessages}\n${newMsg}`);
-  });
+  const addSystemMessage = (newMsg) => {
+    setSystemMessages(systemMessages => systemMessages.concat(newMsg));
+  };
 
   const openChannel = () => {
     const cmd = JSON.stringify({
@@ -101,7 +101,7 @@ const App = () => {
       <FormControl
         as="textarea"
         className="w-50 m-1"
-        value={systemMessages}
+        value={systemMessages.join('\n')}
         readOnly
       />
       <h2 className="m-1 mt-5">Configuration</h2>
