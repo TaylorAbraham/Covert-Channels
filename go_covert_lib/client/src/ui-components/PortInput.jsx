@@ -12,8 +12,8 @@ const PortInput = (props) => {
         <InputGroup.Text className="input-text">{label}</InputGroup.Text>
       </InputGroup.Prepend>
       <FormControl
-        onChange={onChange}
         value={value}
+        onChange={onChange}
       />
     </InputGroup>
   );

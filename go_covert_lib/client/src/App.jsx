@@ -28,7 +28,7 @@ const App = () => {
   };
 
   const addSystemMessage = (newMsg) => {
-    setSystemMessages(systemMessages => systemMessages.concat(newMsg));
+    setSystemMessages(sm => sm.concat(newMsg));
   };
 
   const openChannel = () => {
@@ -43,6 +43,11 @@ const App = () => {
     ws.send(cmd, { binary: true });
   };
 
+  const closeChannel = () => {
+    const cmd = JSON.stringify({ OpCode: 'close' });
+    ws.send(cmd, { binary: true });
+  };
+
   const handleMessage = (msg) => {
     switch (msg.OpCode) {
       case 'config':
@@ -53,6 +58,9 @@ const App = () => {
         break;
       case 'open':
         addSystemMessage('Covert channel successfully opened.');
+        break;
+      case 'close':
+        addSystemMessage('Covert channel closed.');
         break;
       default:
         console.log('ERROR: Unknown message');
@@ -136,22 +144,39 @@ const App = () => {
       </Dropdown>
       {Object.keys(config).map((key) => {
         const opt = config[key];
-        // TODO: Grouping logic
         switch (opt.Type) {
           case 'ipv4':
             return (
               <IPInput
+                key={key}
                 label={opt.Display.Name}
                 value={opt.Value}
-                key={key}
+                onChange={(e) => {
+                  setConfig({
+                    ...config,
+                    [key]: {
+                      ...config[key],
+                      Value: e.target.value,
+                    },
+                  });
+                }}
               />
             );
           case 'u16':
             return (
               <PortInput
+                key={key}
                 label={opt.Display.Name}
                 value={opt.Value}
-                key={key}
+                onChange={(e) => {
+                  setConfig({
+                    ...config,
+                    [key]: {
+                      ...config[key],
+                      Value: parseInt(e.target.value),
+                    },
+                  });
+                }}
               />
             );
           default:
@@ -159,7 +184,7 @@ const App = () => {
         }
       })}
       <Button variant="success" onClick={() => openChannel()} className="m-1 w-25">Open Covert Channel</Button>
-      <Button variant="danger" className="m-1 w-25">Close Covert Channel</Button>
+      <Button variant="danger" onClick={() => closeChannel()} className="m-1 w-25">Close Covert Channel</Button>
     </div>
   );
 };
