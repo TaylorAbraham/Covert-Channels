@@ -50,6 +50,12 @@ const App = () => {
     ws.send(cmd, { binary: true });
   };
 
+  const sendMessage = () => {
+    const cmd = JSON.stringify({ OpCode: 'write', Message: textToSend });
+    ws.send(cmd, { binary: true });
+    setTextToSend('');
+  };
+
   const handleMessage = (msg) => {
     switch (msg.OpCode) {
       case 'config':
@@ -73,10 +79,10 @@ const App = () => {
 
   useEffect(() => {
     // Matches just the "127.0.0.1:8080" portion of the address
-    // const addressRegex = /[a-zA-Z0-9.]+:[\d]+/g;
-    // const ws = new WebSocket(`ws://${window.location.href.match(addressRegex)[0]}/api/ws`);
+    const addressRegex = /[a-zA-Z0-9.]+:[\d]+/g;
+    const newWS = new WebSocket(`ws://${window.location.href.match(addressRegex)[0]}/api/ws`);
     // TODO: The line below exists for easy personal debugging
-    const newWS = new WebSocket('ws://localhost:8080/api/ws');
+    // const newWS = new WebSocket('ws://localhost:8080/api/ws');
     newWS.binaryType = 'arraybuffer';
     newWS.onopen = _e => sendInitialConfig(newWS);
     newWS.onerror = _e => console.log('UNIMPLEMENTED'); // TODO:
@@ -99,7 +105,7 @@ const App = () => {
         value={textToSend}
         onChange={e => setTextToSend(e.target.value)}
       />
-      <Button variant="primary" className="m-1">Send Message</Button>
+      <Button variant="primary" onClick={sendMessage} className="m-1">Send Message</Button>
       <br />
       <div className="m-1">Incoming Messages</div>
       <FormControl
@@ -201,8 +207,8 @@ const App = () => {
             return (<div key={key}>UNIMPLEMENTED</div>);
         }
       })}
-      <Button variant="success" onClick={() => openChannel()} className="m-1 w-25">Open Covert Channel</Button>
-      <Button variant="danger" onClick={() => closeChannel()} className="m-1 w-25">Close Covert Channel</Button>
+      <Button variant="success" onClick={openChannel} className="m-1 w-25">Open Covert Channel</Button>
+      <Button variant="danger" onClick={closeChannel} className="m-1 w-25">Close Covert Channel</Button>
     </div>
   );
 };
