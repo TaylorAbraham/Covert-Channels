@@ -36,7 +36,7 @@ const App = () => {
   const openChannel = () => {
     const cmd = JSON.stringify({
       OpCode: 'open',
-      Processors: config.processors,
+      Processors: processors,
       Channel: {
         Type: channel.value,
         Data: config,
@@ -70,10 +70,18 @@ const App = () => {
       case 'close':
         addSystemMessage('Covert channel closed.');
         break;
+      case 'write':
+        addSystemMessage('Covert message sent.');
+        break;
+      case 'read':
+        addSystemMessage(`Covert message received: ${msg.Message}`);
+        break;
+      case 'error':
+        addSystemMessage(`[ERROR]: ${msg.Message}`);
+        break;
       default:
         console.log('ERROR: Unknown message');
-        console.log("### msg", msg);
-          // TODO:
+        console.log('### msg', msg);
     }
   };
 
