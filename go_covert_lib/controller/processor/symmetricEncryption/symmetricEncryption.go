@@ -55,8 +55,7 @@ func (c *SymmetricEncryption) Process(data []byte) ([]byte, error) {
 	case "Galois Counter Mode (GCM)":
 		cipherText = GCMEncrypter(block, data)
 		if cipherText == nil {
-			return nil, errors.New("Unable to encrypt in Galosis 
-									Counter Mode (GCM)")
+			return nil, errors.New("Unable to encrypt in Galosis Counter Mode (GCM)")
 		}
 	case "Cipher Block Chaining (CBC)":
 		cipherText = CBCEncrypter(block, data, blockSize)
@@ -177,8 +176,7 @@ func (c *SymmetricEncryption) Unprocess(data []byte) ([]byte, error) {
 	case "Galois Counter Mode (GCM)":
 		data = GCMDecrypter(block, data)
 		if data == nil {
-			return nil, errors.New("Unable to decrypt in Galosis 
-									Counter Mode (GCM)")
+			return nil, errors.New("Unable to decrypt in Galosis Counter Mode (GCM)")
 		}
 	case "Cipher Block Chaining (CBC)":
 		data = CBCDecrypter(block, data, blockSize)
