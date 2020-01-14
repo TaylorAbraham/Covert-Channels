@@ -10,6 +10,7 @@ import (
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
 	"./processor/none"
+	"./processor/checksum"
 	"./processor/symmetricEncryption"
 	"encoding/json"
 	"errors"
@@ -160,6 +161,10 @@ func (ctr *Controller) retrieveProcessor(pconf processorConfig) (processor.Proce
 		}
 	case "Caesar":
 		if p, err = caesar.ToProcessor(newConf.Data.Caesar); err != nil {
+			return nil, nil, err
+		}
+	case "Checksum":
+		if p, err = checksum.ToProcessor(newConf.Data.Checksum); err != nil {
 			return nil, nil, err
 		}
 	case "SymmetricEncryption":
