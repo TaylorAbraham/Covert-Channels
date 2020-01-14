@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
 import FormControl from 'react-bootstrap/FormControl';
 import InputGroup from 'react-bootstrap/InputGroup';
 
-
 const PortInput = (props) => {
   const { label, value, onChange } = props;
   return (

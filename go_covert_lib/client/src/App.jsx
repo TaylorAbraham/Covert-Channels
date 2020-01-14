@@ -8,6 +8,7 @@ import IPInput from './ui-components/IPInput';
 import PortInput from './ui-components/PortInput';
 import './styles.css';
 import Checkbox from './ui-components/Checkbox';
+import Select from './ui-components/Select';
 
 /**
  * IMPORTANT NOTE: For styling, refer to https://getbootstrap.com/docs/4.0/utilities/position/
@@ -184,9 +185,16 @@ const App = () => {
                   ...config,
                   [key]: {
                     ...config[key],
-                    Value: parseInt(e.target.checked),
+                    Value: e.target.checked,
                   },
                 })}
+              />
+            );
+          case 'select':
+            return (
+              <Select
+                {...props}
+                items={opt.Range}
               />
             );
           default:
