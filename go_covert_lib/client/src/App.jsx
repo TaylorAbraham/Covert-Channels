@@ -13,40 +13,65 @@ import './styles.css';
  */
 const App = () => {
   const [textToSend, setTextToSend] = useState('');
+  const [processorList, setProcessorList] = useState([]);
   const [processors, setProcessors] = useState([]);
-  const [processor, setProcessor] = useState({});
-  const [channels, setChannels] = useState([]);
+  const [channelList, setChannelList] = useState([]);
   const [channel, setChannel] = useState({});
   const [config, setConfig] = useState({});
   const [isLoading, setLoading] = useState(true);
+  const [ws, setWS] = useState(null);
+  const [systemMessages, setSystemMessages] = useState('');
 
-  const sendConfig = (ws) => {
+  const sendInitialConfig = (localWS) => {
     const cmd = JSON.stringify({ OpCode: 'config' });
-    ws.send(cmd);
+    localWS.send(cmd, { binary: true });
+  };
+
+  useEffect(function addSystemMessage(newMsg) {
+    setSystemMessages(`${systemMessages}\n${newMsg}`);
+  });
+
+  const openChannel = () => {
+    const cmd = JSON.stringify({
+      OpCode: 'open',
+      Processors: config.processors,
+      Channel: {
+        Type: channel.value,
+        Data: config,
+      },
+    });
+    ws.send(cmd, { binary: true });
   };
 
   const handleMessage = (msg) => {
     switch (msg.OpCode) {
       case 'config':
-        setChannels(msg.Default.Channel);
-        setProcessors(msg.Default.Processor);
+        setChannelList(msg.Default.Channel);
+        setProcessorList(msg.Default.Processor);
+        addSystemMessage('Connection to server established.');
         setLoading(false);
         break;
+      case 'open':
+        addSystemMessage('Covert channel successfully opened.');
+        break;
       default:
+        console.log('ERROR: Unknown message');
+        console.log("### msg", msg);
           // TODO:
     }
   };
 
   useEffect(() => {
     // Matches just the "127.0.0.1:8080" portion of the address
-    const addressRegex = /[a-zA-Z0-9.]+:[\d]+/g;
-    const ws = new WebSocket(`ws://${window.location.href.match(addressRegex)[0]}/api/ws`);
+    // const addressRegex = /[a-zA-Z0-9.]+:[\d]+/g;
+    // const ws = new WebSocket(`ws://${window.location.href.match(addressRegex)[0]}/api/ws`);
     // TODO: The line below exists for easy personal debugging
-    // const ws = new WebSocket('ws://localhost:8080/api/ws');
-    ws.binaryType = 'arraybuffer';
-    ws.onopen = _e => sendConfig(ws);
-    ws.onerror = _e => console.log('UNIMPLEMENTED'); // TODO:
-    ws.onmessage = e => handleMessage(JSON.parse(e.data));
+    const newWS = new WebSocket('ws://localhost:8080/api/ws');
+    newWS.binaryType = 'arraybuffer';
+    newWS.onopen = _e => sendInitialConfig(newWS);
+    newWS.onerror = _e => console.log('UNIMPLEMENTED'); // TODO:
+    newWS.onmessage = e => handleMessage(JSON.parse(e.data));
+    setWS(newWS);
   }, []);
 
   console.log("### config", config);
@@ -69,7 +94,14 @@ const App = () => {
       <div className="m-1">Incoming Messages</div>
       <FormControl
         as="textarea"
-        className="w-25 m-1"
+        className="w-50 m-1"
+        readOnly
+      />
+      <div className="m-1">System Messages</div>
+      <FormControl
+        as="textarea"
+        className="w-50 m-1"
+        value={systemMessages}
         readOnly
       />
       <h2 className="m-1 mt-5">Configuration</h2>
@@ -82,16 +114,16 @@ const App = () => {
         </Dropdown.Toggle>
         <Dropdown.Menu className="w-25">
           {
-            Object.keys(channels).map(chan => (
+            Object.keys(channelList).map(chan => (
               <Dropdown.Item
                 as="option"
                 active={chan === channel.value}
                 onClick={(e) => {
                   setChannel({
                     value: e.target.value,
-                    properties: channels[chan],
+                    properties: channelList[chan],
                   });
-                  setConfig(channels[chan]);
+                  setConfig(channelList[chan]);
                 }}
                 value={chan}
                 key={chan}
@@ -110,7 +142,7 @@ const App = () => {
             return (
               <IPInput
                 label={opt.Display.Name}
-                default="127.0.0.1"
+                value={opt.Value}
                 key={key}
               />
             );
@@ -118,7 +150,7 @@ const App = () => {
             return (
               <PortInput
                 label={opt.Display.Name}
-                default="127.0.0.1"
+                value={opt.Value}
                 key={key}
               />
             );
@@ -126,7 +158,7 @@ const App = () => {
             return (<div key={key}>UNIMPLEMENTED</div>);
         }
       })}
-      <Button variant="success" className="m-1 w-25">Open Covert Channel</Button>
+      <Button variant="success" onClick={() => openChannel()} className="m-1 w-25">Open Covert Channel</Button>
       <Button variant="danger" className="m-1 w-25">Close Covert Channel</Button>
     </div>
   );

@@ -5,14 +5,14 @@ import InputGroup from 'react-bootstrap/InputGroup';
 
 
 const IPInput = (props) => {
-  const { label } = props;
+  const { label, value } = props;
   return (
     <InputGroup className="m-1 w-25">
       <InputGroup.Prepend>
         <InputGroup.Text className="input-text">{label}</InputGroup.Text>
       </InputGroup.Prepend>
       <FormControl
-        placeholder="127.0.0.1"
+        value={value}
       />
     </InputGroup>
   );
@@ -20,6 +20,11 @@ const IPInput = (props) => {
 
 IPInput.propTypes = {
   label: PropTypes.string.isRequired,
+  value: PropTypes.string,
+};
+
+IPInput.defaultProps = {
+  value: '',
 };
 
 export default IPInput;

@@ -5,14 +5,15 @@ import InputGroup from 'react-bootstrap/InputGroup';
 
 
 const PortInput = (props) => {
-  const { label } = props;
+  const { label, value, onChange } = props;
   return (
     <InputGroup className="m-1 w-25">
       <InputGroup.Prepend>
         <InputGroup.Text className="input-text">{label}</InputGroup.Text>
       </InputGroup.Prepend>
       <FormControl
-        placeholder="8080"
+        onChange={onChange}
+        value={value}
       />
     </InputGroup>
   );
@@ -20,6 +21,12 @@ const PortInput = (props) => {
 
 PortInput.propTypes = {
   label: PropTypes.string.isRequired,
+  value: PropTypes.number,
+  onChange: PropTypes.func.isRequired,
+};
+
+PortInput.defaultProps = {
+  value: 0,
 };
 
 export default PortInput;
