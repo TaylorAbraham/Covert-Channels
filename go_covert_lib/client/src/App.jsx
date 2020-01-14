@@ -7,6 +7,7 @@ import Spinner from 'react-bootstrap/Spinner';
 import IPInput from './ui-components/IPInput';
 import PortInput from './ui-components/PortInput';
 import './styles.css';
+import Checkbox from './ui-components/Checkbox';
 
 /**
  * IMPORTANT NOTE: For styling, refer to https://getbootstrap.com/docs/4.0/utilities/position/
@@ -144,39 +145,48 @@ const App = () => {
       </Dropdown>
       {Object.keys(config).map((key) => {
         const opt = config[key];
+        const props = {
+          key,
+          label: opt.Display.Name,
+          value: opt.Value,
+          onChange: e => setConfig({
+            ...config,
+            [key]: {
+              ...config[key],
+              Value: e.target.value,
+            },
+          }),
+        };
         switch (opt.Type) {
           case 'ipv4':
             return (
-              <IPInput
-                key={key}
-                label={opt.Display.Name}
-                value={opt.Value}
-                onChange={(e) => {
-                  setConfig({
-                    ...config,
-                    [key]: {
-                      ...config[key],
-                      Value: e.target.value,
-                    },
-                  });
-                }}
-              />
+              <IPInput {...props} />
             );
           case 'u16':
+          case 'u64':
             return (
               <PortInput
-                key={key}
-                label={opt.Display.Name}
-                value={opt.Value}
-                onChange={(e) => {
-                  setConfig({
-                    ...config,
-                    [key]: {
-                      ...config[key],
-                      Value: parseInt(e.target.value),
-                    },
-                  });
-                }}
+                {...props}
+                onChange={e => setConfig({
+                  ...config,
+                  [key]: {
+                    ...config[key],
+                    Value: parseInt(e.target.value),
+                  },
+                })}
+              />
+            );
+          case 'bool':
+            return (
+              <Checkbox
+                {...props}
+                onChange={e => setConfig({
+                  ...config,
+                  [key]: {
+                    ...config[key],
+                    Value: parseInt(e.target.checked),
+                  },
+                })}
               />
             );
           default:

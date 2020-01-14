@@ -26,6 +26,8 @@
         "arrow-body-style": 0,
         "consistent-return": 0,
         "radix": 0, // Disable prompting for radix when using parseInt
+        "jsx-a11y/label-has-associated-control": 0,
+        "react/jsx-props-no-spreading": 0,
         // MemberExpression refers to dot functions like `.then` on new lines
         "indent": ["error", 2, { "MemberExpression": 0, "SwitchCase": 1 }],
         "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
