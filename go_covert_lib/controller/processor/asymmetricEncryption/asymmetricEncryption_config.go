@@ -13,10 +13,10 @@ type ConfigClient struct {
 
 func GetDefault() ConfigClient {
 	return ConfigClient{
-		SenderPublicKey: config.MakeKey(make([]byte, 32), config.Display{Description: "Your Public Key"}),
-		SenderPrivateKey: config.MakeKey(make([]byte, 32), config.Display{Description: "Your Private Key"}),
-		ReceiverPublicKey: config.MakeKey(make([]byte, 32), config.Display{Description: "Receiver's Public Key"}),
-		ReceiverPrivateKey: config.MakeKey(make([]byte, 32), config.Display{Description: "Receiver's Private Key"}),
+		SenderPublicKey: config.MakeKey([]byte("12345"), config.Display{Description: "Your Public Key"}),
+		SenderPrivateKey: config.MakeKey([]byte("12345"), config.Display{Description: "Your Private Key"}),
+		ReceiverPublicKey: config.MakeKey([]byte("12345"), config.Display{Description: "Receiver's Public Key"}),
+		ReceiverPrivateKey: config.MakeKey([]byte("12345"), config.Display{Description: "Receiver's Private Key"}),
 	}
 }
 
