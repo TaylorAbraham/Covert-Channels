@@ -5,7 +5,7 @@ import FormControl from 'react-bootstrap/FormControl';
 import Spinner from 'react-bootstrap/Spinner';
 
 import IPInput from './ui-components/IPInput';
-import PortInput from './ui-components/PortInput';
+import NumberInput from './ui-components/NumberInput';
 import './styles.css';
 import Checkbox from './ui-components/Checkbox';
 import Select from './ui-components/Select';
@@ -228,10 +228,12 @@ const App = () => {
             return (
               <IPInput {...props} />
             );
+          case 'i8':
           case 'u16':
           case 'u64':
+          case 'exactu64':
             return (
-              <PortInput
+              <NumberInput
                 {...props}
                 onChange={e => setConfig({
                   ...config,

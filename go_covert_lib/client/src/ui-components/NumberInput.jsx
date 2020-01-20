@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import FormControl from 'react-bootstrap/FormControl';
 import InputGroup from 'react-bootstrap/InputGroup';
 
-const PortInput = (props) => {
+const NumberInput = (props) => {
   const { label, value, onChange } = props;
   return (
     <InputGroup className="m-1 w-25">
@@ -18,14 +18,14 @@ const PortInput = (props) => {
   );
 };
 
-PortInput.propTypes = {
+NumberInput.propTypes = {
   label: PropTypes.string.isRequired,
   value: PropTypes.number,
   onChange: PropTypes.func.isRequired,
 };
 
-PortInput.defaultProps = {
+NumberInput.defaultProps = {
   value: 0,
 };
 
-export default PortInput;
+export default NumberInput;
