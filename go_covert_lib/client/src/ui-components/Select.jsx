@@ -1,23 +1,28 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import Dropdown from 'react-bootstrap/Dropdown';
-
+import InputGroup from 'react-bootstrap/InputGroup';
 
 const Select = (props) => {
-  const { label, items, value, onChange } = props;
+  const {
+    label,
+    items,
+    value,
+    onChange,
+  } = props;
   return (
-    <div className="d-flex">
-      <div style={{ margin: 'auto 0' }}>
-        {label}
-      </div>
-      <Dropdown className="m-1 w-25">
+    <InputGroup className="d-flex m-1 w-25">
+      <InputGroup.Prepend>
+        <InputGroup.Text className="input-text">{label}</InputGroup.Text>
+      </InputGroup.Prepend>
+      <Dropdown style={{ flexGrow: 1 }}>
         <Dropdown.Toggle
-          className="w-50"
           variant="outline-primary"
+          className="w-100"
         >
           {value}
         </Dropdown.Toggle>
-        <Dropdown.Menu className="w-25">
+        <Dropdown.Menu className="w-100">
           {
             items.map(item => (
               <Dropdown.Item
@@ -33,7 +38,7 @@ const Select = (props) => {
           }
         </Dropdown.Menu>
       </Dropdown>
-    </div>
+    </InputGroup>
   );
 };
 
