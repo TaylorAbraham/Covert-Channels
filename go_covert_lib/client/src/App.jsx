@@ -115,12 +115,6 @@ const App = () => {
       />
       <Button variant="primary" onClick={sendMessage} className="m-1">Send Message</Button>
       <br />
-      <div className="m-1">Incoming Messages</div>
-      <FormControl
-        as="textarea"
-        className="w-50 m-1"
-        readOnly
-      />
       <div className="m-1">System Messages</div>
       <FormControl
         as="textarea"
