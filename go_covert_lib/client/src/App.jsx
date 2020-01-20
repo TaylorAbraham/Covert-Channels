@@ -34,12 +34,14 @@ const App = () => {
   };
 
   const openChannel = () => {
+    const chanConf = {};
+    chanConf[channel.value] = config;
     const cmd = JSON.stringify({
       OpCode: 'open',
       Processors: processors,
       Channel: {
         Type: channel.value,
-        Data: config,
+        Data: chanConf,
       },
     });
     ws.send(cmd, { binary: true });
