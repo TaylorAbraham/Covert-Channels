@@ -1,16 +1,19 @@
 package controller
 
 import (
+	"sync"
+
 	"./channel"
 	"./channel/ipv4tcp"
 	"./channel/tcp"
 	"./processor"
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
-	"./processor/symmetricEncryption"
+	"./processor/gZipCompression"
 	"./processor/none"
+	"./processor/symmetricEncryption"
+	"./processor/zLibCompression"
 	"github.com/gorilla/websocket"
-	"sync"
 )
 
 // The go json library has this really convenient feature
@@ -58,10 +61,12 @@ type channelData struct {
 }
 
 type processorData struct {
-	None   none.ConfigClient
-	Caesar caesar.ConfigClient
-	SymmetricEncryption symmetricEncryption.ConfigClient
+	None                 none.ConfigClient
+	Caesar               caesar.ConfigClient
+	SymmetricEncryption  symmetricEncryption.ConfigClient
 	AsymmetricEncryption asymmetricEncryption.ConfigClient
+	GZipCompression      gZipCompression.ConfigClient
+	ZLibCompression      zLibCompression.ConfigClient
 }
 
 type Layers struct {

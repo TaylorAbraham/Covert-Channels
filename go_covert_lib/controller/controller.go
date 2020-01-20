@@ -1,18 +1,21 @@
 package controller
 
 import (
+	"encoding/json"
+	"errors"
+	"strconv"
+	"time"
+
 	"./channel/ipv4tcp"
 	"./channel/tcp"
 	"./config"
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
-	"./processor/symmetricEncryption"
+	"./processor/gZipCompression"
 	"./processor/none"
-	"encoding/json"
-	"errors"
+	"./processor/symmetricEncryption"
+	"./processor/zLibCompression"
 	"github.com/gorilla/websocket"
-	"strconv"
-	"time"
 )
 
 // Constructor for the controller
@@ -75,10 +78,12 @@ func defaultChannel() channelData {
 
 func defaultProcessor() processorData {
 	return processorData{
-		None:   none.GetDefault(),
-		Caesar: caesar.GetDefault(),
-		SymmetricEncryption: symmetricEncryption.GetDefault(),
+		None:                 none.GetDefault(),
+		Caesar:               caesar.GetDefault(),
+		SymmetricEncryption:  symmetricEncryption.GetDefault(),
 		AsymmetricEncryption: asymmetricEncryption.GetDefault(),
+		GZipCompression:      gZipCompression.GetDefault(),
+		ZLibCompression:      zLibCompression.GetDefault(),
 	}
 }
 

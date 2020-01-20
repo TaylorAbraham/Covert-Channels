@@ -5,17 +5,17 @@ import (
 )
 
 type ConfigClient struct {
-	SenderPublicKey config.KeyParam
-	SenderPrivateKey config.KeyParam
-	ReceiverPublicKey config.KeyParam
+	SenderPublicKey    config.KeyParam
+	SenderPrivateKey   config.KeyParam
+	ReceiverPublicKey  config.KeyParam
 	ReceiverPrivateKey config.KeyParam
 }
 
 func GetDefault() ConfigClient {
 	return ConfigClient{
-		SenderPublicKey: config.MakeKey([]byte("12345"), config.Display{Description: "Your Public Key"}),
-		SenderPrivateKey: config.MakeKey([]byte("12345"), config.Display{Description: "Your Private Key"}),
-		ReceiverPublicKey: config.MakeKey([]byte("12345"), config.Display{Description: "Receiver's Public Key"}),
+		SenderPublicKey:    config.MakeKey([]byte("12345"), config.Display{Description: "Your Public Key"}),
+		SenderPrivateKey:   config.MakeKey([]byte("12345"), config.Display{Description: "Your Private Key"}),
+		ReceiverPublicKey:  config.MakeKey([]byte("12345"), config.Display{Description: "Receiver's Public Key"}),
 		ReceiverPrivateKey: config.MakeKey([]byte("12345"), config.Display{Description: "Receiver's Private Key"}),
 	}
 }
