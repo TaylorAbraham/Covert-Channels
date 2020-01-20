@@ -8,7 +8,15 @@ Build the code.
 go build main.go
 ```
 
-Run two instances of the server with different websocket ports (must run in supper user mode).
+Build the client.
+```
+cd client
+npm install
+npm run build
+cd ..
+```
+
+Run two instances of the server with different websocket ports (must run in super user mode).
 In one terminal, run:
 ```
 sudo ./main -p 8080
@@ -18,10 +26,7 @@ In a second terminal, run:
 sudo ./main -p 8081
 ```
 
-Open up `test.html` twice in separate browser tabs.
-
-You will be prompted for the port numbers. Choose the two websocket ports chosen 
-earlier (in our case, 8080 and 8081).
+Open a browser tab and navigate to localhost:8080, and in another tab localhost:8081. The client will automatically connect to the server running at that port.
 
 The config will open for the TCP covert channel. You will see inputs for FriendPort and
 OriginPort. These should start at 8123 and 8124. In one of the open tabs, switch these 
@@ -30,8 +35,6 @@ is complementary to the other channel.
 
 In both taps, click the `Open` button. If everything works, you should now be able to 
 exchange messages by typing into the input and clicking the `Send` button.
-
-Received messages will appear in the `textarea`.
 
 Covert Channel
 ==============
