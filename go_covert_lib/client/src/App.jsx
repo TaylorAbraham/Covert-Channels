@@ -89,19 +89,16 @@ const App = () => {
 
   useEffect(() => {
     // Matches just the "127.0.0.1:8080" portion of the address
-    // const addressRegex = /[a-zA-Z0-9.]+:[\d]+/g;
-    // const newWS = new WebSocket(`ws://${window.location.href.match(addressRegex)[0]}/api/ws`);
+    const addressRegex = /[a-zA-Z0-9.]+:[\d]+/g;
+    const newWS = new WebSocket(`ws://${window.location.href.match(addressRegex)[0]}/api/ws`);
     // TODO: The line below exists for easy personal debugging
-    const newWS = new WebSocket('ws://localhost:8080/api/ws');
+    // const newWS = new WebSocket('ws://localhost:8080/api/ws');
     newWS.binaryType = 'arraybuffer';
     newWS.onopen = _e => sendInitialConfig(newWS);
     newWS.onerror = _e => console.log('UNIMPLEMENTED'); // TODO:
     newWS.onmessage = e => handleMessage(JSON.parse(e.data));
     setWS(newWS);
   }, []);
-
-  console.log("### processorList", processorList);
-  console.log("### processors", processors);
 
   return isLoading ? (
     <div className="spinner-container">
@@ -145,38 +142,134 @@ const App = () => {
       </Button>
       {
         processors.map((processor, i) => (
-          <Dropdown className="m-1" key={i.toString()}>
-            <Dropdown.Toggle
-              className="w-25"
-              variant="outline-primary"
-            >
-              {processors[i].Type || 'Select a Processor'}
-            </Dropdown.Toggle>
-            <Dropdown.Menu className="w-25">
-              {
-                Object.keys(processorList).map(p => (
-                  <Dropdown.Item
-                    as="option"
-                    active={p === processors[i].Type}
-                    onClick={(e) => {
-                      setProcessors([
+          <div key={i.toString()}>
+            <Dropdown className="m-1">
+              <Dropdown.Toggle
+                className="w-25"
+                variant="outline-primary"
+              >
+                {processor.Type || 'Select a Processor'}
+              </Dropdown.Toggle>
+              <Dropdown.Menu className="w-25">
+                {
+                  Object.keys(processorList).map(p => (
+                    <Dropdown.Item
+                      as="option"
+                      active={p === processor.Type}
+                      onClick={(e) => {
+                        setProcessors([
+                          ...processors.slice(0, i),
+                          {
+                            Type: e.target.value,
+                            Data: processorList,
+                          },
+                          ...processors.slice(i + 1, processors.length + 1),
+                        ]);
+                      }}
+                      value={p}
+                      key={p}
+                    >
+                      {p}
+                    </Dropdown.Item>
+                  ))
+                }
+              </Dropdown.Menu>
+            </Dropdown>
+            {processor.Data && Object.keys(processor.Data[processor.Type]).map((key) => {
+              /**
+               * EXTREME DANGER WARNING
+               * The below code involves very convoluted spread operators to massage
+               * the data to the format that GoLang expects it to be in.
+               */
+              const opt = processor.Data[processor.Type][key];
+              const props = {
+                key,
+                label: opt.Display.Name,
+                value: opt.Value,
+                onChange: e => setProcessors([
+                  ...processors.slice(0, i),
+                  {
+                    ...processor,
+                    Data: {
+                      ...processor.Data,
+                      [processor.Type]: {
+                        ...processor.Data[processor.Type],
+                        [key]: {
+                          ...opt,
+                          Value: e.target.value,
+                        },
+                      },
+                    },
+                  },
+                  ...processors.slice(i + 1, processors.length + 1),
+                ]),
+              };
+              switch (opt.Type) {
+                case 'ipv4':
+                  return (
+                    <IPInput {...props} />
+                  );
+                case 'i8':
+                case 'u16':
+                case 'u64':
+                case 'exactu64':
+                  return (
+                    <NumberInput
+                      {...props}
+                      onChange={e => setProcessors([
                         ...processors.slice(0, i),
                         {
-                          Type: e.target.value,
-                          Data: processorList,
+                          ...processor,
+                          Data: {
+                            ...processor.Data,
+                            [processor.Type]: {
+                              ...processor.Data[processor.Type],
+                              [key]: {
+                                ...opt,
+                                Value: parseInt(e.target.value) || 0,
+                              },
+                            },
+                          },
                         },
                         ...processors.slice(i + 1, processors.length + 1),
-                      ]);
-                    }}
-                    value={p}
-                    key={p}
-                  >
-                    {p}
-                  </Dropdown.Item>
-                ))
+                      ])}
+                    />
+                  );
+                case 'bool':
+                  return (
+                    <Checkbox
+                      {...props}
+                      onChange={e => setProcessors([
+                        ...processors.slice(0, i),
+                        {
+                          ...processor,
+                          Data: {
+                            ...processor.Data,
+                            [processor.Type]: {
+                              ...processor.Data[processor.Type],
+                              [key]: {
+                                ...opt,
+                                Value: e.target.checked,
+                              },
+                            },
+                          },
+                        },
+                        ...processors.slice(i + 1, processors.length + 1),
+                      ])}
+                    />
+                  );
+                case 'select':
+                  return (
+                    <Select
+                      {...props}
+                      items={opt.Range}
+                    />
+                  );
+                default:
+                  return (<div key={key}>UNIMPLEMENTED</div>);
               }
-            </Dropdown.Menu>
-          </Dropdown>
+            })}
+          </div>
         ))
       }
       <h3 className="m-1">Channel</h3>
@@ -239,7 +332,7 @@ const App = () => {
                   ...config,
                   [key]: {
                     ...config[key],
-                    Value: parseInt(e.target.value),
+                    Value: parseInt(e.target.value) || 0,
                   },
                 })}
               />
