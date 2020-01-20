@@ -89,10 +89,10 @@ const App = () => {
 
   useEffect(() => {
     // Matches just the "127.0.0.1:8080" portion of the address
-    const addressRegex = /[a-zA-Z0-9.]+:[\d]+/g;
-    const newWS = new WebSocket(`ws://${window.location.href.match(addressRegex)[0]}/api/ws`);
+    // const addressRegex = /[a-zA-Z0-9.]+:[\d]+/g;
+    // const newWS = new WebSocket(`ws://${window.location.href.match(addressRegex)[0]}/api/ws`);
     // TODO: The line below exists for easy personal debugging
-    // const newWS = new WebSocket('ws://localhost:8080/api/ws');
+    const newWS = new WebSocket('ws://localhost:8080/api/ws');
     newWS.binaryType = 'arraybuffer';
     newWS.onopen = _e => sendInitialConfig(newWS);
     newWS.onerror = _e => console.log('UNIMPLEMENTED'); // TODO:
@@ -100,7 +100,8 @@ const App = () => {
     setWS(newWS);
   }, []);
 
-  console.log("### config", config);
+  console.log("### processorList", processorList);
+  console.log("### processors", processors);
 
   return isLoading ? (
     <div className="spinner-container">
@@ -131,6 +132,54 @@ const App = () => {
         readOnly
       />
       <h2 className="m-1 mt-5">Configuration</h2>
+      <h3 className="m-1">Processors</h3>
+      <Button
+        variant="success"
+        className="m-1 w-25"
+        onClick={() => setProcessors(processors.concat({
+          Type: null,
+          Data: null,
+        }))}
+      >
+        Add Processor
+      </Button>
+      {
+        processors.map((processor, i) => (
+          <Dropdown className="m-1" key={i.toString()}>
+            <Dropdown.Toggle
+              className="w-25"
+              variant="outline-primary"
+            >
+              {processors[i].Type || 'Select a Processor'}
+            </Dropdown.Toggle>
+            <Dropdown.Menu className="w-25">
+              {
+                Object.keys(processorList).map(p => (
+                  <Dropdown.Item
+                    as="option"
+                    active={p === processors[i].Type}
+                    onClick={(e) => {
+                      setProcessors([
+                        ...processors.slice(0, i),
+                        {
+                          Type: e.target.value,
+                          Data: processorList,
+                        },
+                        ...processors.slice(i + 1, processors.length + 1),
+                      ]);
+                    }}
+                    value={p}
+                    key={p}
+                  >
+                    {p}
+                  </Dropdown.Item>
+                ))
+              }
+            </Dropdown.Menu>
+          </Dropdown>
+        ))
+      }
+      <h3 className="m-1">Channel</h3>
       <Dropdown className="m-1">
         <Dropdown.Toggle
           className="w-25"
