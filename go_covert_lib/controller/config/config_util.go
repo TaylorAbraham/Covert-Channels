@@ -86,7 +86,7 @@ type HexKeyParam struct {
 
 type KeyParam struct {
 	Type string
-	Value []byte
+	Value string
 	Display Display
 }
 
@@ -195,7 +195,7 @@ func MakeHexKey(value []byte, rng []int, display Display) HexKeyParam {
 	return HexKeyParam{"hexkey", value, rng, display}
 }
 
-func MakeKey(value []byte, display Display) KeyParam {
+func MakeKey(value string, display Display) KeyParam {
 	return KeyParam{"key", value, display}
 }
 

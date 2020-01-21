@@ -11,7 +11,7 @@ import (
 // the original message, the contents of the message, followed by a series of
 // zero's to fill the block size requirements of the symmetric encryption 
 // algorithm 
-const padIndex = 7
+const padAmount = 8
 
 type SymmetricEncryption struct {
 	algorithm string
@@ -87,9 +87,9 @@ func Pad(data []byte) []byte {
 	// series of zero's to fill the block size requirements of the symmetric  
 	// encryption algorithm 
 
-	b := make([]byte, 8)
+	b := make([]byte, padAmount)
 	b = append(b, data...)
-	binary.BigEndian.PutUint64(b[:8], uint64(len(data)))
+	binary.BigEndian.PutUint64(b[:padAmount], uint64(len(data)))
 
 	for len(b)%aes.BlockSize != 0 {
 		b = append(b, 0)
@@ -97,13 +97,20 @@ func Pad(data []byte) []byte {
 	return b
 }
 
-func UnPad(data []byte) []byte {
-	lenOfData := binary.BigEndian.Uint64(data[:8])
-	data = data[8:]
-	return data[:lenOfData]
+func UnPad(data []byte) ([]byte, error) {
+	lenOfData := binary.BigEndian.Uint64(data[:padAmount])
+	if lenOfData < uint64(len(data) - 8) {
+		return nil, errors.New("Failed to unprocess data, as data was not processed correctly")
+	}
+	data = data[padAmount:]
+	return data[:lenOfData], nil
 }
 
 func (c *SymmetricEncryption) Unprocess(data []byte) ([]byte, error) {
+	if len(data)%c.blockSize != 0 {
+		return nil, errors.New("Unable to decrypt, wrong block size")
+	}
+	
 	// based on the users choice of the mode of operation encrypt in that mode
 	switch c.mode {
 	case "Cipher Block Chaining (CBC)":
@@ -118,9 +125,9 @@ func (c *SymmetricEncryption) Unprocess(data []byte) ([]byte, error) {
 		return nil, errors.New("Undefined mode selected")
 	}
 
-	data = UnPad(data)
+	data, _ = UnPad(data)
 
-	return data[:], nil
+	return data, nil
 }
 
 func CBCDecrypter(block cipher.Block, data []byte, blockSize int) []byte {
