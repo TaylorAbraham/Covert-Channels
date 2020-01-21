@@ -87,6 +87,12 @@ type HexKeyParam struct {
 	Display Display
 }
 
+type KeyParam struct {
+	Type string
+	Value string
+	Display Display
+}
+
 func (p I8Param) Validate() error {
 	if p.Value >= p.Range[0] && p.Value <= p.Range[1] {
 		return nil
@@ -162,6 +168,10 @@ func (p HexKeyParam) Validate() error {
 	return errors.New("Invalid key length")
 }
 
+func (p KeyParam) Validate() error {
+	return nil
+}
+
 func MakeI8(value int8, rng [2]int8, display Display) I8Param {
 	return I8Param{"i8", value, rng, display}
 }
@@ -186,6 +196,10 @@ func MakeIPV4(value string, display Display) IPV4Param {
 
 func MakeHexKey(value []byte, rng []int, display Display) HexKeyParam {
 	return HexKeyParam{"hexkey", value, rng, display}
+}
+
+func MakeKey(value string, display Display) KeyParam {
+	return KeyParam{"key", value, display}
 }
 
 func Validate(c interface{}) error {

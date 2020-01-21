@@ -6,6 +6,7 @@ import (
 	"./channel/tcpNormal"
 	"./channel/tcpSyn"
 	"./processor"
+	"./processor/asymmetricEncryption"
 	"./processor/caesar"
 	"./processor/none"
 	"./processor/symmetricEncryption"
@@ -62,6 +63,7 @@ type processorData struct {
 	None                none.ConfigClient
 	Caesar              caesar.ConfigClient
 	SymmetricEncryption symmetricEncryption.ConfigClient
+	AsymmetricEncryption asymmetricEncryption.ConfigClient
 }
 
 type Layers struct {

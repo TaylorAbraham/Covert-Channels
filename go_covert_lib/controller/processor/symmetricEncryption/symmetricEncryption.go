@@ -3,85 +3,42 @@ package symmetricEncryption
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/des"
 	"errors"
+	"encoding/binary"
 )
 
 // padding is done by having 7 zero's at the start followed by the length of 
 // the original message, the contents of the message, followed by a series of
 // zero's to fill the block size requirements of the symmetric encryption 
 // algorithm 
-const padIndex = 7
+const padAmount = 8
 
 type SymmetricEncryption struct {
 	algorithm string
 	mode      string
 	key       []byte
+	block	cipher.Block
+	blockSize int
 }
 
 func (c *SymmetricEncryption) Process(data []byte) ([]byte, error) {
 	data = Pad(data)
-	algorithm := c.algorithm
-
-	var (
-		blockSize int
-		block     cipher.Block
-		err       error
-	)
-
-	// based on the users choice of symmetric algorithm create a cipher
-	switch algorithm {
-	case "Advanced Encryption Standard (AES)":
-		block, err = aes.NewCipher(c.key)
-		blockSize = 16
-	case "Data Encryption Standard (DES)":
-		block, err = des.NewCipher(c.key)
-		blockSize = 8
-	case "Triple Data Encryption Standard (3DES)":
-		block, err = des.NewTripleDESCipher(c.key)
-		blockSize = 8
-	default:
-		return nil, errors.New("Undefined algorithm selected")
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
 	// based on the users choice of the mode of operation encrypt in that mode
 	var cipherText []byte
-	selectedMode := c.mode
-	switch selectedMode {
-	case "Galois Counter Mode (GCM)":
-		cipherText = GCMEncrypter(block, data)
-		if cipherText == nil {
-			return nil, errors.New("Unable to encrypt in Galosis 
-									Counter Mode (GCM)")
-		}
+	switch c.mode {
 	case "Cipher Block Chaining (CBC)":
-		cipherText = CBCEncrypter(block, data, blockSize)
+		cipherText = CBCEncrypter(c.block, data, c.blockSize)
 	case "Cipher Feedback (CFB)":
-		cipherText = CFBEncrypter(block, data, blockSize)
+		cipherText = CFBEncrypter(c.block, data, c.blockSize)
 	case "Counter (CTR)":
-		cipherText = CTREncrypter(block, data, blockSize)
+		cipherText = CTREncrypter(c.block, data, c.blockSize)
+	case "Output Feedback (OFB)":
+		cipherText = OFBEncrypter(c.block, data, c.blockSize)
 	default:
 		return nil, errors.New("Undefined mode selected")
 	}
 
-	return cipherText[:], nil
-}
-
-func GCMEncrypter(block cipher.Block, data []byte) []byte {
-	nonce := make([]byte, 12)
-
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil
-	}
-
-	cipherText := aesgcm.Seal(nil, nonce, data, nil)
-
-	return cipherText[:]
+	return cipherText, nil
 }
 
 func CBCEncrypter(block cipher.Block, data []byte, blockSize int) []byte {
@@ -114,97 +71,63 @@ func CTREncrypter(block cipher.Block, data []byte, blockSize int) []byte {
 	return cipherText[:]
 }
 
+func OFBEncrypter(block cipher.Block, data []byte, blockSize int) []byte {
+	cipherText := make([]byte, blockSize+len(data))
+	iv := cipherText[:blockSize]
+
+	stream := cipher.NewOFB(block, iv)
+	stream.XORKeyStream(cipherText[blockSize:], data)
+
+	return cipherText[:]
+}
+
 func Pad(data []byte) []byte {
 	// padding is done by having 7 zero's at the start followed by the length 
 	// of the original message, the contents of the message, followed by a 
 	// series of zero's to fill the block size requirements of the symmetric  
 	// encryption algorithm 
-	lenOfData := len(data)
-	data = append(data, 0)
-	copy(data[1:], data)
-	data[0] = byte(lenOfData)
 
-	for i := 0; i < padIndex; i++ {
-		data = append(data, 0)
-		copy(data[1:], data)
-		data[0] = 0
+	b := make([]byte, padAmount)
+	b = append(b, data...)
+	binary.BigEndian.PutUint64(b[:padAmount], uint64(len(data)))
+
+	for len(b)%aes.BlockSize != 0 {
+		b = append(b, 0)
 	}
-
-	for len(data)%aes.BlockSize != 0 {
-		data = append(data, 0)
-	}
-
-	return data[:]
+	return b
 }
 
-func UnPad(data []byte) []byte {
-	lenOfData := data[padIndex]
-	data = data[padIndex+1:]
-	return data[:lenOfData]
+func UnPad(data []byte) ([]byte, error) {
+	lenOfData := binary.BigEndian.Uint64(data[:padAmount])
+	if lenOfData < uint64(len(data) - padAmount) {
+		return nil, errors.New("Failed to unprocess data, as data was not processed correctly")
+	}
+	data = data[padAmount:]
+	return data[:lenOfData], nil
 }
 
 func (c *SymmetricEncryption) Unprocess(data []byte) ([]byte, error) {
-	algorithm := c.algorithm
-
-	var (
-		blockSize int
-		block     cipher.Block
-		err       error
-	)
-
-	// based on the users choice of symmetric algorithm create a cipher
-	switch algorithm {
-	case "Advanced Encryption Standard (AES)":
-		block, err = aes.NewCipher(c.key)
-		blockSize = 16
-	case "Data Encryption Standard (DES)":
-		block, err = des.NewCipher(c.key)
-		blockSize = 8
-	case "Triple Data Encryption Standard (3DES)":
-		block, err = des.NewTripleDESCipher(c.key)
-		blockSize = 8
-	default:
-		return nil, errors.New("Undefined algorithm selected")
+	if len(data)%c.blockSize != 0 && len(data) >= c.blockSize {
+		return nil, errors.New("Unable to decrypt, wrong block size")
 	}
-
-	if err != nil {
-		return nil, err
-	}
-
+	
 	// based on the users choice of the mode of operation encrypt in that mode
-	selectedMode := c.mode
-	switch selectedMode {
-	case "Galois Counter Mode (GCM)":
-		data = GCMDecrypter(block, data)
-		if data == nil {
-			return nil, errors.New("Unable to decrypt in Galosis 
-									Counter Mode (GCM)")
-		}
+	switch c.mode {
 	case "Cipher Block Chaining (CBC)":
-		data = CBCDecrypter(block, data, blockSize)
+		data = CBCDecrypter(c.block, data, c.blockSize)
 	case "Cipher Feedback (CFB)":
-		data = CFBDecrypter(block, data, blockSize)
+		data = CFBDecrypter(c.block, data, c.blockSize)
 	case "Counter (CTR)":
-		data = CTRDecrypter(block, data, blockSize)
+		data = CTRDecrypter(c.block, data, c.blockSize)
+	case "Output Feedback (OFB)":
+		data = OFBDecrypter(c.block, data, c.blockSize)
 	default:
 		return nil, errors.New("Undefined mode selected")
 	}
 
-	data = UnPad(data)
+	data, _ = UnPad(data)
 
-	return data[:], nil
-}
-
-func GCMDecrypter(block cipher.Block, data []byte) []byte {
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil
-	}
-
-	nonce := make([]byte, 12)
-	plaintext, err := aesgcm.Open(nil, nonce, data, nil)
-
-	return plaintext[:]
+	return data, nil
 }
 
 func CBCDecrypter(block cipher.Block, data []byte, blockSize int) []byte {
@@ -231,6 +154,15 @@ func CTRDecrypter(block cipher.Block, data []byte, blockSize int) []byte {
 	plaintext := make([]byte, len(data))
 	iv := data[:blockSize]
 	stream := cipher.NewCTR(block, iv)
+	stream.XORKeyStream(plaintext, data[blockSize:])
+
+	return plaintext[:]
+}
+
+func OFBDecrypter(block cipher.Block, data []byte, blockSize int) []byte {
+	plaintext := make([]byte, len(data))
+	iv := data[:blockSize]
+	stream := cipher.NewOFB(block, iv)
 	stream.XORKeyStream(plaintext, data[blockSize:])
 
 	return plaintext[:]

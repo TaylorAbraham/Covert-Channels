@@ -5,6 +5,7 @@ import (
 	"./channel/tcpNormal"
 	"./channel/tcpSyn"
 	"./config"
+	"./processor/asymmetricEncryption"
 	"./processor/caesar"
 	"./processor/none"
 	"./processor/symmetricEncryption"
@@ -81,6 +82,7 @@ func defaultProcessor() processorData {
 		None:                none.GetDefault(),
 		Caesar:              caesar.GetDefault(),
 		SymmetricEncryption: symmetricEncryption.GetDefault(),
+		AsymmetricEncryption: asymmetricEncryption.GetDefault(),
 	}
 }
 
