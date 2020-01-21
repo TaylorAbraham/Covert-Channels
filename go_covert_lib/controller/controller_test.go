@@ -116,12 +116,12 @@ func TestRetrieveWriteMessage(t *testing.T) {
 	conf := checkConfig(read1, DefaultConfig(), t)
 
 	conf.OpCode = "open"
-	conf.Channel.Data.Ipv4tcp.FriendPort.Value = 8090
-	conf.Channel.Data.Ipv4tcp.OriginPort.Value = 8091
+	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
+	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
 	writeTestMsg(write1, conf, t)
 
-	conf.Channel.Data.Ipv4tcp.FriendPort.Value = 8091
-	conf.Channel.Data.Ipv4tcp.OriginPort.Value = 8090
+	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
+	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
 	writeTestMsg(write2, conf, t)
 
 	checkMsgType(read1, "open", "Open success", t)
@@ -146,8 +146,8 @@ func TestWithProcessor(t *testing.T) {
 	conf := checkConfig(read1, DefaultConfig(), t)
 
 	conf.OpCode = "open"
-	conf.Channel.Data.Ipv4tcp.FriendPort.Value = 8090
-	conf.Channel.Data.Ipv4tcp.OriginPort.Value = 8091
+	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
+	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
 	conf.Processors = []processorConfig{
 		processorConfig{
 			Type: "Caesar", Data: defaultProcessor(),
@@ -160,8 +160,8 @@ func TestWithProcessor(t *testing.T) {
 	conf.Processors[1].Data.Caesar.Shift.Value = 7
 	writeTestMsg(write1, conf, t)
 
-	conf.Channel.Data.Ipv4tcp.FriendPort.Value = 8091
-	conf.Channel.Data.Ipv4tcp.OriginPort.Value = 8090
+	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
+	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
 	writeTestMsg(write2, conf, t)
 
 	checkMsgType(read1, "open", "Open success", t)
@@ -189,8 +189,8 @@ func TestWithProcessorNoUnprocess(t *testing.T) {
 	conf := checkConfig(read1, DefaultConfig(), t)
 
 	conf.OpCode = "open"
-	conf.Channel.Data.Ipv4tcp.FriendPort.Value = 8090
-	conf.Channel.Data.Ipv4tcp.OriginPort.Value = 8091
+	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
+	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
 	conf.Processors = []processorConfig{
 		processorConfig{
 			Type: "Caesar", Data: defaultProcessor(),
@@ -203,8 +203,8 @@ func TestWithProcessorNoUnprocess(t *testing.T) {
 	conf.Processors[1].Data.Caesar.Shift.Value = 3
 	writeTestMsg(write1, conf, t)
 
-	conf.Channel.Data.Ipv4tcp.FriendPort.Value = 8091
-	conf.Channel.Data.Ipv4tcp.OriginPort.Value = 8090
+	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
+	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
 	conf.Processors = []processorConfig{}
 	writeTestMsg(write2, conf, t)
 
@@ -243,10 +243,10 @@ func checkMsgType(ch chan []byte, opcode string, msg string, t *testing.T) {
 			t.Errorf("Unexpected unmarshal error: %s", err.Error())
 		} else {
 			if mt.OpCode != opcode {
-				t.Errorf("Open message does not have correct opcode: %s, want %s", mt.OpCode, opcode)
+				t.Errorf("Message does not have correct opcode: %s, want %s", mt.OpCode, opcode)
 			}
 			if mt.Message != msg {
-				t.Errorf("Open message does not have correct message: %s, want %s", mt.Message, msg)
+				t.Errorf("Message does not have correct message: %s, want %s", mt.Message, msg)
 			}
 		}
 	case <-time.After(time.Second * 5):
@@ -269,4 +269,89 @@ func checkConfig(ch chan []byte, expt configData, t *testing.T) configData {
 		t.Errorf("Unexpected read timeout")
 	}
 	return conf
+}
+
+type channelTest struct {
+	name string
+	f1   func(*configData)
+	f2   func(*configData)
+}
+
+func runMultiChannelWrite(t *testing.T, cl []channelTest) {
+	ctr1, _ := CreateController()
+	ctr2, _ := CreateController()
+
+	write1, read1, stop1, done1 := openConn("ws://127.0.0.1:9030/covert", "9030", ctr1, t)
+	write2, read2, stop2, done2 := openConn("ws://127.0.0.1:9040/covert", "9040", ctr2, t)
+
+	varCurrConf1 := DefaultConfig()
+
+	for i := range cl {
+		write1 <- []byte("{\"OpCode\" : \"config\"}")
+		conf := checkConfig(read1, varCurrConf1, t)
+
+		conf.Channel.Type = cl[i].name
+		cl[i].f1(&conf)
+		varCurrConf1 = conf
+
+		conf.OpCode = "open"
+		writeTestMsg(write1, conf, t)
+		cl[i].f2(&conf)
+		writeTestMsg(write2, conf, t)
+
+		checkMsgType(read1, "open", "Open success", t)
+		checkMsgType(read2, "open", "Open success", t)
+
+		write1 <- []byte("{\"OpCode\" : \"write\", \"Message\" : \"Hello World!\"}")
+		checkMsgType(read1, "write", "Message write success", t)
+		checkMsgType(read2, "read", "Hello World!", t)
+
+		write1 <- []byte("{\"OpCode\" : \"close\"}")
+		write2 <- []byte("{\"OpCode\" : \"close\"}")
+
+		checkMsgType(read1, "close", "Close success", t)
+		checkMsgType(read2, "close", "Close success", t)
+	}
+
+	checkClose(stop1, done1, t)
+	checkClose(stop2, done2, t)
+}
+
+func TestMultiChannelWriteMessage(t *testing.T) {
+	cl := []channelTest{
+		channelTest{
+			name: "TcpNormal",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpNormal.FriendReceivePort.Value = 8090
+				conf.Channel.Data.TcpNormal.OriginReceivePort.Value = 8091
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpNormal.FriendReceivePort.Value = 8091
+				conf.Channel.Data.TcpNormal.OriginReceivePort.Value = 8090
+			},
+		},
+		channelTest{
+			name: "TcpHandshake",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
+			},
+		},
+		channelTest{
+			name: "TcpSyn",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8090
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8091
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8091
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8090
+			},
+		},
+	}
+	runMultiChannelWrite(t, cl)
 }

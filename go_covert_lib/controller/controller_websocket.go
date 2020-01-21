@@ -60,6 +60,7 @@ loop:
 // A loop for processing incomming messages from the client
 func (ctr *Controller) webReceiveLoop() {
 	defer close(ctr.doneWsRecv)
+	defer ctr.handleClose()
 
 loop:
 	for {

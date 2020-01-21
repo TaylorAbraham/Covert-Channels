@@ -1,16 +1,19 @@
 package controller
 
 import (
-	"./channel/ipv4tcp"
-	"./channel/tcp"
+	"./channel/tcpHandshake"
+	"./channel/tcpNormal"
+	"./channel/tcpSyn"
 	"./config"
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
-	"./processor/symmetricEncryption"
 	"./processor/none"
+	"./processor/symmetricEncryption"
 	"encoding/json"
 	"errors"
 	"github.com/gorilla/websocket"
+	"log"
+	"os"
 	"strconv"
 	"time"
 )
@@ -60,7 +63,7 @@ func DefaultConfig() configData {
 		},
 		Processors: []processorConfig{},
 		Channel: channelConfig{
-			Type: "Ipv4tcp",
+			Type: "TcpHandshake",
 			Data: defaultChannel(),
 		},
 	}
@@ -68,15 +71,16 @@ func DefaultConfig() configData {
 
 func defaultChannel() channelData {
 	return channelData{
-		Ipv4tcp: ipv4tcp.GetDefault(),
-		Tcp:     tcp.GetDefault(),
+		TcpSyn:       tcpSyn.GetDefault(),
+		TcpHandshake: tcpHandshake.GetDefault(),
+		TcpNormal:    tcpNormal.GetDefault(),
 	}
 }
 
 func defaultProcessor() processorData {
 	return processorData{
-		None:   none.GetDefault(),
-		Caesar: caesar.GetDefault(),
+		None:                none.GetDefault(),
+		Caesar:              caesar.GetDefault(),
 		SymmetricEncryption: symmetricEncryption.GetDefault(),
 		AsymmetricEncryption: asymmetricEncryption.GetDefault(),
 	}
@@ -140,6 +144,7 @@ func toMessage(opcode string, data string) []byte {
 
 // Handle the config command
 func (ctr *Controller) handleConfig() ([]byte, error) {
+	ctr.config.OpCode = "config"
 	if data, err := json.Marshal(ctr.config); err != nil {
 		return nil, err
 	} else {
@@ -206,11 +211,25 @@ loop:
 		default:
 			data, err := ctr.handleRead()
 			if err != nil {
-				ctr.wsSend <- toMessage("error", err.Error())
-				// If there has been a read error wait
-				// to avoid a constant stream of data
-				// to the UI
-				time.Sleep(time.Second)
+				// First, check if we are closing the covert channel
+				// If so, then that is the likely explanation of the error
+				// and we don't neet to report it
+				select {
+				case <-ctr.layers.readClose:
+				default:
+					// Else we try to report the error
+					// This select also includes the readClose
+					// to handle the case where the server is being shutdown
+					select {
+					case ctr.wsSend <- toMessage("error", err.Error()):
+						// If there has been a read error wait
+						// to avoid a constant stream of data
+						// to the UI
+						time.Sleep(time.Second)
+						// If we have closed we return immediately
+					case <-ctr.layers.readClose:
+					}
+				}
 			} else {
 				ctr.wsSend <- toMessage("read", string(data))
 			}
@@ -222,10 +241,18 @@ loop:
 func (ctr *Controller) handleClose() error {
 	var err error
 	if ctr.layers != nil {
-		err = ctr.layers.channel.Close()
-		// We must wait to ensure that the read loop is complete
+
 		close(ctr.layers.readClose)
-		<-ctr.layers.readCloseDone
+		err = ctr.layers.channel.Close()
+
+		// We must wait to ensure that the read loop is complete
+		// In case closing the channel failed to cause handleRead to return
+		select {
+		case <-ctr.layers.readCloseDone:
+		case <-time.After(time.Second * 5):
+			var l *log.Logger = log.New(os.Stderr, "", log.Flags())
+			l.Println("Failed to close read loop. Covert channel did not return from cancel.")
+		}
 		ctr.layers = nil
 	}
 	return err
