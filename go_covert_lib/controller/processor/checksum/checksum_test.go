@@ -7,12 +7,24 @@ import (
 )
 
 func TestEncodeDecode(t *testing.T) {
+	b := make([]byte, 256)
+	for i := range b {
+		b[i] = byte(i)
+	}
+
+	// Try different length byte slices
+	encodeDecode(t, Checksum{table: crc32.MakeTable(crc32.IEEE)}, []byte{})
 	encodeDecode(t, Checksum{table: crc32.MakeTable(crc32.IEEE)}, []byte{1})
-	encodeDecode(t, Checksum{table: crc32.MakeTable(crc32.IEEE)}, []byte{1, 2, 3, 4, 5})
+	encodeDecode(t, Checksum{table: crc32.MakeTable(crc32.IEEE)}, []byte{1, 2})
+	encodeDecode(t, Checksum{table: crc32.MakeTable(crc32.IEEE)}, []byte{1, 2, 3})
+	encodeDecode(t, Checksum{table: crc32.MakeTable(crc32.IEEE)}, []byte{1, 2, 3, 4})
+	encodeDecode(t, Checksum{table: crc32.MakeTable(crc32.IEEE)}, []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 100})
+	encodeDecode(t, Checksum{table: crc32.MakeTable(crc32.IEEE)}, b)
+
+	// Try different polynomials
 	encodeDecode(t, Checksum{table: crc32.MakeTable(crc32.Castagnoli)}, []byte{1, 2, 3, 4, 5})
 	encodeDecode(t, Checksum{table: crc32.MakeTable(crc32.Koopman)}, []byte{1, 2, 3, 4, 5})
-	encodeDecode(t, Checksum{table: crc32.MakeTable(crc32.IEEE)}, []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 100})
-	encodeDecode(t, Checksum{table: crc32.MakeTable(crc32.IEEE)}, []byte{})
+	encodeDecode(t, Checksum{table: crc32.MakeTable(12345)}, []byte{1, 2, 3, 4, 5})
 }
 
 func encodeDecode(t *testing.T, c Checksum, b []byte) {
