@@ -99,7 +99,7 @@ func Pad(data []byte) []byte {
 
 func UnPad(data []byte) ([]byte, error) {
 	lenOfData := binary.BigEndian.Uint64(data[:padAmount])
-	if lenOfData < uint64(len(data) - 8) {
+	if lenOfData < uint64(len(data) - padAmount) {
 		return nil, errors.New("Failed to unprocess data, as data was not processed correctly")
 	}
 	data = data[padAmount:]
@@ -107,7 +107,7 @@ func UnPad(data []byte) ([]byte, error) {
 }
 
 func (c *SymmetricEncryption) Unprocess(data []byte) ([]byte, error) {
-	if len(data)%c.blockSize != 0 {
+	if len(data)%c.blockSize != 0 && len(data) >= c.blockSize {
 		return nil, errors.New("Unable to decrypt, wrong block size")
 	}
 	
