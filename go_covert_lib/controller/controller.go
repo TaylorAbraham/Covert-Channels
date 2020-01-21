@@ -4,7 +4,9 @@ import (
 	"./channel/ipv4tcp"
 	"./channel/tcp"
 	"./config"
+	"./processor/asymmetricEncryption"
 	"./processor/caesar"
+	"./processor/symmetricEncryption"
 	"./processor/none"
 	"encoding/json"
 	"errors"
@@ -75,6 +77,8 @@ func defaultProcessor() processorData {
 	return processorData{
 		None:   none.GetDefault(),
 		Caesar: caesar.GetDefault(),
+		SymmetricEncryption: symmetricEncryption.GetDefault(),
+		AsymmetricEncryption: asymmetricEncryption.GetDefault(),
 	}
 }
 

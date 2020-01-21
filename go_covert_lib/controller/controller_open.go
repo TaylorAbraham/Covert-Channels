@@ -6,7 +6,9 @@ import (
 	"./channel/tcp"
 	"./config"
 	"./processor"
+	"./processor/asymmetricEncryption"
 	"./processor/caesar"
+	"./processor/symmetricEncryption"
 	"./processor/none"
 	"encoding/json"
 	"errors"
@@ -132,6 +134,14 @@ func (ctr *Controller) retrieveProcessor(pconf processorConfig) (processor.Proce
 		}
 	case "Caesar":
 		if p, err = caesar.ToProcessor(newConf.Data.Caesar); err != nil {
+			return nil, nil, err
+		}
+	case "SymmetricEncryption":
+		if p, err = symmetricEncryption.ToProcessor(newConf.Data.SymmetricEncryption); err != nil {
+			return nil, nil, err
+		}
+	case "AsymmetricEncryption":
+		if p, err = asymmetricEncryption.ToProcessor(newConf.Data.AsymmetricEncryption); err != nil {
 			return nil, nil, err
 		}
 	default:
