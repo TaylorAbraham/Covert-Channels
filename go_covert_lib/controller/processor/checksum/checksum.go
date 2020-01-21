@@ -1,18 +1,18 @@
 package checksum
 
 import (
-	"hash/crc32"
 	"encoding/binary"
 	"errors"
+	"hash/crc32"
 )
 
-type Checksum struct{
+type Checksum struct {
 	table *crc32.Table
 }
 
 func (cs *Checksum) Process(data []byte) ([]byte, error) {
 	check := crc32.Checksum(data, cs.table)
-	newData := make([]byte, len(data) + 4)
+	newData := make([]byte, len(data)+4)
 	copy(newData, data)
 	binary.BigEndian.PutUint32(newData[len(data):], check)
 	return newData, nil
@@ -28,6 +28,6 @@ func (cs *Checksum) Unprocess(data []byte) ([]byte, error) {
 		return nil, errors.New("Checksum failure")
 	}
 	newData := make([]byte, len(data)-4)
-	copy(newData, data[:len(data) - 4])
+	copy(newData, data[:len(data)-4])
 	return newData, nil
 }

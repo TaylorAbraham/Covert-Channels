@@ -8,8 +8,8 @@ import (
 	"./processor"
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
-	"./processor/none"
 	"./processor/checksum"
+	"./processor/none"
 	"./processor/symmetricEncryption"
 	"github.com/gorilla/websocket"
 	"sync"
@@ -61,10 +61,10 @@ type channelData struct {
 }
 
 type processorData struct {
-	None                none.ConfigClient
-	Caesar              caesar.ConfigClient
-	Checksum            checksum.ConfigClient
-	SymmetricEncryption symmetricEncryption.ConfigClient
+	None                 none.ConfigClient
+	Caesar               caesar.ConfigClient
+	Checksum             checksum.ConfigClient
+	SymmetricEncryption  symmetricEncryption.ConfigClient
 	AsymmetricEncryption asymmetricEncryption.ConfigClient
 }
 

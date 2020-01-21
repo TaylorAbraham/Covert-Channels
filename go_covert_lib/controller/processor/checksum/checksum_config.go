@@ -28,5 +28,5 @@ func ToProcessor(cc ConfigClient) (*Checksum, error) {
 	default:
 		return nil, errors.New("Invalid polynomial")
 	}
-	return &Checksum{ table : crc32.MakeTable(poly) }, nil
+	return &Checksum{table: crc32.MakeTable(poly)}, nil
 }
