@@ -118,28 +118,28 @@ const App = () => {
             <Nav.Link href="#msg">Messaging</Nav.Link>
             <Nav.Link href="#help">Help</Nav.Link>
           </Nav>
-          <Button variant="danger">Channel Closed</Button>
+          <Button variant="success">Channel Open</Button>
         </Navbar.Collapse>
       </Navbar>
       <div className="ml-2 mb-2 mr-2 d-flex" style={{ marginTop: '70px' }}>
-        {/* <h2 className="m-1">Messaging</h2>
-        <FormControl
-          as="textarea"
-          className="w-75 m-1"
-          value={textToSend}
-          onChange={e => setTextToSend(e.target.value)}
-        />
-        <Button variant="primary" onClick={sendMessage} className="m-1">Send Message</Button>
-        <br />
-        <div className="m-1">System Messages</div>
-        <FormControl
-          as="textarea"
-          className="w-75 m-1"
-          value={systemMessages.join('\n')}
-          readOnly
-        /> */}
-        <div style={{ flexGrow: 3 }}>
-          <h2 className="m-1">Configuration</h2>
+        <div style={{ flexGrow: 2 }}>
+          <h2 className="m-1">Messaging</h2>
+          <FormControl
+            as="textarea"
+            className="w-75 m-1"
+            value={textToSend}
+            onChange={e => setTextToSend(e.target.value)}
+          />
+          <Button variant="primary" onClick={sendMessage} className="m-1">Send Message</Button>
+          <br />
+          <div className="m-1">Incoming Messages</div>
+          <FormControl
+            as="textarea"
+            className="w-75 m-1"
+            value="Hello Dr. Jaskolka and Dr. Banihashemi!"
+            readOnly
+          />
+          {/* <h2 className="m-1">Configuration</h2>
           <h3 className="m-1">Processors</h3>
           <Button
             variant="success"
@@ -191,7 +191,6 @@ const App = () => {
                    * EXTREME DANGER WARNING
                    * The below code involves very convoluted spread operators to massage
                    * the data to the format that GoLang expects it to be in.
-                   */
                   const opt = processor.Data[processor.Type][key];
                   const props = {
                     key,
@@ -372,13 +371,15 @@ const App = () => {
                 return (<div key={key}>UNIMPLEMENTED</div>);
             }
           })}
-          <Button variant="success" onClick={openChannel} className="m-1" style={{ width: '36.25%' }}>Open Covert Channel</Button>
-          <Button variant="danger" onClick={closeChannel} className="m-1" style={{ width: '36.25%' }}>Close Covert Channel</Button>
+          <Button variant="danger" onClick={openChannel} className="m-1 w-75">Close Covert Channel</Button> */}
         </div>
         <div style={{ flexGrow: 1 }}>
           <div className="p-3" style={{ position: 'fixed', border: '1px solid black', height: '90%' }}>
             <h3 style={{ borderBottom: '1px solid black' }}>System Log</h3>
-            <p className="">Connection to server established on port 8080.</p>
+            <p>Connection to server established on port 8081.</p>
+            <p>Opening Covert Channel...</p>
+            <p>Covert channel opened successfully.</p>
+            <p>Received message.</p>
           </div>
         </div>
       </div>
