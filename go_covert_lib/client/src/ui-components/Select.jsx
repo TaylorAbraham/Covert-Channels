@@ -11,7 +11,7 @@ const Select = (props) => {
     onChange,
   } = props;
   return (
-    <InputGroup className="d-flex m-1 w-25">
+    <InputGroup className="d-flex m-1 w-75">
       <InputGroup.Prepend>
         <InputGroup.Text className="input-text">{label}</InputGroup.Text>
       </InputGroup.Prepend>
