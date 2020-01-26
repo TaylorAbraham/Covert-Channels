@@ -1,9 +1,7 @@
-package tcp
+package tcpNormal
 
 import (
 	"bytes"
-	"encoding/json"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"sort"
@@ -223,20 +221,12 @@ func randomString(maxLen int) string {
 
 func TestMultipleSend(t *testing.T) {
 	log.Println("Starting TestMultipleSend")
-	sconfCopy := sconf
-	sconfCopy.logPackets = true
-	rconfCopy := rconf
-	rconfCopy.logPackets = true
 	runMultiTest(t, sconf, rconf)
 }
 
 func TestMultipleSendTimeout(t *testing.T) {
 	log.Println("Starting TestMultipleSendTimeout")
-	sconfCopy := sconfTimeout
-	sconfCopy.logPackets = true
-	rconfCopy := rconfTimeout
-	rconfCopy.logPackets = true
-	runMultiTest(t, sconfCopy, rconfCopy)
+	runMultiTest(t, sconfTimeout, rconfTimeout)
 }
 
 // Test that multiple messages can be sent before a
@@ -328,31 +318,17 @@ func runMultiTest(t *testing.T, sconf, rconf Config) {
 	sort.Strings(outputs)
 	sort.Strings(inputs)
 
-	logPkts := func(mp map[uint16][]packet, name string) {
-		if buf, err := json.Marshal(mp); err == nil {
-			if err := ioutil.WriteFile(name, buf, 0777); err != nil {
-				log.Println("Could not write file")
-			}
-		} else {
-			log.Println("Could not marshal")
-		}
-	}
-
 	if len(inputs) == len(outputs) {
 		for i := range inputs {
 			if outputs[i] != inputs[i] {
 				t.Errorf("Received '%s'; want '%s'", outputs[i], inputs[i])
 				t.Error([]byte(outputs[i]))
 				t.Error([]byte(inputs[i]))
-				logPkts(sch.sendPktLog.pktMap, "./sendLogMismatch")
-				logPkts(rch.receivePktLog.pktMap, "./receiveLogMismatch")
 				break
 			}
 		}
 	} else {
 		t.Errorf("Insufficent replies received")
-		logPkts(sch.sendPktLog.pktMap, "./sendLogTimeout")
-		logPkts(rch.receivePktLog.pktMap, "./receiveLogTimeout")
 	}
 
 	if err := sch.Close(); err != nil {
