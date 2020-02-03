@@ -7,8 +7,8 @@ import (
 	"./config"
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
-	"./processor/none"
 	"./processor/checksum"
+	"./processor/none"
 	"./processor/symmetricEncryption"
 	"encoding/json"
 	"errors"
@@ -80,10 +80,10 @@ func defaultChannel() channelData {
 
 func defaultProcessor() processorData {
 	return processorData{
-		None:                none.GetDefault(),
-		Caesar:              caesar.GetDefault(),
-		Checksum:						 checksum.GetDefault(),
-		SymmetricEncryption: symmetricEncryption.GetDefault(),
+		None:                 none.GetDefault(),
+		Caesar:               caesar.GetDefault(),
+		Checksum:             checksum.GetDefault(),
+		SymmetricEncryption:  symmetricEncryption.GetDefault(),
 		AsymmetricEncryption: asymmetricEncryption.GetDefault(),
 	}
 }
