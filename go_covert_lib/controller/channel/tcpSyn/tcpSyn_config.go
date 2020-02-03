@@ -1,4 +1,4 @@
-package ipv4tcp
+package tcpSyn
 
 import (
 	"../../config"
