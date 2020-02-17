@@ -13,13 +13,13 @@ type ConfigClient struct {
 
 func GetDefault() ConfigClient {
 	return ConfigClient{
-		SenderPublicKey:    config.MakeKey([]byte("12345"), config.Display{Description: "Your Public Key"}),
-		SenderPrivateKey:   config.MakeKey([]byte("12345"), config.Display{Description: "Your Private Key"}),
-		ReceiverPublicKey:  config.MakeKey([]byte("12345"), config.Display{Description: "Receiver's Public Key"}),
-		ReceiverPrivateKey: config.MakeKey([]byte("12345"), config.Display{Description: "Receiver's Private Key"}),
+		SenderPublicKey:    config.MakeKey("-----BEGIN RSA PRIVATE KEY-----enter key here-----END RSA PRIVATE KEY-----", config.Display{Description: "Your Public Key", Name: "Sender's Public Key", Group: "Asymmetric Encryption"}),
+		SenderPrivateKey:   config.MakeKey("-----BEGIN RSA PRIVATE KEY-----enter key here-----END RSA PRIVATE KEY-----", config.Display{Description: "Your Private Key", Name: "Sender's Private Key", Group: "Asymmetric Encryption"}),
+		ReceiverPublicKey:  config.MakeKey("-----BEGIN RSA PRIVATE KEY-----enter key here-----END RSA PRIVATE KEY-----", config.Display{Description: "Receiver's Public Key", Name: "Senders Public Key", Group: "Asymmetric Encryption"}),
+		ReceiverPrivateKey: config.MakeKey("-----BEGIN RSA PRIVATE KEY-----enter key here-----END RSA PRIVATE KEY-----", config.Display{Description: "Receiver's Private Key", Name: "Senders Private Key", Group: "Asymmetric Encryption"}),
 	}
 }
 
 func ToProcessor(cc ConfigClient) (*AsymmetricEncryption, error) {
-	return &AsymmetricEncryption{senderPublicKey: cc.SenderPublicKey.Value, senderPrivateKey: cc.SenderPrivateKey.Value, receiverPublicKey: cc.ReceiverPublicKey.Value, receiverPrivateKey: cc.ReceiverPrivateKey.Value}, nil
+	return &AsymmetricEncryption{senderPublicKey: []byte(cc.SenderPublicKey.Value), senderPrivateKey: []byte(cc.SenderPrivateKey.Value), receiverPublicKey: []byte(cc.ReceiverPublicKey.Value), receiverPrivateKey: []byte(cc.ReceiverPrivateKey.Value)}, nil
 }

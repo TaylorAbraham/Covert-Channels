@@ -15,6 +15,9 @@ type Display struct {
 	Description string
 	Name        string
 	Group       string
+	// If GroupToggle is set to true on a bool Param, the truthiness of the bool Param
+	// will determine whether the rest of the Group is shown or hidden
+	GroupToggle bool
 }
 
 type I8Param struct {
@@ -86,7 +89,7 @@ type HexKeyParam struct {
 
 type KeyParam struct {
 	Type string
-	Value []byte
+	Value string
 	Display Display
 }
 
@@ -195,7 +198,7 @@ func MakeHexKey(value []byte, rng []int, display Display) HexKeyParam {
 	return HexKeyParam{"hexkey", value, rng, display}
 }
 
-func MakeKey(value []byte, display Display) KeyParam {
+func MakeKey(value string, display Display) KeyParam {
 	return KeyParam{"key", value, display}
 }
 

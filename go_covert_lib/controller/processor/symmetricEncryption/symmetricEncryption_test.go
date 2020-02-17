@@ -2,6 +2,7 @@ package symmetricEncryption
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 )
 
@@ -25,6 +26,18 @@ func Test3DESEncodeDecode(t *testing.T) {
 	encodeDecode(t, make([]byte, 24), "Triple Data Encryption Standard (3DES)", "Cipher Feedback (CFB)", []byte{1, 2, 3, 4, 5})
 	encodeDecode(t, make([]byte, 24), "Triple Data Encryption Standard (3DES)", "Counter (CTR)", []byte{1, 2, 3, 4, 5})
 	encodeDecode(t, make([]byte, 24), "Triple Data Encryption Standard (3DES)", "Output Feedback (OFB)", []byte{1, 2, 3, 4, 5})
+}
+
+func TestPadUnpad(t *testing.T) {
+	b := Pad([]byte{76, 42, 98, 34, 88, 12, 45, 32, 76})
+	if !reflect.DeepEqual(b, []byte{0, 0, 0, 0, 0, 0, 0, 9, 76, 42, 98, 34, 88, 12, 45, 32, 76, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}) {
+		t.Errorf("Array not padded correctly")
+	}
+
+	b = UnPad(b)
+	if !reflect.DeepEqual(b, []byte{76, 42, 98, 34, 88, 12, 45, 32, 76}) {
+		t.Errorf("Array not unpadded correctly")
+	}
 }
 
 func encodeDecode(t *testing.T, key []byte, algo string, mode string, b []byte) {
