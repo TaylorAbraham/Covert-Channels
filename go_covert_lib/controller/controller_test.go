@@ -300,7 +300,6 @@ func TestMessageExchange(t *testing.T) {
 				}
 			},
 		},
-		,
 		channelTest{
 			name: "TcpHandshake",
 			f1: func(conf *configData) {
