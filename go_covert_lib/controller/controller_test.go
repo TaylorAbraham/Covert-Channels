@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/gorilla/websocket"
+	"math/rand"
 	"net/http"
 	"reflect"
 	"testing"
@@ -184,6 +185,11 @@ func checkMsgType(ch chan []byte, opcode string, msg string, t *testing.T) {
 	}
 }
 
+// Checks that two strings are equal in terms of utf characters
+func utf8Equal() {
+
+}
+
 func checkConfig(ch chan []byte, expt configData, t *testing.T) configData {
 	var conf configData
 	select {
@@ -207,7 +213,7 @@ type channelTest struct {
 	f2   func(*configData)
 }
 
-func runMultiChannelWrite(t *testing.T, cl []channelTest) {
+func runMultiChannelWrite(t *testing.T, cl []channelTest, messages []string) {
 	ctr1, _ := CreateController()
 	ctr2, _ := CreateController()
 
@@ -232,9 +238,22 @@ func runMultiChannelWrite(t *testing.T, cl []channelTest) {
 		checkMsgType(read1, "open", "Open success", t)
 		checkMsgType(read2, "open", "Open success", t)
 
-		write1 <- []byte("{\"OpCode\" : \"write\", \"Message\" : \"Hello World!\"}")
-		checkMsgType(read1, "write", "Message write success", t)
-		checkMsgType(read2, "read", "Hello World!", t)
+		for i := range messages {
+			msg := messageType{OpCode: "write", Message: messages[i]}
+			if b, err := json.Marshal(msg); err == nil {
+				write1 <- b
+				checkMsgType(read1, "write", "Message write success", t)
+				// The marshaller will convert the string into a format that can be interpreted on the other side
+				// This will change invalid utf8 into valid, so we must use that string.
+				if err := json.Unmarshal(b, &msg); err == nil {
+					checkMsgType(read2, "read", msg.Message, t)
+				} else {
+					t.Errorf("Marshal Error: %s", err.Error())
+				}
+			} else {
+				t.Errorf("Marshal Error: %s", err.Error())
+			}
+		}
 
 		write1 <- []byte("{\"OpCode\" : \"close\"}")
 		write2 <- []byte("{\"OpCode\" : \"close\"}")
@@ -335,5 +354,21 @@ func TestMessageExchange(t *testing.T) {
 			},
 		},
 	}
-	runMultiChannelWrite(t, cl)
+
+	messages := []string{"", "A", "Hello World!", "🍌", "🍌🍌🍌", "Hello\nNewline!" }
+	for i := 0; i < 10; i++ {
+		messages = append(messages, randomValidString(32))
+	}
+
+	runMultiChannelWrite(t, cl, messages)
+}
+
+func randomValidString(maxLen int) string {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	l := r.Int() & maxLen
+	buf := []byte{}
+	for i := 0; i < l; i++ {
+		buf = append(buf, byte(r.Int()&0xFF))
+	}
+	return string(buf)
 }

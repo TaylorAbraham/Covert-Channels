@@ -86,7 +86,7 @@ func TestReceiveSend(t *testing.T) {
 		rErr error
 		nr   uint64
 		// Test with message with many characters and with 0 characters
-		inputs [][]byte = [][]byte{[]byte("Hello world!"), []byte("")}
+		inputs [][]byte = [][]byte{[]byte("Hello world!"), []byte(""), []byte("A"), []byte("Hello\nworld!")}
 	)
 
 	for _, input := range inputs {
