@@ -300,6 +300,30 @@ func TestMessageExchange(t *testing.T) {
 				}
 			},
 		},
+		,
+		channelTest{
+			name: "TcpHandshake",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
+
+				conf.Processors = []processorConfig{
+					processorConfig{
+						Type: "Caesar", Data: defaultProcessor(),
+					},
+				}
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
+
+				conf.Processors = []processorConfig{
+					processorConfig{
+						Type: "Caesar", Data: defaultProcessor(),
+					},
+				}
+			},
+		},
 		channelTest{
 			name: "TcpSyn",
 			f1: func(conf *configData) {
