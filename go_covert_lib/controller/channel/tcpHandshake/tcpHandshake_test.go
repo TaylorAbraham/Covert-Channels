@@ -2,8 +2,6 @@ package tcpHandshake
 
 import (
 	"bytes"
-	"encoding/json"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"sort"
@@ -223,19 +221,13 @@ func randomString(maxLen int) string {
 
 func TestMultipleSend(t *testing.T) {
 	log.Println("Starting TestMultipleSend")
-	sconfCopy := sconf
-	sconfCopy.logPackets = true
-	rconfCopy := rconf
-	rconfCopy.logPackets = true
 	runMultiTest(t, sconf, rconf)
 }
 
 func TestMultipleSendTimeout(t *testing.T) {
 	log.Println("Starting TestMultipleSendTimeout")
 	sconfCopy := sconfTimeout
-	sconfCopy.logPackets = true
 	rconfCopy := rconfTimeout
-	rconfCopy.logPackets = true
 	runMultiTest(t, sconfCopy, rconfCopy)
 }
 
@@ -243,12 +235,12 @@ func TestMultipleSendTimeout(t *testing.T) {
 // the receive calls its Receive method
 func runMultiTest(t *testing.T, sconf, rconf Config) {
 
-	sch, err := MakeChannel(sconf)
+	ch1, err := MakeChannel(sconf)
 	if err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
 
-	rch, err := MakeChannel(rconf)
+	ch2, err := MakeChannel(rconf)
 	if err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
@@ -263,47 +255,56 @@ func runMultiTest(t *testing.T, sconf, rconf Config) {
 	var (
 		// Test with message with many characters and with 0 characters
 		inputs   []string
-		received chan opOutput = make(chan opOutput)
-		sended   chan opOutput = make(chan opOutput)
+		rec1 chan opOutput = make(chan opOutput)
+		rec2 chan opOutput = make(chan opOutput)
+		sen1   chan opOutput = make(chan opOutput)
+		sen2   chan opOutput = make(chan opOutput)
 	)
 
+	fRch := func(ch *Channel, creceive chan opOutput) {
+		var data [1024]byte
+		var rOut opOutput
+		nr, err := ch.Receive(data[:])
+		rOut.err = err
+		rOut.data = data[:nr]
+		select {
+		case creceive <- rOut:
+		case <-time.After(time.Second * 5):
+		}
+	}
+
 	// Randomly generate input strings
-	for i := 0; i < 32; i++ {
-		inputs = append(inputs, randomString(0xFF))
+	for i := 0; i < 8; i++ {
+		inputs = append(inputs, randomString(0x1F))
 		// Test simultaneous receives
-		go func() {
-			var data [1024]byte
-			var rOut opOutput
-			nr, err := rch.Receive(data[:])
-			rOut.err = err
-			rOut.data = data[:nr]
-			select {
-			case received <- rOut:
-			case <-time.After(time.Second * 5):
-			}
-		}()
+		go fRch(ch1, rec1)
+		go fRch(ch2, rec2)
+	}
+
+	fSn := func(ch *Channel, input []byte, csend chan opOutput) {
+		var sOut opOutput
+		nr, err := ch.Send(input)
+		sOut.err = err
+		sOut.sent = nr
+		sOut.size = uint64(len(input))
+		select {
+		case csend <- sOut:
+		case <-time.After(time.Second * 5):
+		}
 	}
 
 	for _, input := range inputs {
 		// Test simultaneous sends
-		go func(input []byte) {
-			var sOut opOutput
-			nr, err := sch.Send(input)
-			sOut.err = err
-			sOut.sent = nr
-			sOut.size = uint64(len(input))
-			select {
-			case sended <- sOut:
-			case <-time.After(time.Second * 5):
-			}
-		}([]byte(input))
+		go fSn(ch1, []byte(input), sen1)
+		go fSn(ch2, []byte(input), sen2)
 	}
 
-	var outputs []string
+	var out1 []string
+	var out2 []string
 
-	for i := 0; i < 32; i++ {
+	fCheckMsg := func (csend, creceive chan opOutput, outputs []string) []string {
 		select {
-		case sOut := <-sended:
+		case sOut := <-csend:
 			if sOut.err != nil {
 				t.Errorf("err = '%s'; want nil", sOut.err)
 			}
@@ -315,7 +316,7 @@ func runMultiTest(t *testing.T, sconf, rconf Config) {
 		}
 
 		select {
-		case rOut := <-received:
+		case rOut := <-creceive:
 			if rOut.err != nil {
 				t.Errorf("err = '%s'; want nil", rOut.err)
 			}
@@ -323,42 +324,41 @@ func runMultiTest(t *testing.T, sconf, rconf Config) {
 		case <-time.After(time.Second * 5):
 			t.Errorf("Receive Timeout")
 		}
+		return outputs
 	}
 
-	sort.Strings(outputs)
+	for i := 0; i < 8; i++ {
+		out1 = fCheckMsg(sen1, rec1, out1)
+		out2 = fCheckMsg(sen2, rec2, out2)
+	}
+
+	sort.Strings(out1)
+	sort.Strings(out2)
 	sort.Strings(inputs)
 
-	logPkts := func(mp map[uint16][]packet, name string) {
-		if buf, err := json.Marshal(mp); err == nil {
-			if err := ioutil.WriteFile(name, buf, 0777); err != nil {
-				log.Println("Could not write file")
-			}
-		} else {
-			log.Println("Could not marshal")
-		}
-	}
-
-	if len(inputs) == len(outputs) {
+	if len(inputs) == len(out1) && len(inputs) == len(out2) {
 		for i := range inputs {
-			if outputs[i] != inputs[i] {
-				t.Errorf("Received '%s'; want '%s'", outputs[i], inputs[i])
-				t.Error([]byte(outputs[i]))
+			if out1[i] != inputs[i] {
+				t.Errorf("Output1 Received '%s'; want '%s'", out1[i], inputs[i])
+				t.Error([]byte(out1[i]))
 				t.Error([]byte(inputs[i]))
-				logPkts(sch.sendPktLog.pktMap, "./sendLogMismatch")
-				logPkts(rch.receivePktLog.pktMap, "./receiveLogMismatch")
+				break
+			}
+			if out2[i] != inputs[i] {
+				t.Errorf("Output2 Received '%s'; want '%s'", out2[i], inputs[i])
+				t.Error([]byte(out2[i]))
+				t.Error([]byte(inputs[i]))
 				break
 			}
 		}
 	} else {
 		t.Errorf("Insufficent replies received")
-		logPkts(sch.sendPktLog.pktMap, "./sendLogTimeout")
-		logPkts(rch.receivePktLog.pktMap, "./receiveLogTimeout")
 	}
 
-	if err := sch.Close(); err != nil {
+	if err := ch1.Close(); err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
-	if err := rch.Close(); err != nil {
+	if err := ch2.Close(); err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
 }
