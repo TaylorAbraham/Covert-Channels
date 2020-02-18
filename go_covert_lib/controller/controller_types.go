@@ -12,15 +12,12 @@ import (
 	"./processor"
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
+	"./processor/checksum"
 	"./processor/gZipCompression"
 	"./processor/none"
 	"./processor/symmetricEncryption"
 	"./processor/zLibCompression"
-	"./processor/checksum"
-  "./processor/gZipCompression"
-	"./processor/none"
-	"./processor/symmetricEncryption"
-  "./processor/zLibCompression"
+
 	"github.com/gorilla/websocket"
 )
 

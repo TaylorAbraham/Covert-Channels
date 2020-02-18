@@ -1,0 +1,248 @@
+Congratulations! You have taken it upon yourself to design a new Processor or Covert Channel (henceforth termed entity).
+This is the first step in your journey towards self actualization and lifelong fulfillment.
+
+Now you may be wondering; "I'm just a simple person". How can I implement a new entity for the Covert Channel application.
+Fear not young traveller. The software gods have seen fit to grant you this text to show YOU how to implement a new
+entity that will be the marvel to for the ages. You shall transcend beyond mere mortality and achieve a higher purpose in 
+our great journey to glorious salvation.
+
+Implementing a new entity takes only 3 simple steps.
+
+Step 1: Implement the entity
+----------------------------
+
+The first step is to implement the new entity. To do so, first create a new folder to contain the entity files.
+If creating a processor, add the folder to go_covert_lib/controller/processor. If creating a covert channel, add the
+folder to go_covert_lib/controller/channel. The folder have the same name as the entity you are creating.
+
+Within this folder, create 3 files: <name>.go, <name>_config.go, and <name>_test.go. Here, <name> should match
+the folder name. Each file should start with "package <name>" so that all files form part of the same package.
+
+<name>.go should implement the entity. For covert channels, you must implement a structure with three methods:
+`Send`, `Receive`, and `Close`. These should match the channel interface found in go_covert_lib/controller/channel/channel.go.
+For processors, you must implement a structure with the `Process` and `Unprocess` methods. These should match the processor 
+interface found in go_covert_lib/controller/processor/processor.go.
+
+For consistency, you should name the covert channel struct as `Channel` in <name>.go.
+The `Send` and `Receive` methods, as their names suggest, send and receive messages from the peer covert channel.
+The `Close` method should cancel any pending sends or receives and clean up resources for the covert channel.
+Since a covert channel typically needs to be initialized to open raw sockets, you should generally create a
+constructor, `MakeChannel`, that accepts a single `Config` argument, and returns the covert channel as well as 
+any errors that occur during initialization. You must also create the `Config` struct with the appropriate
+parameters for configuring the covert channel.
+
+For processors, the struct should be called `Processor`. The `Process` and `Unprocess` methods, as their names
+suggest, convert byte arrays between processed and unprocessed forms. Many processors do not require
+initialization (see the caesar processor), so a `MakeProcessor` constructor and `Config` struct are not necessary,
+though they may be necessary for other processors.
+
+<name>_config.go is responsible for providing a configurable interface with the UI. Here, you create 
+a `ConfigClient` that contains a set of parameters that may be modified by the UI. Each field in this struct
+must be one of the types defined in go_covert_lib/controller/config or validation will fail. 
+An example `ConfigClient` is shown below.
+
+```
+type ConfigClient struct {
+	FriendIP          config.IPV4Param
+	OriginIP          config.IPV4Param
+	FriendReceivePort config.U16Param
+	OriginReceivePort config.U16Param
+	Encoder           config.SelectParam
+	DialTimeout       config.U64Param
+	AcceptTimeout     config.U64Param
+	ReadTimeout       config.U64Param
+	WriteTimeout      config.U64Param
+}
+```
+Note that all of the fields must be in upper case to make them public.
+
+The types used for the fields (i.e. `config.IPV4Param`) are designed to allow the UI to determine what type of
+input to use to enable users to configure the fields. They also all implement `Validate` methods to allow
+the controller to check incoming configurations for correctness.
+
+<name>_config.go should implement a `GetDefault` function to facilitate retrieving the default version of the 
+`ConfigClient`. When describing the default, you will be able to set the default value, a description, and ranges
+for fields that only allow for a subset of possible values (such as `config.SelectParam` and any numerical parameters).
+When initializing the `ConfigClient` in `GetDefault`, it is essential that you use he constructors in config such 
+as `config.MakeIPV4` or `config.MakeIPV4` or `config.MakeSelect` to initialize the fields in the `ConfigClient`. 
+These constructors automatically set a `Type` field in the parameter that allows the UI to distinguish the types
+appropriately. A truncated example is shown below.
+
+```
+func GetDefault() ConfigClient {
+	return ConfigClient{
+		FriendIP:          config.MakeIPV4("127.0.0.1", config.Display{Description: "Your friends IP Address."}),
+		OriginIP:          config.MakeIPV4("127.0.0.1", config.Display{Description: "Your IP Address."}),
+		Encoder:           config.MakeSelect("id", []string{"id"}, config.Display{Description: "The encoding mechanism to use for this protocol."}),
+		AcceptTimeout:     config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The accept timeout for the Receive method in milliseconds. Zero for no timeout."}),
+	}
+}
+```
+
+You will notice `config.Display` in the constructor for each field. This is a struct that allows you to specify a description
+for the field, a display name for the field, and a grouping for the field. Setting a group for the field allows the UI to
+group related fields under a common header.
+
+The final function in <name>_config.go is the `ToChannel(cc ConfigClient) (*Channel, error)` function for covert channels or 
+`ToProcessor(cc ConfigClient) (*Processor, error)` function for processors. This is the function that the controller will use 
+to initialize this entity. It should generally translate the `ConfigClient` to the local `Config` used by the constructor for the 
+entity. If no constructor is required, then the function can directly initialize the entity. It must return an error to comply 
+with other entities that may fail during initialization.
+
+The final file is <name>_test.go. This file contains all the tests for the entity. For covert channels, you should test
+communication between peers, paying special attention to edge cases and, if possible, stress conditions. For processors,
+it is usually sufficient to check that the application of `Process` followed by `Unprocess` will produce the original data.
+
+To run the tests, run `go test` in a terminal. This is usually sufficient for processors. For covert channels, which usually
+use raw sockets, you must run `sudo go test` to acquire sudo privileges. Running these tests will check for compile errors
+and for logic errors in the program.
+
+Step 2: Integration 
+-------------------
+
+The next step is to integrate you entity with the rest of the controller. There are three files that must be modified
+in go_covert_lib/controller. 
+
+First, you must add the new entity to the config types defined in go_covert_lib/controller/controller_types.go. If adding a 
+new covert channel, add the `ConfigClient` type from your package to the `channelData` structure. If adding a new processor, add 
+the `ConfigClient` to the `processorData` structure. Use the name of the entity (capitalized) as the field name. The current 
+versions of these structures are shown below.
+
+```
+// include the Ipv4tcp and Tcp channel types
+type channelData struct {
+	Ipv4tcp ipv4tcp.ConfigClient
+	Tcp     tcp.ConfigClient
+}
+
+// include the None and Caesar processor types
+type processorData struct {
+	None   none.ConfigClient
+	Caesar caesar.ConfigClient
+}
+```
+
+The `channelData` and `processorData` structs are used to make a simple interface that the UI can use to access and configure
+the current configuration of each covert channel and processor. By keeping them in a structure, the JSON parser can be used
+to provide significant type verification when processing modified configurations retrieved from the client.
+
+You will also have to import your package to make it accessible to these structures. The subset of imports at the
+top of controller_types.go dealing with covert channel and processor imports are shown below.
+
+```
+import (
+	"./channel/ipv4tcp"
+	"./channel/tcp"
+	"./processor/caesar"
+	"./processor/none"
+)
+```
+
+With the types updated, you must now update go_covert_lib/controller/controller.go to retrieve the default entities.
+Update the `defaultChannel` function (for covert channels) or `defaultProcessor` function (for processors) to call the
+`GetDefault` method defined earlier in your package and populate the newly added field in `channelData` or `processorData`
+with the default `ConfigClient`. The current versions of these functions are shown below to give you an idea of what is
+meant.
+
+```
+func defaultChannel() channelData {
+	return channelData{
+		Ipv4tcp: ipv4tcp.GetDefault(),
+		Tcp:     tcp.GetDefault(),
+	}
+}
+
+func defaultProcessor() processorData {
+	return processorData{
+		None:   none.GetDefault(),
+		Caesar: caesar.GetDefault(),
+	}
+}
+```
+
+You will also have to add to the import statement at the top of the file similar to the one 
+additions to controller_types.go to access the new packages.
+
+Finally, it is necessary to update go_covert_lib/controller/controller_open.go to allow the controller to initialize 
+the entity when it is selected in by the user.
+
+If updating a covert channel, you update the switch statement in `retrieveChannel`. Add a new case with the exact
+name of the new field from `channelData`. If this case is hit, you must call your `ToChannel` function to create the
+covert channel and assign it to the covert channel variable `c` defined at the top of the function. You must also check
+for errors, and return if so. The current switch statement is shown below.
+
+```
+// There is a case for each field in channelData
+switch newConf.Type {
+case "Ipv4tcp":
+	if c, err = ipv4tcp.ToChannel(newConf.Data.Ipv4tcp); err != nil {
+		return nil, nil, err
+	}
+case "Tcp":
+	if c, err = tcp.ToChannel(newConf.Data.Tcp); err != nil {
+		return nil, nil, err
+	}
+default:
+	err = errors.New("Invalid Channel Type")
+}
+```
+
+
+If updating a processor, you update the switch statement in `retrieveProcessor`. Add a new case with the exact
+name of the new field from `processorData`. If this case is hit, you must call your `ToProcessor` function to 
+create the processor and assign it to the processor variable `p` defined at the top of the function. You must 
+also check for errors, and return if so. The current switch statement is shown below.
+
+```
+// There is a case for each field in processorData
+switch newConf.Type {
+case "None":
+	if p, err = none.ToProcessor(newConf.Data.None); err != nil {
+		return nil, nil, err
+	}
+case "Caesar":
+	if p, err = caesar.ToProcessor(newConf.Data.Caesar); err != nil {
+		return nil, nil, err
+	}
+default:
+	err = errors.New("Invalid Processor Type")
+}
+```
+
+You will also have to add to the import statement at the top of the file similar to the one 
+additions to controller_types.go to access the new packages.
+
+
+Step 3 Testing
+--------------
+
+The final step is testing. You must first run the tests for the controller to check for compile
+and runtime errors. Run `sudo go test` in the go_covert_lib/controller directory to run the tests. This will
+immediately alert you to compile errors. You may also update the file go_covert_lib/controller/controller_test.go 
+if you have additional behaviour that you would like to analyze.
+
+Once the tests are passing, you should test the use of your entity with the UI.
+First, head to the go_covert_lib directory and run `go build main.go` to create the application. In two separate
+terminals run `sudo ./main -p <port>` where <port> is replaced with a distinct port number for each process.
+
+Next, open go_covert_lib/test.html in two separate browser tabs. You will be prompted in each to enter a port number.
+Enter the port numbers you gave when executing the main processes (one for each tab).
+
+Once the connection is established the window will fill with the current configurations for the controller.
+There is a separate "Channel" and "Processor" section. In the "Channel" section there is a select box that you can
+use to select which covert channel to use. Below this are a set of inputs to configure that channel.
+
+In the "Processor" section, there may be a list of processors boxes depending on how the controller has been pre-configured.
+Each box will have a select input to choose the processor to use and the inputs for configuring the processor.
+In addition, there is a "-" button next to each box. This can be used to remove existing processors from the processor
+list. Click the "+" to remove processors. When sending messages these processors act in order to change the data. When
+retrieving messages these processors act in reverse order to restore the original message.
+
+When you have chosen your processor and covert channel, click the "open" button to configure the controller. 
+Scroll down to the bottom of the "Console" text area to see a message reporting if the configuration was successful.
+
+If both tabs successfully configure the controller, you can now write messages between the two peers. In one tab, 
+enter your message in the text input, and click "send". In the other, you should see the message appear at the 
+bottom of the console.
+
+

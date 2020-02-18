@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"fmt"
 )
 
 type AsymmetricEncryption struct {
@@ -19,11 +18,11 @@ type AsymmetricEncryption struct {
 
 func (c *AsymmetricEncryption) Process(data []byte) ([]byte, error) {
 	hash := sha512.New()
-	fmt.Println(c.receiverPublicKey)
 	rsaPublicKey, err := BytesToPublicKey(c.receiverPublicKey)
 	if err != nil {
 		return nil, err
 	}
+
 	ciphertext, err := rsa.EncryptOAEP(hash, rand.Reader, rsaPublicKey, data, nil)
 	if err != nil {
 		return nil, err
@@ -34,8 +33,14 @@ func (c *AsymmetricEncryption) Process(data []byte) ([]byte, error) {
 
 func (c *AsymmetricEncryption) Unprocess(data []byte) ([]byte, error) {
 	hash := sha512.New()
-	rsaPrivateKey, _ := BytesToPrivateKey(c.receiverPrivateKey)
+
+	rsaPrivateKey, err := BytesToPrivateKey(c.receiverPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
 	plaintext, err := rsa.DecryptOAEP(hash, rand.Reader, rsaPrivateKey, data, nil)
+
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +74,12 @@ func PublicKeyToBytes(publicKey *rsa.PublicKey) ([]byte, error) {
 
 func BytesToPrivateKey(privateKey []byte) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode(privateKey)
+
+	if block == nil || block.Type != "RSA PRIVATE KEY" {
+		return nil, errors.New("Failed to decode PEM block containing private key")
+	}
 	encrypted := x509.IsEncryptedPEMBlock(block)
+
 	b := block.Bytes
 	var err error
 	if encrypted {
@@ -88,8 +98,8 @@ func BytesToPrivateKey(privateKey []byte) (*rsa.PrivateKey, error) {
 func BytesToPublicKey(publicKey []byte) (*rsa.PublicKey, error) {
 	var err error
 	block, _ := pem.Decode(publicKey)
-	if block == nil {
-		return nil, errors.New("No PEM Data Found")
+	if block == nil || block.Type != "PUBLIC KEY" {
+		return nil, errors.New("Failed to decode PEM block containing public key")
 	}
 	encrypted := x509.IsEncryptedPEMBlock(block)
 	b := block.Bytes
