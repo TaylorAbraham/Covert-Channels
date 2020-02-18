@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"sync"
+
 	"./channel"
 	"./channel/tcpHandshake"
 	"./channel/tcpNormal"
@@ -9,10 +11,12 @@ import (
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
 	"./processor/checksum"
+	"./processor/gZipCompression"
 	"./processor/none"
 	"./processor/symmetricEncryption"
+	"./processor/zLibCompression"
+
 	"github.com/gorilla/websocket"
-	"sync"
 )
 
 // The go json library has this really convenient feature
@@ -66,6 +70,8 @@ type processorData struct {
 	Checksum             checksum.ConfigClient
 	SymmetricEncryption  symmetricEncryption.ConfigClient
 	AsymmetricEncryption asymmetricEncryption.ConfigClient
+	GZipCompression      gZipCompression.ConfigClient
+	ZLibCompression      zLibCompression.ConfigClient
 }
 
 type Layers struct {
