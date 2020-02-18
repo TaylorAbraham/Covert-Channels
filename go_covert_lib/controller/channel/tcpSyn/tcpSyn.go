@@ -335,7 +335,7 @@ func (c *Channel) Close() error {
 	return c.rawConn.Close()
 }
 
-// Read to a raw connection whil setting a timeout if necessary
+// Read from a raw connection whil setting a timeout if necessary
 func (c *Channel) readConn(buf []byte) (*ipv4.Header, []byte, *ipv4.ControlMessage, error) {
 	if c.conf.ReadTimeout > 0 {
 		c.rawConn.SetReadDeadline(time.Now().Add(c.conf.ReadTimeout))

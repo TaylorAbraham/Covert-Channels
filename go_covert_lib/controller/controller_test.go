@@ -371,8 +371,8 @@ func TestMessageExchange(t *testing.T) {
 		channelTest{
 			name: "UdpIP",
 			f1: func(conf *configData) {
-				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
-				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
+				conf.Channel.Data.UdpIP.FriendReceivePort.Value = 8090
+				conf.Channel.Data.UdpIP.OriginReceivePort.Value = 8091
 
 				conf.Processors = []processorConfig{
 					processorConfig{
@@ -381,8 +381,8 @@ func TestMessageExchange(t *testing.T) {
 				}
 			},
 			f2: func(conf *configData) {
-				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
-				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
+				conf.Channel.Data.UdpIP.FriendReceivePort.Value = 8091
+				conf.Channel.Data.UdpIP.OriginReceivePort.Value = 8090
 
 				conf.Processors = []processorConfig{
 					processorConfig{

@@ -9,26 +9,6 @@ import (
 	"time"
 )
 
-// These tests must be run in sudo mode
-// When running tests network traffic should be kept to a minimum (i.e. close an video streaming going on)
-// The raw socket used to receive the covert packets has a default buffer that holds roughly 300 packets
-// (based on my experimental results)
-// If there is a lot of tcp traffic then packets involved in the test communication may be dropped,
-// causing the message to not be received.
-// This issue will manifest as a failure of either TestMultipleSend or TestMultipleSendTimeout.
-// The received and transmitted byte string will be printed. The received byte will typically be empty
-// (if the TCP handshake packets were dropped) or will match sections of the sent message (typically
-// the start and end of the receive byte string will match the start and end of the sent bytes, with
-// a region in the middle ommitted)
-// If the test fails for reasons other than the case described above, then you should
-// investigate further to identify any other potential bugs in the covert channel.
-// Even with a video playing over the network, the above error is relatively uncommon,
-// so an increase in frequence of the error should also be investigated.
-// Keep in mind that the TestMultipleSend or TestMultipleSendTimeout tests are used to
-// assess the performance when the covert channel is approaching (but not exceeding)
-// its maximum storage capacity for number of connections. Thus they are not representative
-// of the typical behaviour, where there should only be one connection at a time.
-
 var sconf Config = Config{
 	FriendIP:          [4]byte{127, 0, 0, 1},
 	OriginIP:          [4]byte{127, 0, 0, 1},
