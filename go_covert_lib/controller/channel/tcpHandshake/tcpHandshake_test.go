@@ -475,3 +475,145 @@ func receiveAndCheck(t *testing.T, input []byte, c chan []byte) {
 		t.Errorf("Read timeout")
 	}
 }
+
+func TestClose(t *testing.T) {
+	log.Println("Starting TestClose")
+
+	sch, err := MakeChannel(sconf)
+	if err != nil {
+		t.Errorf("err = '%s'; want nil", err.Error())
+	}
+
+	rch, err := MakeChannel(rconf)
+	if err != nil {
+		t.Errorf("err = '%s'; want nil", err.Error())
+	}
+
+	buf := make([]byte, 32)
+	doneClose := make(chan bool)
+
+	go func() {
+		time.Sleep(time.Millisecond * 100)
+		rch.Close()
+		sch.Close()
+		doneClose <- true
+	}()
+
+	n, err := rch.Receive(buf)
+	if n != 0 {
+		t.Errorf("Expected 0 bytes, got %d", n)
+	} else if err == nil {
+		t.Errorf("Expected error; got nil")
+	}
+
+	select {
+	case <-doneClose:
+	case <-time.After(time.Second):
+		t.Errorf("Close timeout")
+	}
+
+	n, err = sch.Send(buf)
+	if n != 0 {
+		t.Errorf("Expected 0 bytes, got %d", n)
+	} else if err == nil {
+		t.Errorf("Expected error; got nil")
+	}
+
+	n, err = rch.Receive(buf)
+	if n != 0 {
+		t.Errorf("Expected 0 bytes, got %d", n)
+	} else if err == nil {
+		t.Errorf("Expected error; got nil")
+	}
+
+}
+
+// Test that closing can happen at random times
+// and any waiting functions will still return with an error
+func TestCloseMultiple(t *testing.T) {
+	log.Println("Starting TestCloseMultiple")
+
+	var sChans []*Channel = make([]*Channel, 5)
+	var rChans []*Channel = make([]*Channel, 5)
+	var closers []chan bool = make([]chan bool, 5)
+	var sDones []chan bool = make([]chan bool, 5)
+	var rDones []chan bool = make([]chan bool, 5)
+
+	sconfCopy := sconf
+	rconfCopy := rconf
+
+	var err error
+
+	for i := 0; i < 5; i++ {
+		sconfCopy.OriginReceivePort += 10
+		sconfCopy.FriendReceivePort += 10
+		rconfCopy.OriginReceivePort += 10
+		rconfCopy.FriendReceivePort += 10
+
+		sChans[i], err = MakeChannel(sconfCopy)
+		if err != nil {
+			t.Errorf("err = '%s'; want nil", err.Error())
+		}
+		rChans[i], err = MakeChannel(rconfCopy)
+		if err != nil {
+			t.Errorf("err = '%s'; want nil", err.Error())
+		}
+		closers[i] = make(chan bool)
+		sDones[i] = make(chan bool)
+		rDones[i] = make(chan bool)
+
+		go func(c *Channel, cl, dn chan bool) {
+			buf := make([]byte, 20)
+			for {
+				_, err := c.Receive(buf)
+				select {
+				case <-cl:
+					if err != nil {
+						close(dn)
+						return
+					}
+				default:
+				}
+			}
+		}(rChans[i], closers[i], rDones[i])
+		go func(c *Channel, cl, dn chan bool) {
+			buf := make([]byte, 10)
+			for {
+				_, err := c.Send(buf)
+				select {
+				case <-cl:
+					if err != nil {
+						close(dn)
+						return
+					}
+				default:
+				}
+			}
+		}(sChans[i], closers[i], sDones[i])
+	}
+
+	for i := 0; i < 5; i++ {
+		go func(cl chan bool, sc, rc *Channel) {
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			delay := uint32(r.Int()) % 300
+			time.Sleep(time.Duration(delay) * time.Millisecond)
+			close(cl)
+			sc.Close()
+			rc.Close()
+		}(closers[i], sChans[i], rChans[i])
+	}
+
+	for i := 0; i < 5; i++ {
+		select {
+		case <-rDones[i]:
+		case <- time.After(time.Second * 2):
+			t.Errorf("Close Timeout")
+		}
+		select {
+		case <-sDones[i]:
+		case <- time.After(time.Second * 2):
+			t.Errorf("Close Timeout")
+		}
+	}
+
+}
