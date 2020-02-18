@@ -13,12 +13,10 @@ import (
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
 	"./processor/checksum"
-  "./processor/gZipCompression"
+	"./processor/gZipCompression"
 	"./processor/none"
 	"./processor/symmetricEncryption"
-  "./processor/zLibCompression"
-	"encoding/json"
-	"errors"
+	"./processor/zLibCompression"
 )
 
 // Function for opening a covert channel
