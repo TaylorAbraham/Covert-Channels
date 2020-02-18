@@ -65,6 +65,43 @@ var rconfTimeout Config = Config{
 	WriteTimeout:      time.Second,
 }
 
+func sendReceive(t *testing.T, sch, rch *Channel, input []byte) {
+	var (
+		c    chan []byte = make(chan []byte)
+		rErr error
+		nr   uint64
+	)
+	go func() {
+		var data [15]byte
+		nr, rErr = rch.Receive(data[:])
+		select {
+		case c <- data[:nr]:
+		case <-time.After(time.Second * 5):
+		}
+	}()
+
+	sendAndCheck(t, input, sch)
+
+	receiveAndCheck(t, input, c)
+
+	if rErr != nil {
+		t.Errorf("err = '%s'; want nil", rErr.Error())
+	}
+}
+
+func messageExcange(t *testing.T, ch1, ch2 *Channel, inputs [][]byte) {
+	for _, input := range inputs {
+		sendReceive(t, ch1, ch2, input)
+		sendReceive(t, ch2, ch1, input)
+	}
+	if err := ch1.Close(); err != nil {
+		t.Errorf("err = '%s'; want nil", err.Error())
+	}
+	if err := ch2.Close(); err != nil {
+		t.Errorf("err = '%s'; want nil", err.Error())
+	}
+}
+
 func TestReceiveSend(t *testing.T) {
 
 	log.Println("Starting TestReceiveSend")
@@ -79,38 +116,7 @@ func TestReceiveSend(t *testing.T) {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
 
-	var (
-		c    chan []byte = make(chan []byte)
-		rErr error
-		nr   uint64
-		// Test with message with many characters and with 0 characters
-		inputs [][]byte = [][]byte{[]byte("Hello world!"), []byte(""), []byte("A"), []byte("Hello\nworld!")}
-	)
-
-	for _, input := range inputs {
-		go func() {
-			var data [15]byte
-			nr, rErr = rch.Receive(data[:])
-			select {
-			case c <- data[:nr]:
-			case <-time.After(time.Second * 5):
-			}
-		}()
-
-		sendAndCheck(t, input, sch)
-
-		receiveAndCheck(t, input, c)
-
-		if rErr != nil {
-			t.Errorf("err = '%s'; want nil", rErr.Error())
-		}
-	}
-	if err := sch.Close(); err != nil {
-		t.Errorf("err = '%s'; want nil", err.Error())
-	}
-	if err := rch.Close(); err != nil {
-		t.Errorf("err = '%s'; want nil", err.Error())
-	}
+	messageExcange(t, sch, rch, [][]byte{[]byte("Hello world!"), []byte(""), []byte("A"), []byte("Hello\nworld!")})
 }
 
 func TestReceiveSendSelf(t *testing.T) {
@@ -129,36 +135,7 @@ func TestReceiveSendSelf(t *testing.T) {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
 
-	var (
-		c    chan []byte = make(chan []byte)
-		rErr error
-		nr   uint64
-		// Test with message with many characters and with 0 characters
-		inputs [][]byte = [][]byte{[]byte("Hello world!"), []byte("")}
-	)
-
-	for _, input := range inputs {
-		go func() {
-			var data [15]byte
-			nr, rErr = ch.Receive(data[:])
-			select {
-			case c <- data[:nr]:
-			case <-time.After(time.Second * 5):
-			}
-		}()
-
-		sendAndCheck(t, input, ch)
-
-		receiveAndCheck(t, input, c)
-
-		if rErr != nil {
-			t.Errorf("err = '%s'; want nil", rErr.Error())
-		}
-	}
-	if err := ch.Close(); err != nil {
-		t.Errorf("err = '%s'; want nil", err.Error())
-	}
-
+	messageExcange(t, ch, ch, [][]byte{[]byte("Hello world!"), []byte(""), []byte("A"), []byte("Hello\nworld!")})
 }
 
 func TestReceiveOverflow(t *testing.T) {
