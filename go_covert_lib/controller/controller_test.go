@@ -359,7 +359,7 @@ func TestMessageExchange(t *testing.T) {
 		},
 	}
 
-	messages := []string{"", "A", "Hello World!", "🍌", "🍌🍌🍌", "Hello\nNewline!" }
+	messages := []string{"", "A", "Hello World!", "🍌", "🍌🍌🍌", "Hello\nNewline!"}
 	for i := 0; i < 10; i++ {
 		messages = append(messages, randomValidString(32))
 	}

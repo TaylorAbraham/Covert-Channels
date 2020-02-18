@@ -12,6 +12,8 @@ then
     sudo apt install tmux -y
 fi
 
+go build main.go # Update your go build
+
 tmux kill-session -t 'Covert-Channels' # Kill any existing CC sessions
 tmux new-session -d -s 'Covert-Channels'
 tmux new -s 'Covert-Channels'

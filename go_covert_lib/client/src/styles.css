@@ -1,7 +1,16 @@
+.spinner-container {
+  text-align: center;
+  margin: 25%
+}
+
 .input-text {
     width: 120px;
     text-align: right !important;
     display: inline-block !important; /* This centers text */
+}
+
+option {
+  cursor: pointer;
 }
 
 .check-container {
