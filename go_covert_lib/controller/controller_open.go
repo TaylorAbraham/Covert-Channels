@@ -5,16 +5,20 @@ import (
 	"errors"
 
 	"./channel"
-	"./channel/ipv4tcp"
-	"./channel/tcp"
+	"./channel/tcpHandshake"
+	"./channel/tcpNormal"
+	"./channel/tcpSyn"
 	"./config"
 	"./processor"
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
-	"./processor/gZipCompression"
+	"./processor/checksum"
+  "./processor/gZipCompression"
 	"./processor/none"
 	"./processor/symmetricEncryption"
-	"./processor/zLibCompression"
+  "./processor/zLibCompression"
+	"encoding/json"
+	"errors"
 )
 
 // Function for opening a covert channel
@@ -28,6 +32,17 @@ func (ctr *Controller) handleOpen(data []byte) error {
 	}
 }
 
+func channelConfigCopy(currConf *channelConfig) (channelConfig, error) {
+	var newConf channelConfig
+	newConf.Data = defaultChannel()
+	newConf.Type = currConf.Type
+	if err := config.CopyValueSet(&newConf.Data, &currConf.Data, nil); err != nil {
+		return newConf, err
+	} else {
+		return newConf, nil
+	}
+}
+
 // Retrieve the layer entities that make up the covert channel
 func (ctr *Controller) retrieveLayers(data []byte) (*Layers, error) {
 	var (
@@ -35,7 +50,10 @@ func (ctr *Controller) retrieveLayers(data []byte) (*Layers, error) {
 		c      channel.Channel
 		ps     []processor.Processor
 		cconf  *channelConfig
-		pconfs []processorConfig
+		// We don't actually have to initialize these slices in go code (append does that for us)
+		// but doing this ensures that null is not sent to the client
+		// so that it loops properly
+		pconfs []processorConfig = make([]processorConfig, 0)
 		err    error
 	)
 
@@ -45,10 +63,12 @@ func (ctr *Controller) retrieveLayers(data []byte) (*Layers, error) {
 	// and we don't want to leave in extra if some have been deleted (I am not sure how the json
 	// unmarshaller handles the case where the current slice is larger than the provided slice,
 	// but I don't want to rely on it)
-	readCd.Channel.Type = ctr.config.Channel.Type
-	if err := config.CopyValueSet(&readCd.Channel.Data, ctr.config.Channel.Data, nil); err != nil {
+	// The config is used for unmarshalling the data so that empty fields are populated with their
+	// current values (I have confirmed that this is how JSON unmarshal works)
+	if readCd.Channel, err = channelConfigCopy(&ctr.config.Channel); err != nil {
 		return nil, err
 	}
+
 	// Read in the new config data
 	if err := json.Unmarshal(data, &readCd); err != nil {
 		return nil, err
@@ -84,11 +104,16 @@ func (ctr *Controller) retrieveChannel(cconf channelConfig) (channel.Channel, *c
 		err     error
 	)
 	// We must retrieve the default channel to retrieve the correct ranges
-	newConf.Data = defaultChannel()
-	// we create a new config and move only the new values to it
-	// That way we don't override any descriptions or ranges
+	// We also populate it with the current values in the channel
+	// This is effectively a copy of the current channel config
+	if newConf, err = channelConfigCopy(&ctr.config.Channel); err != nil {
+		return nil, nil, err
+	}
+
 	newConf.Type = cconf.Type
-	if err = config.CopyValueSet(&newConf.Data, cconf.Data, []string{newConf.Type}); err != nil {
+
+	// Then we populate the new config with the updated values only for the selected covert channel
+	if err = config.CopyValueSet(&newConf.Data, &cconf.Data, []string{newConf.Type}); err != nil {
 		return nil, nil, err
 	}
 
@@ -97,12 +122,16 @@ func (ctr *Controller) retrieveChannel(cconf channelConfig) (channel.Channel, *c
 	}
 
 	switch newConf.Type {
-	case "Ipv4tcp":
-		if c, err = ipv4tcp.ToChannel(newConf.Data.Ipv4tcp); err != nil {
+	case "TcpSyn":
+		if c, err = tcpSyn.ToChannel(newConf.Data.TcpSyn); err != nil {
 			return nil, nil, err
 		}
-	case "Tcp":
-		if c, err = tcp.ToChannel(newConf.Data.Tcp); err != nil {
+	case "TcpHandshake":
+		if c, err = tcpHandshake.ToChannel(newConf.Data.TcpHandshake); err != nil {
+			return nil, nil, err
+		}
+	case "TcpNormal":
+		if c, err = tcpNormal.ToChannel(newConf.Data.TcpNormal); err != nil {
 			return nil, nil, err
 		}
 	default:
@@ -122,7 +151,7 @@ func (ctr *Controller) retrieveProcessor(pconf processorConfig) (processor.Proce
 	// we create a new config and move only the new values to it
 	// That way we don't override any descriptions or ranges
 	newConf.Type = pconf.Type
-	if err = config.CopyValueSet(&newConf.Data, pconf.Data, []string{newConf.Type}); err != nil {
+	if err = config.CopyValueSet(&newConf.Data, &pconf.Data, []string{newConf.Type}); err != nil {
 		return nil, nil, err
 	}
 
@@ -137,6 +166,10 @@ func (ctr *Controller) retrieveProcessor(pconf processorConfig) (processor.Proce
 		}
 	case "Caesar":
 		if p, err = caesar.ToProcessor(newConf.Data.Caesar); err != nil {
+			return nil, nil, err
+		}
+	case "Checksum":
+		if p, err = checksum.ToProcessor(newConf.Data.Checksum); err != nil {
 			return nil, nil, err
 		}
 	case "SymmetricEncryption":

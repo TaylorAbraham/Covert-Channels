@@ -4,8 +4,9 @@ import (
 	"sync"
 
 	"./channel"
-	"./channel/ipv4tcp"
-	"./channel/tcp"
+	"./channel/tcpHandshake"
+	"./channel/tcpNormal"
+	"./channel/tcpSyn"
 	"./processor"
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
@@ -13,6 +14,11 @@ import (
 	"./processor/none"
 	"./processor/symmetricEncryption"
 	"./processor/zLibCompression"
+	"./processor/checksum"
+  "./processor/gZipCompression"
+	"./processor/none"
+	"./processor/symmetricEncryption"
+  "./processor/zLibCompression"
 	"github.com/gorilla/websocket"
 )
 
@@ -56,13 +62,15 @@ type channelConfig struct {
 }
 
 type channelData struct {
-	Ipv4tcp ipv4tcp.ConfigClient
-	Tcp     tcp.ConfigClient
+	TcpSyn       tcpSyn.ConfigClient
+	TcpHandshake tcpHandshake.ConfigClient
+	TcpNormal    tcpNormal.ConfigClient
 }
 
 type processorData struct {
 	None                 none.ConfigClient
 	Caesar               caesar.ConfigClient
+	Checksum             checksum.ConfigClient
 	SymmetricEncryption  symmetricEncryption.ConfigClient
 	AsymmetricEncryption asymmetricEncryption.ConfigClient
 	GZipCompression      gZipCompression.ConfigClient
