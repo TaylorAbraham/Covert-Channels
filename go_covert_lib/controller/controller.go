@@ -10,8 +10,10 @@ import (
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
 	"./processor/checksum"
+  "./processor/gZipCompression"
 	"./processor/none"
 	"./processor/symmetricEncryption"
+  "./processor/zLibCompression"
 	"encoding/json"
 	"errors"
 	"github.com/gorilla/websocket"
@@ -89,6 +91,8 @@ func defaultProcessor() processorData {
 		Checksum:             checksum.GetDefault(),
 		SymmetricEncryption:  symmetricEncryption.GetDefault(),
 		AsymmetricEncryption: asymmetricEncryption.GetDefault(),
+		GZipCompression:      gZipCompression.GetDefault(),
+		ZLibCompression:      zLibCompression.GetDefault(),
 	}
 }
 
