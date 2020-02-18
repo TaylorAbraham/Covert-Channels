@@ -92,7 +92,7 @@
       }
 
       function selectConfig(configData, parent) {
-        console.log(event);
+        //console.log(event);
         configData.Type = this.val();
         var tbl = handleConfigKeys(configData.Data[this.val()])
         parent.empty().append(tbl);
