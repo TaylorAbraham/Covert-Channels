@@ -5,20 +5,21 @@ import (
 	"crypto/cipher"
 	"crypto/des"
 	"errors"
+
 	"../../config"
 )
 
 type ConfigClient struct {
 	Algorithm config.SelectParam
-	Mode       config.SelectParam
-	Key        config.HexKeyParam
+	Mode      config.SelectParam
+	Key       config.HexKeyParam
 }
 
 func GetDefault() ConfigClient {
 	return ConfigClient{
 		Algorithm: config.MakeSelect("Advanced Encryption Standard (AES)", []string{"Advanced Encryption Standard (AES)", "Data Encryption Standard (DES)", "Triple Data Encryption Standard (3DES)"}, config.Display{Description: "Select an encryption algorithm", Name: "Encryption Algorithm", Group: "Symmetric Encryption"}),
-		Mode:       config.MakeSelect("Cipher Block Chaining (CBC)", []string{"Cipher Block Chaining (CBC)", "Cipher Feedback (CFB)", "Counter (CTR)", "Output Feedback (OFB)"}, config.Display{Description: "Select the mode of operation", Name: "Mode of Operation", Group: "Symmetric Encryption"}),
-		// AES-128 = key size 32 characters long, AES-192 = key size 48 
+		Mode:      config.MakeSelect("Cipher Block Chaining (CBC)", []string{"Cipher Block Chaining (CBC)", "Cipher Feedback (CFB)", "Counter (CTR)", "Output Feedback (OFB)"}, config.Display{Description: "Select the mode of operation", Name: "Mode of Operation", Group: "Symmetric Encryption"}),
+		// AES-128 = key size 32 characters long, AES-192 = key size 48
 		//characters long, and AES-256 = key size 64 characters long
 		// DES key size 16 characters long, 3DES key size 48 characters
 		// long (i.e. 3*16)

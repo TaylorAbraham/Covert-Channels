@@ -1,6 +1,9 @@
 package controller
 
 import (
+	"encoding/json"
+	"errors"
+
 	"./channel"
 	"./channel/tcpHandshake"
 	"./channel/tcpNormal"
@@ -9,10 +12,11 @@ import (
 	"./processor"
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
+	"./processor/checksum"
+	"./processor/gZipCompression"
 	"./processor/none"
 	"./processor/symmetricEncryption"
-	"encoding/json"
-	"errors"
+	"./processor/zLibCompression"
 )
 
 // Function for opening a covert channel
@@ -162,12 +166,24 @@ func (ctr *Controller) retrieveProcessor(pconf processorConfig) (processor.Proce
 		if p, err = caesar.ToProcessor(newConf.Data.Caesar); err != nil {
 			return nil, nil, err
 		}
+	case "Checksum":
+		if p, err = checksum.ToProcessor(newConf.Data.Checksum); err != nil {
+			return nil, nil, err
+		}
 	case "SymmetricEncryption":
 		if p, err = symmetricEncryption.ToProcessor(newConf.Data.SymmetricEncryption); err != nil {
 			return nil, nil, err
 		}
 	case "AsymmetricEncryption":
 		if p, err = asymmetricEncryption.ToProcessor(newConf.Data.AsymmetricEncryption); err != nil {
+			return nil, nil, err
+		}
+	case "GZipCompression":
+		if p, err = gZipCompression.ToProcessor(newConf.Data.GZipCompression); err != nil {
+			return nil, nil, err
+		}
+	case "ZLibCompression":
+		if p, err = zLibCompression.ToProcessor(newConf.Data.ZLibCompression); err != nil {
 			return nil, nil, err
 		}
 	default:

@@ -352,6 +352,11 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 	// This issue is discussed and handled further in the portRouter loop
 	defer c.receiveRouter.donePktChan(ac.friendPort, true, c.cancel)
 
+	var (
+		nPayload int = 0
+		payloadBuf []byte = make([]byte, 256)
+	)
+
 	// Exit when the fin packet is received
 	for !fin {
 		var err error
@@ -368,12 +373,61 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 				err   error
 			)
 			n, handshake, valid, fin, err = c.handleReceivedPacket(p, data, n, ac.friendPort, handshake)
+
+			// If packets are sent with payload then it will fill up the internal
+			// tcp buffer.
+			// This space must be cleared or else the tcp socket may reply to those packets
+			// with rst packets to indicate that it can't take any more data
+			if valid {
+				nPayload += (p.Ipv4h.TotalLen - p.Ipv4h.Len) - (int(p.Tcph.DataOffset) * 4)
+			}
+			// We always leave at least one byte in the TCP socket buffer
+			// That way we ensure that when the close operation is performed
+			// there is still data in the socket so the close causes a RST packet
+			// to be sent instead of a FIN/ACK packet.
+			// We don't want a FIN/ACK packet to be sent because if we do
+			// the client TCP socket will get confused over the mismatch Sequence numbers
+			// and the two sides of the connection exchange a large number of FIN/ACK packets
+			// Although not ideal, replying with a RST packet is preferable.
+			for nPayload > 1 {
+				var bytesToRead int
+				if nPayload <= 256 {
+					bytesToRead = nPayload - 1
+				} else {
+					bytesToRead = 256
+				}
+				ac.conn.SetReadDeadline(time.Now().Add(time.Millisecond * 100))
+				bytesRead, err := ac.conn.Read(payloadBuf[:bytesToRead])
+				nPayload -= bytesRead
+				if err != nil || bytesRead == 0 {
+					break
+				}
+			}
 			return valid, err
 		}, c.cancel)
 		if err != nil {
 			return n, err
 		}
 	}
+
+	/*
+	// This code allows the TCP conn to reply with a proper FIN/Ack
+	// Unfortunately, it causes the sender to get confused and send a FIN/ACK
+	// packet, which seems to cause a large number of FIN/ACK exchanges that is
+	// not covert at all
+	// Read any tcp stream data that has been received on the channel
+	for {
+		dummyBuffer := make([]byte, 256)
+		// We always set a short timeout here. That way, we can check handle the case
+		// where even though a fin packet was received the channel did not close properly
+		ac.conn.SetReadDeadline(time.Now().Add(time.Second * 1))
+
+		readn, err := ac.conn.Read(dummyBuffer)
+		if err != nil || readn == 0 {
+			break
+		}
+	}
+	*/
 	return n, nil
 }
 
@@ -406,6 +460,7 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 		//          ack = d.tcph.Ack
 		//          seq = d.tcph.Seq
 		handshake = 2
+		valid = true
 	} else if p.Tcph.RST {
 		// If rst packet is sent we quit
 		err = errors.New("RST packet")
@@ -500,11 +555,11 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	defer c.sendRouter.donePktChan(originPort, false, c.cancel)
 
 	// Wait for the SYN/ACK packet
-	err = waitPacket(recvPktChan, time.Second*5, func(p packet) (bool, error) {
+	err = waitPacket(recvPktChan, time.Second*3, func(p packet) (bool, error) {
 		// We empty packets from the channel until we get the SYN/ACK packet
 		// from the 3-way handshake. This packet can be used to retrieve
 		// the seq and ack numbers
-		if layers.TCPPort(originPort) == p.Tcph.DstPort && p.Tcph.ACK && p.Tcph.SYN {
+		if p.Tcph.ACK && p.Tcph.SYN {
 			seq = p.Tcph.Ack
 			ack = p.Tcph.Seq + 1
 			return true, nil
@@ -515,18 +570,24 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		return 0, err
 	}
 
+	var (
+		ipv4h ipv4.Header         = createIPHeader(c.conf.OriginIP, c.conf.FriendIP)
+		cm    ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
+		tcph  layers.TCP
+		wbuf  []byte
+	)
+
+	tcph.ACK = true
+	tcph.PSH = true
+
 	// Send each packet
 	for len(rem) > 0 {
-		var (
-			ipv4h ipv4.Header         = createIPHeader(c.conf.OriginIP, c.conf.FriendIP)
-			cm    ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
-			tcph  layers.TCP
-			wbuf  []byte
-		)
+		var payload []byte = make([]byte, 5)
 		if ipv4h, tcph, rem, err = c.conf.Encoder.SetByte(ipv4h, tcph, rem); err != nil {
 			return n, err
 		}
-		if wbuf, tcph, err = createTCPHeader(tcph, seq, ack, c.conf.OriginIP, c.conf.FriendIP, originPort, c.conf.FriendReceivePort); err != nil {
+
+		if wbuf, tcph, err = createTCPHeader(tcph, seq, ack, c.conf.OriginIP, c.conf.FriendIP, originPort, c.conf.FriendReceivePort, payload); err != nil {
 			return n, err
 		}
 
@@ -538,7 +599,32 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 			return n, err
 		}
 		n = uint64(len(data) - len(rem))
+		seq = seq + uint32(len(payload))
 	}
+	tcph.ACK = true
+	tcph.FIN = true
+	tcph.PSH = false
+	if wbuf, tcph, err = createTCPHeader(tcph, seq, ack, c.conf.OriginIP, c.conf.FriendIP, originPort, c.conf.FriendReceivePort, []byte{}); err != nil {
+		return n, err
+	}
+
+	if err = c.sendPacket(&ipv4h, wbuf, &cm); err != nil {
+		return n, err
+	}
+
+	// This delay reduces the weirdness of the final close
+	// Otherwise the close method for the socket conn mediates the close and
+	// it ends up with the wrong sequence number, causing the close to look weird.
+	err = waitPacket(recvPktChan, time.Second*1, func(p packet) (bool, error) {
+		// We empty packets from the channel until we get the SYN/ACK packet
+		// from the 3-way handshake. This packet can be used to retrieve
+		// the seq and ack numbers
+		if p.Tcph.ACK && (p.Tcph.FIN || p.Tcph.RST) {
+			return true, nil
+		}
+		return false, nil
+	}, c.cancel)
+
 	return n, err
 }
 
@@ -564,7 +650,7 @@ func (c *Channel) sendPacket(h *ipv4.Header, b []byte, cm *ipv4.ControlMessage) 
 }
 
 // We return the tcph header so that it can be logged if needed for debugging
-func createTCPHeader(tcph layers.TCP, seq, ack uint32, sip, dip [4]byte, sport, dport uint16) ([]byte, layers.TCP, error) {
+func createTCPHeader(tcph layers.TCP, seq, ack uint32, sip, dip [4]byte, sport, dport uint16, payload []byte) ([]byte, layers.TCP, error) {
 
 	iph := layers.IPv4{
 		SrcIP: sip[:],
@@ -577,12 +663,9 @@ func createTCPHeader(tcph layers.TCP, seq, ack uint32, sip, dip [4]byte, sport, 
 	tcph.Seq = seq
 	tcph.Ack = ack
 
-	// These packets must have the ACK flag set as they are a part of regular messages
-	tcph.ACK = true
-
 	// Based on a preliminary investigation of my machine (running Ubuntu 18.04),
 	// SYN packets always seem to have a window of 65495
-	tcph.Window = 65495
+	tcph.Window = 512
 
 	if err := tcph.SetNetworkLayerForChecksum(&iph); err != nil {
 		return nil, tcph, err
@@ -595,7 +678,7 @@ func createTCPHeader(tcph layers.TCP, seq, ack uint32, sip, dip [4]byte, sport, 
 	}
 
 	// This will compute proper checksums
-	if err := tcph.SerializeTo(sb, op); err != nil {
+	if err := gopacket.SerializeLayers(sb, op, &tcph, gopacket.Payload(payload)); err != nil {
 		return nil, tcph, err
 	}
 
@@ -608,7 +691,6 @@ func createIPHeader(sip, dip [4]byte) ipv4.Header {
 		Version:  4,
 		Len:      20,
 		TOS:      0,
-		TotalLen: 40,
 		FragOff:  0,
 		TTL:      64,
 		Protocol: 6,
