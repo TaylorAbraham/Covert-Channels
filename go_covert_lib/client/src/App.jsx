@@ -5,7 +5,7 @@ import FormControl from 'react-bootstrap/FormControl';
 import Spinner from 'react-bootstrap/Spinner';
 
 import IPInput from './ui-components/IPInput';
-import PortInput from './ui-components/PortInput';
+import NumberInput from './ui-components/NumberInput';
 import './styles.css';
 import Checkbox from './ui-components/Checkbox';
 import Select from './ui-components/Select';
@@ -34,12 +34,14 @@ const App = () => {
   };
 
   const openChannel = () => {
+    const chanConf = {};
+    chanConf[channel.value] = config;
     const cmd = JSON.stringify({
       OpCode: 'open',
       Processors: processors,
       Channel: {
         Type: channel.value,
-        Data: config,
+        Data: chanConf,
       },
     });
     ws.send(cmd, { binary: true });
@@ -98,8 +100,6 @@ const App = () => {
     setWS(newWS);
   }, []);
 
-  console.log("### config", config);
-
   return isLoading ? (
     <div className="spinner-container">
       <Spinner animation="border" role="status" />
@@ -115,12 +115,6 @@ const App = () => {
       />
       <Button variant="primary" onClick={sendMessage} className="m-1">Send Message</Button>
       <br />
-      <div className="m-1">Incoming Messages</div>
-      <FormControl
-        as="textarea"
-        className="w-50 m-1"
-        readOnly
-      />
       <div className="m-1">System Messages</div>
       <FormControl
         as="textarea"
@@ -129,6 +123,150 @@ const App = () => {
         readOnly
       />
       <h2 className="m-1 mt-5">Configuration</h2>
+      <h3 className="m-1">Processors</h3>
+      <Button
+        variant="success"
+        className="m-1 w-25"
+        onClick={() => setProcessors(processors.concat({
+          Type: null,
+          Data: null,
+        }))}
+      >
+        Add Processor
+      </Button>
+      {
+        processors.map((processor, i) => (
+          <div key={i.toString()}>
+            <Dropdown className="m-1">
+              <Dropdown.Toggle
+                className="w-25"
+                variant="outline-primary"
+              >
+                {processor.Type || 'Select a Processor'}
+              </Dropdown.Toggle>
+              <Dropdown.Menu className="w-25">
+                {
+                  Object.keys(processorList).map(p => (
+                    <Dropdown.Item
+                      as="option"
+                      active={p === processor.Type}
+                      onClick={(e) => {
+                        setProcessors([
+                          ...processors.slice(0, i),
+                          {
+                            Type: e.target.value,
+                            Data: processorList,
+                          },
+                          ...processors.slice(i + 1, processors.length + 1),
+                        ]);
+                      }}
+                      value={p}
+                      key={p}
+                    >
+                      {p}
+                    </Dropdown.Item>
+                  ))
+                }
+              </Dropdown.Menu>
+            </Dropdown>
+            {processor.Data && Object.keys(processor.Data[processor.Type]).map((key) => {
+              /**
+               * EXTREME DANGER WARNING
+               * The below code involves very convoluted spread operators to massage
+               * the data to the format that GoLang expects it to be in.
+               */
+              const opt = processor.Data[processor.Type][key];
+              const props = {
+                key,
+                label: opt.Display.Name,
+                value: opt.Value,
+                onChange: e => setProcessors([
+                  ...processors.slice(0, i),
+                  {
+                    ...processor,
+                    Data: {
+                      ...processor.Data,
+                      [processor.Type]: {
+                        ...processor.Data[processor.Type],
+                        [key]: {
+                          ...opt,
+                          Value: e.target.value,
+                        },
+                      },
+                    },
+                  },
+                  ...processors.slice(i + 1, processors.length + 1),
+                ]),
+              };
+              switch (opt.Type) {
+                case 'ipv4':
+                  return (
+                    <IPInput {...props} />
+                  );
+                case 'i8':
+                case 'u16':
+                case 'u64':
+                case 'exactu64':
+                  return (
+                    <NumberInput
+                      {...props}
+                      onChange={e => setProcessors([
+                        ...processors.slice(0, i),
+                        {
+                          ...processor,
+                          Data: {
+                            ...processor.Data,
+                            [processor.Type]: {
+                              ...processor.Data[processor.Type],
+                              [key]: {
+                                ...opt,
+                                Value: parseInt(e.target.value) || 0,
+                              },
+                            },
+                          },
+                        },
+                        ...processors.slice(i + 1, processors.length + 1),
+                      ])}
+                    />
+                  );
+                case 'bool':
+                  return (
+                    <Checkbox
+                      {...props}
+                      onChange={e => setProcessors([
+                        ...processors.slice(0, i),
+                        {
+                          ...processor,
+                          Data: {
+                            ...processor.Data,
+                            [processor.Type]: {
+                              ...processor.Data[processor.Type],
+                              [key]: {
+                                ...opt,
+                                Value: e.target.checked,
+                              },
+                            },
+                          },
+                        },
+                        ...processors.slice(i + 1, processors.length + 1),
+                      ])}
+                    />
+                  );
+                case 'select':
+                  return (
+                    <Select
+                      {...props}
+                      items={opt.Range}
+                    />
+                  );
+                default:
+                  return (<div key={key}>UNIMPLEMENTED</div>);
+              }
+            })}
+          </div>
+        ))
+      }
+      <h3 className="m-1">Channel</h3>
       <Dropdown className="m-1">
         <Dropdown.Toggle
           className="w-25"
@@ -177,16 +315,18 @@ const App = () => {
             return (
               <IPInput {...props} />
             );
+          case 'i8':
           case 'u16':
           case 'u64':
+          case 'exactu64':
             return (
-              <PortInput
+              <NumberInput
                 {...props}
                 onChange={e => setConfig({
                   ...config,
                   [key]: {
                     ...config[key],
-                    Value: parseInt(e.target.value),
+                    Value: parseInt(e.target.value) || 0,
                   },
                 })}
               />
