@@ -241,15 +241,19 @@ func runMultiChannelWrite(t *testing.T, cl []channelTest, messages []string) {
 		for i := range messages {
 			msg := messageType{OpCode: "write", Message: messages[i]}
 			if b, err := json.Marshal(msg); err == nil {
-				write1 <- b
-				checkMsgType(read1, "write", "Message write success", t)
 				// The marshaller will convert the string into a format that can be interpreted on the other side
 				// This will change invalid utf8 into valid, so we must use that string.
-				if err := json.Unmarshal(b, &msg); err == nil {
-					checkMsgType(read2, "read", msg.Message, t)
-				} else {
+				if err := json.Unmarshal(b, &msg); err != nil {
 					t.Errorf("Marshal Error: %s", err.Error())
 				}
+
+				// Check message sending in both directions
+				write1 <- b
+				checkMsgType(read1, "write", "Message write success", t)
+				checkMsgType(read2, "read", msg.Message, t)
+				write2 <- b
+				checkMsgType(read2, "write", "Message write success", t)
+				checkMsgType(read1, "read", msg.Message, t)
 			} else {
 				t.Errorf("Marshal Error: %s", err.Error())
 			}
