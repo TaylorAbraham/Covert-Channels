@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/gorilla/websocket"
+	"math/rand"
 	"net/http"
 	"reflect"
 	"testing"
@@ -104,76 +105,6 @@ func TestRetrieveConfig(t *testing.T) {
 	checkClose(stop, done, t)
 }
 
-func TestRetrieveWriteMessage(t *testing.T) {
-	ctr1, _ := CreateController()
-	ctr2, _ := CreateController()
-
-	write1, read1, stop1, done1 := openConn("ws://127.0.0.1:9030/covert", "9030", ctr1, t)
-	write2, read2, stop2, done2 := openConn("ws://127.0.0.1:9040/covert", "9040", ctr2, t)
-
-	write1 <- []byte("{\"OpCode\" : \"config\"}")
-
-	conf := checkConfig(read1, DefaultConfig(), t)
-
-	conf.OpCode = "open"
-	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
-	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
-	writeTestMsg(write1, conf, t)
-
-	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
-	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
-	writeTestMsg(write2, conf, t)
-
-	checkMsgType(read1, "open", "Open success", t)
-	checkMsgType(read2, "open", "Open success", t)
-
-	write1 <- []byte("{\"OpCode\" : \"write\", \"Message\" : \"Hello World!\"}")
-	checkMsgType(read2, "read", "Hello World!", t)
-
-	checkClose(stop1, done1, t)
-	checkClose(stop2, done2, t)
-}
-
-func TestWithProcessor(t *testing.T) {
-	ctr1, _ := CreateController()
-	ctr2, _ := CreateController()
-
-	write1, read1, stop1, done1 := openConn("ws://127.0.0.1:9030/covert", "9030", ctr1, t)
-	write2, read2, stop2, done2 := openConn("ws://127.0.0.1:9040/covert", "9040", ctr2, t)
-
-	write1 <- []byte("{\"OpCode\" : \"config\"}")
-
-	conf := checkConfig(read1, DefaultConfig(), t)
-
-	conf.OpCode = "open"
-	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
-	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
-	conf.Processors = []processorConfig{
-		processorConfig{
-			Type: "Caesar", Data: defaultProcessor(),
-		},
-		processorConfig{
-			Type: "Caesar", Data: defaultProcessor(),
-		},
-	}
-	conf.Processors[0].Data.Caesar.Shift.Value = -1
-	conf.Processors[1].Data.Caesar.Shift.Value = 7
-	writeTestMsg(write1, conf, t)
-
-	conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
-	conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
-	writeTestMsg(write2, conf, t)
-
-	checkMsgType(read1, "open", "Open success", t)
-	checkMsgType(read2, "open", "Open success", t)
-
-	write1 <- []byte("{\"OpCode\" : \"write\", \"Message\" : \"Hello World!\"}")
-	checkMsgType(read2, "read", "Hello World!", t)
-
-	checkClose(stop1, done1, t)
-	checkClose(stop2, done2, t)
-}
-
 // To confirm that the processing is really occurring,
 // we ommit the processors for the receiver side and confirm
 // that it changes the output message
@@ -254,6 +185,11 @@ func checkMsgType(ch chan []byte, opcode string, msg string, t *testing.T) {
 	}
 }
 
+// Checks that two strings are equal in terms of utf characters
+func utf8Equal() {
+
+}
+
 func checkConfig(ch chan []byte, expt configData, t *testing.T) configData {
 	var conf configData
 	select {
@@ -277,7 +213,7 @@ type channelTest struct {
 	f2   func(*configData)
 }
 
-func runMultiChannelWrite(t *testing.T, cl []channelTest) {
+func runMultiChannelWrite(t *testing.T, cl []channelTest, messages []string) {
 	ctr1, _ := CreateController()
 	ctr2, _ := CreateController()
 
@@ -302,9 +238,26 @@ func runMultiChannelWrite(t *testing.T, cl []channelTest) {
 		checkMsgType(read1, "open", "Open success", t)
 		checkMsgType(read2, "open", "Open success", t)
 
-		write1 <- []byte("{\"OpCode\" : \"write\", \"Message\" : \"Hello World!\"}")
-		checkMsgType(read1, "write", "Message write success", t)
-		checkMsgType(read2, "read", "Hello World!", t)
+		for i := range messages {
+			msg := messageType{OpCode: "write", Message: messages[i]}
+			if b, err := json.Marshal(msg); err == nil {
+				// The marshaller will convert the string into a format that can be interpreted on the other side
+				// This will change invalid utf8 into valid, so we must use that string.
+				if err := json.Unmarshal(b, &msg); err != nil {
+					t.Errorf("Marshal Error: %s", err.Error())
+				}
+
+				// Check message sending in both directions
+				write1 <- b
+				checkMsgType(read1, "write", "Message write success", t)
+				checkMsgType(read2, "read", msg.Message, t)
+				write2 <- b
+				checkMsgType(read2, "write", "Message write success", t)
+				checkMsgType(read1, "read", msg.Message, t)
+			} else {
+				t.Errorf("Marshal Error: %s", err.Error())
+			}
+		}
 
 		write1 <- []byte("{\"OpCode\" : \"close\"}")
 		write2 <- []byte("{\"OpCode\" : \"close\"}")
@@ -317,7 +270,7 @@ func runMultiChannelWrite(t *testing.T, cl []channelTest) {
 	checkClose(stop2, done2, t)
 }
 
-func TestMultiChannelWriteMessage(t *testing.T) {
+func TestMessageExchange(t *testing.T) {
 	cl := []channelTest{
 		channelTest{
 			name: "TcpNormal",
@@ -342,6 +295,58 @@ func TestMultiChannelWriteMessage(t *testing.T) {
 			},
 		},
 		channelTest{
+			name: "TcpHandshake",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
+
+				conf.Processors = []processorConfig{
+					processorConfig{
+						Type: "Caesar", Data: defaultProcessor(),
+					},
+					processorConfig{
+						Type: "Caesar", Data: defaultProcessor(),
+					},
+				}
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
+
+				conf.Processors = []processorConfig{
+					processorConfig{
+						Type: "Caesar", Data: defaultProcessor(),
+					},
+					processorConfig{
+						Type: "Caesar", Data: defaultProcessor(),
+					},
+				}
+			},
+		},
+		channelTest{
+			name: "TcpHandshake",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
+
+				conf.Processors = []processorConfig{
+					processorConfig{
+						Type: "Caesar", Data: defaultProcessor(),
+					},
+				}
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
+
+				conf.Processors = []processorConfig{
+					processorConfig{
+						Type: "Caesar", Data: defaultProcessor(),
+					},
+				}
+			},
+		},
+		channelTest{
 			name: "TcpSyn",
 			f1: func(conf *configData) {
 				conf.Channel.Data.TcpSyn.FriendPort.Value = 8090
@@ -353,5 +358,21 @@ func TestMultiChannelWriteMessage(t *testing.T) {
 			},
 		},
 	}
-	runMultiChannelWrite(t, cl)
+
+	messages := []string{"", "A", "Hello World!", "🍌", "🍌🍌🍌", "Hello\nNewline!" }
+	for i := 0; i < 10; i++ {
+		messages = append(messages, randomValidString(32))
+	}
+
+	runMultiChannelWrite(t, cl, messages)
+}
+
+func randomValidString(maxLen int) string {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	l := r.Int() & maxLen
+	buf := []byte{}
+	for i := 0; i < l; i++ {
+		buf = append(buf, byte(r.Int()&0xFF))
+	}
+	return string(buf)
 }

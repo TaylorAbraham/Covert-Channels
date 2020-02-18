@@ -38,7 +38,7 @@ func TestProtocolDelimiter(t *testing.T) {
 		rErr error
 		nr   uint64
 		// Test with message with many characters and with 0 characters
-		inputs []string = []string{"Hello world!", ""}
+		inputs []string = []string{"Hello world!", "", "A", "Hello\nworld!"}
 	)
 
 	for _, input := range inputs {
