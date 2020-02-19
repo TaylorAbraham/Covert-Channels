@@ -22,6 +22,7 @@ const App = () => {
   const [processors, setProcessors] = useState([]);
   const [channelList, setChannelList] = useState([]);
   const [channel, setChannel] = useState({});
+  const [channelIsOpen, setChannelIsOpen] = useState(false);
   const [config, setConfig] = useState({});
   const [isLoading, setLoading] = useState(true);
   const [ws, setWS] = useState(null);
@@ -72,8 +73,10 @@ const App = () => {
         break;
       case 'open':
         addSystemMessage('Covert channel successfully opened.');
+        setChannelIsOpen(true);
         break;
       case 'close':
+        setChannelIsOpen(false);
         addSystemMessage('Covert channel closed.');
         break;
       case 'write':
@@ -119,7 +122,11 @@ const App = () => {
             <Nav.Link href="#msg" onClick={() => setScreen(Screens.MSG)}>Messaging</Nav.Link>
             <Nav.Link href="#help" onClick={() => setScreen(Screens.HELP)}>Help</Nav.Link>
           </Nav>
-          <Button variant="success">Channel Open</Button>
+          {channelIsOpen ? (
+            <Button variant="success" disabled style={{opacity: "100%"}}>Channel Open</Button>
+          ) : (
+            <Button variant="danger" disabled style={{opacity: "100%"}}>Channel Closed</Button>
+          )}
         </Navbar.Collapse>
       </Navbar>
       {screen === Screens.CONFIG ? (
