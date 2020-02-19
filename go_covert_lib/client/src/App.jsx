@@ -5,7 +5,7 @@ import Button from 'react-bootstrap/Button';
 import Spinner from 'react-bootstrap/Spinner';
 
 import ConfigScreen from './screens/ConfigScreen';
-import './styles.css';
+import './styles.scss';
 
 const Screens  = Object.freeze({
   CONFIG: "config",
