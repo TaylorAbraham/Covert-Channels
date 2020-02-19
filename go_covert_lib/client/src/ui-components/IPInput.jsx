@@ -7,7 +7,7 @@ import InputGroup from 'react-bootstrap/InputGroup';
 const IPInput = (props) => {
   const { label, value, onChange } = props;
   return (
-    <InputGroup className="m-1 w-75">
+    <InputGroup className="m-1 w-25">
       <InputGroup.Prepend>
         <InputGroup.Text className="input-text">{label}</InputGroup.Text>
       </InputGroup.Prepend>
