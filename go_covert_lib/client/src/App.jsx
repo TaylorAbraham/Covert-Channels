@@ -5,13 +5,23 @@ import Button from 'react-bootstrap/Button';
 import Spinner from 'react-bootstrap/Spinner';
 
 import ConfigScreen from './screens/ConfigScreen';
+import Console from './screens/Console';
 import './styles.scss';
 
-const Screens  = Object.freeze({
-  CONFIG: "config",
-  MSG:    "msg",
-  HELP:   "help"
+const Screens = Object.freeze({
+  CONFIG: 'config',
+  MSG: 'msg',
+  HELP: 'help',
 });
+
+const getTimestamp = () => {
+  const d = new Date();
+  const hr = d.getHours().toString().padStart(2, '0');
+  const min = d.getMinutes().toString().padStart(2, '0');
+  const sec = d.getSeconds().toString().padStart(2, '0');
+  const ms = d.getMilliseconds().toString().padStart(3, '0');
+  return `${hr}:${min}:${sec}.${ms}`;
+};
 
 /**
  * IMPORTANT NOTE: For styling, refer to https://getbootstrap.com/docs/4.0/utilities/position/
@@ -35,7 +45,7 @@ const App = () => {
   };
 
   const addSystemMessage = (newMsg) => {
-    setSystemMessages(sm => sm.concat(newMsg));
+    setSystemMessages(sm => sm.concat(`[${getTimestamp()}] ${newMsg}`));
   };
 
   const openChannel = () => {
@@ -113,7 +123,7 @@ const App = () => {
     </div>
   ) : (
     <div>
-      <Navbar bg="primary" variant="dark" expand="lg">
+      <Navbar className="cc-navbar" bg="primary" variant="dark" expand="lg">
         <Navbar.Brand href="#config">Covert Client</Navbar.Brand>
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
         <Navbar.Collapse id="basic-navbar-nav">
@@ -123,28 +133,36 @@ const App = () => {
             <Nav.Link href="#help" onClick={() => setScreen(Screens.HELP)}>Help</Nav.Link>
           </Nav>
           {channelIsOpen ? (
-            <Button variant="success" disabled style={{opacity: "100%"}}>Channel Open</Button>
+            <Button variant="success" disabled style={{ opacity: '100%' }}>Channel Open</Button>
           ) : (
-            <Button variant="danger" disabled style={{opacity: "100%"}}>Channel Closed</Button>
+            <Button variant="danger" disabled style={{ opacity: '100%' }}>Channel Closed</Button>
           )}
         </Navbar.Collapse>
       </Navbar>
-      {screen === Screens.CONFIG ? (
-        <ConfigScreen
-          openChannel={openChannel}
-          closeChannel={closeChannel}
-          config={config}
-          setConfig={setConfig}
-          processorList={processorList}
-          processors={processors}
-          setProcessors={setProcessors}
-          channelList={channelList}
-          channel={channel}
-          setChannel={setChannel}
-        />
-      ) : (
-        <div>UNIMPLEMENTED</div>
-      )}
+      <div className="cc-content">
+        <div className="cc-content__screen">
+          {screen === Screens.CONFIG ? (
+            <ConfigScreen
+              openChannel={openChannel}
+              closeChannel={closeChannel}
+              config={config}
+              setConfig={setConfig}
+              processorList={processorList}
+              processors={processors}
+              setProcessors={setProcessors}
+              channelList={channelList}
+              channel={channel}
+              setChannel={setChannel}
+              channelIsOpen={channelIsOpen}
+            />
+          ) : (
+            <div>UNIMPLEMENTED</div>
+          )}
+        </div>
+        <div className="cc-content__console">
+          <Console messages={systemMessages} />
+        </div>
+      </div>
     </div>
   );
 };

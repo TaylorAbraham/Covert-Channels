@@ -20,6 +20,7 @@ const ConfigScreen = (props) => {
     channelList,
     channel,
     setChannel,
+    channelIsOpen,
   } = props;
 
   return (
@@ -28,7 +29,7 @@ const ConfigScreen = (props) => {
       <h3 className="m-1">Processors</h3>
       <Button
         variant="success"
-        className="m-1 w-25"
+        className="m-1 w-100"
         onClick={() => setProcessors(processors.concat({
           Type: null,
           Data: null,
@@ -41,12 +42,12 @@ const ConfigScreen = (props) => {
           <div key={i.toString()}>
             <Dropdown className="m-1">
               <Dropdown.Toggle
-                className="w-25"
+                className="w-100"
                 variant="outline-primary"
               >
                 {processor.Type || 'Select a Processor'}
               </Dropdown.Toggle>
-              <Dropdown.Menu className="w-25">
+              <Dropdown.Menu className="w-100">
                 {
                   Object.keys(processorList).map(p => (
                     <Dropdown.Item
@@ -78,7 +79,7 @@ const ConfigScreen = (props) => {
                * the data to the format that GoLang expects it to be in.
                */
               const opt = processor.Data[processor.Type][key];
-              const props = {
+              const propsForComponent = {
                 key,
                 label: opt.Display.Name,
                 value: opt.Value,
@@ -103,7 +104,7 @@ const ConfigScreen = (props) => {
               switch (opt.Type) {
                 case 'ipv4':
                   return (
-                    <IPInput {...props} />
+                    <IPInput {...propsForComponent} />
                   );
                 case 'i8':
                 case 'u16':
@@ -111,7 +112,7 @@ const ConfigScreen = (props) => {
                 case 'exactu64':
                   return (
                     <NumberInput
-                      {...props}
+                      {...propsForComponent}
                       onChange={e => setProcessors([
                         ...processors.slice(0, i),
                         {
@@ -134,7 +135,7 @@ const ConfigScreen = (props) => {
                 case 'bool':
                   return (
                     <Checkbox
-                      {...props}
+                      {...propsForComponent}
                       onChange={e => setProcessors([
                         ...processors.slice(0, i),
                         {
@@ -157,7 +158,7 @@ const ConfigScreen = (props) => {
                 case 'select':
                   return (
                     <Select
-                      {...props}
+                      {...propsForComponent}
                       items={opt.Range}
                     />
                   );
@@ -171,12 +172,12 @@ const ConfigScreen = (props) => {
       <h3 className="m-1">Channel</h3>
       <Dropdown className="m-1">
         <Dropdown.Toggle
-          className="w-25"
+          className="w-100"
           variant="outline-primary"
         >
           {channel.value || 'Select a Channel'}
         </Dropdown.Toggle>
-        <Dropdown.Menu className="w-25">
+        <Dropdown.Menu className="w-100">
           {
             Object.keys(channelList).map(chan => (
               <Dropdown.Item
@@ -200,7 +201,7 @@ const ConfigScreen = (props) => {
       </Dropdown>
       {Object.keys(config).map((key) => {
         const opt = config[key];
-        const props = {
+        const propsForComponent = {
           key,
           label: opt.Display.Name,
           value: opt.Value,
@@ -215,7 +216,7 @@ const ConfigScreen = (props) => {
         switch (opt.Type) {
           case 'ipv4':
             return (
-              <IPInput {...props} />
+              <IPInput {...propsForComponent} />
             );
           case 'i8':
           case 'u16':
@@ -223,7 +224,7 @@ const ConfigScreen = (props) => {
           case 'exactu64':
             return (
               <NumberInput
-                {...props}
+                {...propsForComponent}
                 onChange={e => setConfig({
                   ...config,
                   [key]: {
@@ -236,7 +237,7 @@ const ConfigScreen = (props) => {
           case 'bool':
             return (
               <Checkbox
-                {...props}
+                {...propsForComponent}
                 onChange={e => setConfig({
                   ...config,
                   [key]: {
@@ -249,7 +250,7 @@ const ConfigScreen = (props) => {
           case 'select':
             return (
               <Select
-                {...props}
+                {...propsForComponent}
                 items={opt.Range}
               />
             );
@@ -257,8 +258,11 @@ const ConfigScreen = (props) => {
             return (<div key={key}>UNIMPLEMENTED</div>);
         }
       })}
-      <Button variant="success" onClick={openChannel} className="m-1 w-25">Open Covert Channel</Button>
-      <Button variant="danger" onClick={closeChannel} className="m-1 w-25">Close Covert Channel</Button>
+      {channelIsOpen ? (
+        <Button variant="danger" onClick={closeChannel} className="m-1 w-100">Close Covert Channel</Button>
+      ) : (
+        <Button variant="success" onClick={openChannel} className="m-1 w-100">Open Covert Channel</Button>
+      )}
     </div>
   );
 };
@@ -274,6 +278,7 @@ ConfigScreen.propTypes = {
   channelList: PropTypes.object.isRequired,
   channel: PropTypes.object.isRequired,
   setChannel: PropTypes.func.isRequired,
+  channelIsOpen: PropTypes.bool.isRequired,
 };
 
 export default ConfigScreen;

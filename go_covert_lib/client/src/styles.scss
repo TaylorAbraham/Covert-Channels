@@ -1,10 +1,35 @@
+$navbar_height: 56px;
+
+.cc-navbar {
+  position: fixed !important;
+  width: 100%;
+}
+
 .spinner-container {
   text-align: center;
   margin: 25%
 }
 
+.cc-content {
+  padding-top: $navbar_height; // Avoid overlapping the navbar
+  display: flex;
+
+  &__screen {
+    width: 60%;
+    height: calc(100vh - #{$navbar_height});
+    overflow-y: auto;
+  }
+
+  &__console {
+    height: calc(100% - #{$navbar_height});
+    width: 40%;
+    right: 0;
+    position: fixed !important;
+  }
+}
+
 .input-text {
-  width: 120px;
+  width: 160px;
   text-align: right !important;
   display: inline-block !important; /* This centers text */
 }
