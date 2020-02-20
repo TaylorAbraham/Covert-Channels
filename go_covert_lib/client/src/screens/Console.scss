@@ -30,8 +30,6 @@ $background: #80808033;
       transition: transform 0.75s;
     }
     &--reverse p {
-      // margin: 0 0 -5px 0;
-      // transform: rotate(180deg);
       -moz-transform: scale(-1, 1);
       -webkit-transform: scale(-1, 1);
       -o-transform: scale(-1, 1);
