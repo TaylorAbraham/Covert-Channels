@@ -215,6 +215,7 @@ const ConfigScreen = (props) => {
             },
           }),
         };
+        console.log("### opt", opt);
         switch (opt.Type) {
           case 'ipv4':
             return (
@@ -267,7 +268,7 @@ const ConfigScreen = (props) => {
           variant="success"
           onClick={openChannel}
           className="m-1 w-100"
-          disabled={Object.entries(channel).length === 0 && channel.constructor === Object}
+          hidden={Object.entries(channel).length === 0 && channel.constructor === Object}
         >
           Open Covert Channel
         </Button>
