@@ -83,6 +83,7 @@ const ConfigScreen = (props) => {
                 key,
                 label: opt.Display.Name,
                 value: opt.Value,
+                tooltip: opt.Display.Description,
                 onChange: e => setProcessors([
                   ...processors.slice(0, i),
                   {
@@ -205,6 +206,7 @@ const ConfigScreen = (props) => {
           key,
           label: opt.Display.Name,
           value: opt.Value,
+          tooltip: opt.Display.Description,
           onChange: e => setConfig({
             ...config,
             [key]: {

@@ -34,6 +34,7 @@ const App = () => {
   const [channelList, setChannelList] = useState([]);
   const [channel, setChannel] = useState({});
   const [channelIsOpen, setChannelIsOpen] = useState(false);
+  const [consoleIsVisible, setConsoleIsVisible] = useState(true);
   const [config, setConfig] = useState({});
   const [isLoading, setLoading] = useState(true);
   const [ws, setWS] = useState(null);
@@ -147,7 +148,7 @@ const App = () => {
         </Navbar.Collapse>
       </Navbar>
       <div className="cc-content">
-        <div className="cc-content__screen">
+        <div className={`cc-content__screen ${!consoleIsVisible ? 'cc-content__screen--expand' : ''}`}>
           {screen === Screens.CONFIG ? (
             <ConfigScreen
               openChannel={openChannel}
@@ -173,8 +174,12 @@ const App = () => {
             <div>UNIMPLEMENTED</div>
           )}
         </div>
-        <div className="cc-content__console">
-          <Console messages={systemMessages} />
+        <div className={`cc-content__console ${!consoleIsVisible ? 'cc-content__console--hidden' : ''}`}>
+          <Console
+            messages={systemMessages}
+            consoleIsVisible={consoleIsVisible}
+            toggleConsoleIsVisible={() => setConsoleIsVisible(!consoleIsVisible)}
+          />
         </div>
       </div>
     </div>

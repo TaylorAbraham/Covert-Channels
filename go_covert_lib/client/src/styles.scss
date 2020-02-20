@@ -1,4 +1,5 @@
 $navbar_height: 56px;
+$hidden_console_width: 54px;
 
 .cc-navbar {
   position: fixed !important;
@@ -18,6 +19,13 @@ $navbar_height: 56px;
     width: 60%;
     height: calc(100vh - #{$navbar_height});
     overflow-y: auto;
+    -webkit-transition: width 0.75s;
+    -moz-transition: width 0.75s;
+    -o-transition: width 0.75s;
+    transition: width 0.75s;
+    &--expand {
+      width: calc(100% - #{$hidden_console_width});
+    }
   }
 
   &__console {
@@ -25,6 +33,13 @@ $navbar_height: 56px;
     width: 40%;
     right: 0;
     position: fixed !important;
+    -webkit-transition: right 0.75s;
+    -moz-transition: right 0.75s;
+    -o-transition: right 0.75s;
+    transition: right 0.75s;
+    &--hidden {
+      right: calc(-40% + #{$hidden_console_width});
+    }
   }
 }
 
@@ -32,6 +47,29 @@ $navbar_height: 56px;
   width: 160px;
   text-align: right !important;
   display: inline-block !important; /* This centers text */
+}
+
+.cc-tooltip {
+  width: 16px;
+  height: 16px;
+  align-self: center;
+
+  &__icon {
+    width: 100%;
+    height: 100%;
+    font-family: sans-serif;
+    font-weight: bold;
+    text-align: center;
+    font-size: 12px;
+    line-height: 18px;
+    border-radius: 100%;
+    color: white;
+    background: black;
+    -webkit-user-select: none; /* Safari */        
+    -moz-user-select: none; /* Firefox */
+    -ms-user-select: none; /* IE10+/Edge */
+    user-select: none; /* Standard */
+  }
 }
 
 option {

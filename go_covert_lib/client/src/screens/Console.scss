@@ -15,6 +15,31 @@ $background: #80808033;
     user-select: none; /* Standard */
   }
 
+  &__header &__toggle-btn {
+    font-size: 24px;
+    padding: 0 10px;
+    font-weight: bold;
+    line-height: 36px;
+    margin-top: -5px;
+    p {
+      margin: -5px 0 0 0;
+      -webkit-transition: transform 1s;
+      -moz-transition: transform 1s;
+      -o-transition: transform 1s;
+      -ms-transition: transform 1s;
+      transition: transform 1s;
+    }
+    &--reverse p {
+      // margin: 0 0 -5px 0;
+      // transform: rotate(180deg);
+      -moz-transform: scale(-1, 1);
+      -webkit-transform: scale(-1, 1);
+      -o-transform: scale(-1, 1);
+      -ms-transform: scale(-1, 1);
+      transform: scale(-1, 1);
+    }
+  }
+
   &__messages {
     background-color: $background;
     height: 100%;
