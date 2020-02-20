@@ -7,6 +7,7 @@ import Spinner from 'react-bootstrap/Spinner';
 import ConfigScreen from './screens/ConfigScreen';
 import Console from './screens/Console';
 import './styles.scss';
+import MessagingScreen from './screens/MessagingScreen';
 
 const Screens = Object.freeze({
   CONFIG: 'config',
@@ -37,6 +38,7 @@ const App = () => {
   const [isLoading, setLoading] = useState(true);
   const [ws, setWS] = useState(null);
   const [systemMessages, setSystemMessages] = useState([]);
+  const [covertMessages, setCovertMessages] = useState([]);
   const [screen, setScreen] = useState(Screens.CONFIG);
 
   const sendInitialConfig = (localWS) => {
@@ -46,6 +48,10 @@ const App = () => {
 
   const addSystemMessage = (newMsg) => {
     setSystemMessages(sm => sm.concat(`[${getTimestamp()}] ${newMsg}`));
+  };
+
+  const addCovertMessage = (newMsg) => {
+    setCovertMessages(sm => sm.concat(`[${getTimestamp()}] ${newMsg}`));
   };
 
   const openChannel = () => {
@@ -93,7 +99,8 @@ const App = () => {
         addSystemMessage('Covert message sent.');
         break;
       case 'read':
-        addSystemMessage(`Covert message received: ${msg.Message}`);
+        addSystemMessage('Covert message received.');
+        addCovertMessage(msg.Message);
         break;
       case 'error':
         addSystemMessage(`[ERROR]: ${msg.Message}`);
@@ -154,6 +161,13 @@ const App = () => {
               channel={channel}
               setChannel={setChannel}
               channelIsOpen={channelIsOpen}
+            />
+          ) : (screen === Screens.MSG) ? (
+            <MessagingScreen
+              textToSend={textToSend}
+              setTextToSend={setTextToSend}
+              covertMessages={covertMessages}
+              sendMessage={sendMessage}
             />
           ) : (
             <div>UNIMPLEMENTED</div>
