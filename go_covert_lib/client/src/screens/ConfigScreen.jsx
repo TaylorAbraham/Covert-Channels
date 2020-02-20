@@ -263,7 +263,14 @@ const ConfigScreen = (props) => {
       {channelIsOpen ? (
         <Button variant="danger" onClick={closeChannel} className="m-1 w-100">Close Covert Channel</Button>
       ) : (
-        <Button variant="success" onClick={openChannel} className="m-1 w-100">Open Covert Channel</Button>
+        <Button
+          variant="success"
+          onClick={openChannel}
+          className="m-1 w-100"
+          disabled={Object.entries(channel).length === 0 && channel.constructor === Object}
+        >
+          Open Covert Channel
+        </Button>
       )}
     </div>
   );
