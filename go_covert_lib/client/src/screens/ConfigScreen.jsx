@@ -79,12 +79,12 @@ const ConfigScreen = (props) => {
                * the data to the format that GoLang expects it to be in.
                */
               const opt = processor.Data[processor.Type][key];
-              const propsForComponent = {
+              let propsForComponent = {
                 key,
                 label: opt.Display.Name,
                 value: opt.Value,
                 tooltip: opt.Display.Description,
-                onChange: e => setProcessors([
+                parentOnChange: e => setProcessors([
                   ...processors.slice(0, i),
                   {
                     ...processor,
@@ -111,10 +111,17 @@ const ConfigScreen = (props) => {
                 case 'u16':
                 case 'u64':
                 case 'exactu64':
+                  if (opt.Range) {
+                    propsForComponent = {
+                      ...propsForComponent,
+                      min: opt.Range[0],
+                      max: opt.Range[1],
+                    };
+                  }
                   return (
                     <NumberInput
                       {...propsForComponent}
-                      onChange={e => setProcessors([
+                      parentOnChange={e => setProcessors([
                         ...processors.slice(0, i),
                         {
                           ...processor,
@@ -137,7 +144,7 @@ const ConfigScreen = (props) => {
                   return (
                     <Checkbox
                       {...propsForComponent}
-                      onChange={e => setProcessors([
+                      parentOnChange={e => setProcessors([
                         ...processors.slice(0, i),
                         {
                           ...processor,
@@ -202,12 +209,12 @@ const ConfigScreen = (props) => {
       </Dropdown>
       {Object.keys(config).map((key) => {
         const opt = config[key];
-        const propsForComponent = {
+        let propsForComponent = {
           key,
           label: opt.Display.Name,
           value: opt.Value,
           tooltip: opt.Display.Description,
-          onChange: e => setConfig({
+          parentOnChange: e => setConfig({
             ...config,
             [key]: {
               ...config[key],
@@ -215,7 +222,6 @@ const ConfigScreen = (props) => {
             },
           }),
         };
-        console.log("### opt", opt);
         switch (opt.Type) {
           case 'ipv4':
             return (
@@ -225,10 +231,17 @@ const ConfigScreen = (props) => {
           case 'u16':
           case 'u64':
           case 'exactu64':
+            if (opt.Range) {
+              propsForComponent = {
+                ...propsForComponent,
+                min: opt.Range[0],
+                max: opt.Range[1],
+              };
+            }
             return (
               <NumberInput
                 {...propsForComponent}
-                onChange={e => setConfig({
+                parentOnChange={e => setConfig({
                   ...config,
                   [key]: {
                     ...config[key],
@@ -241,7 +254,7 @@ const ConfigScreen = (props) => {
             return (
               <Checkbox
                 {...propsForComponent}
-                onChange={e => setConfig({
+                parentOnChange={e => setConfig({
                   ...config,
                   [key]: {
                     ...config[key],

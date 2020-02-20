@@ -10,7 +10,7 @@ const IPInput = (props) => {
   const {
     label,
     value,
-    onChange,
+    parentOnChange,
     tooltip,
   } = props;
   return (
@@ -20,7 +20,7 @@ const IPInput = (props) => {
       </InputGroup.Prepend>
       <FormControl
         value={value}
-        onChange={onChange}
+        onChange={parentOnChange}
       />
       {tooltip && (
         <OverlayTrigger overlay={<Tooltip id="tooltip-disabled">{tooltip}</Tooltip>}>
@@ -36,7 +36,7 @@ const IPInput = (props) => {
 IPInput.propTypes = {
   label: PropTypes.string.isRequired,
   value: PropTypes.string,
-  onChange: PropTypes.func.isRequired,
+  parentOnChange: PropTypes.func.isRequired,
   tooltip: PropTypes.string,
 };
 

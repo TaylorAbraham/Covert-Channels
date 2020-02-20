@@ -8,7 +8,7 @@ const Checkbox = (props) => {
   const {
     label,
     value,
-    onChange,
+    parentOnChange,
     tooltip,
   } = props;
   return (
@@ -18,7 +18,7 @@ const Checkbox = (props) => {
         <input
           type="checkbox"
           checked={value}
-          onChange={onChange}
+          onChange={parentOnChange}
         />
         <span className="checkmark" />
       </label>
@@ -36,7 +36,7 @@ const Checkbox = (props) => {
 Checkbox.propTypes = {
   label: PropTypes.string.isRequired,
   value: PropTypes.bool,
-  onChange: PropTypes.func.isRequired,
+  parentOnChange: PropTypes.func.isRequired,
   tooltip: PropTypes.string,
 };
 

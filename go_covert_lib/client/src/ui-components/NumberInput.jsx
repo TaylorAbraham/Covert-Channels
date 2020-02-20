@@ -9,7 +9,9 @@ const NumberInput = (props) => {
   const {
     label,
     value,
-    onChange,
+    min,
+    max,
+    parentOnChange,
     tooltip,
   } = props;
   return (
@@ -19,7 +21,14 @@ const NumberInput = (props) => {
       </InputGroup.Prepend>
       <FormControl
         value={value}
-        onChange={onChange}
+        onChange={(e) => {
+          if (e.target.value > max) {
+            e.target.value = max;
+          } else if (e.target.value < min) {
+            e.target.value = min;
+          }
+          parentOnChange(e);
+        }}
       />
       {tooltip && (
         <OverlayTrigger overlay={<Tooltip id="tooltip-disabled">{tooltip}</Tooltip>}>
@@ -35,12 +44,16 @@ const NumberInput = (props) => {
 NumberInput.propTypes = {
   label: PropTypes.string.isRequired,
   value: PropTypes.number,
-  onChange: PropTypes.func.isRequired,
+  min: PropTypes.number,
+  max: PropTypes.number,
+  parentOnChange: PropTypes.func.isRequired,
   tooltip: PropTypes.string,
 };
 
 NumberInput.defaultProps = {
   value: 0,
+  min: Number.MIN_SAFE_INTEGER,
+  max: Number.MAX_SAFE_INTEGER,
   tooltip: '',
 };
 

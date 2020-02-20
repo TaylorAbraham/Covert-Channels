@@ -10,7 +10,7 @@ const Select = (props) => {
     label,
     items,
     value,
-    onChange,
+    parentOnChange,
     tooltip,
   } = props;
   return (
@@ -31,7 +31,7 @@ const Select = (props) => {
               <Dropdown.Item
                 as="option"
                 active={value === item}
-                onClick={onChange}
+                onClick={parentOnChange}
                 value={item}
                 key={item}
               >
@@ -56,7 +56,7 @@ Select.propTypes = {
   label: PropTypes.string.isRequired,
   items: PropTypes.arrayOf(PropTypes.string).isRequired,
   value: PropTypes.string.isRequired,
-  onChange: PropTypes.func.isRequired,
+  parentOnChange: PropTypes.func.isRequired,
   tooltip: PropTypes.string,
 };
 
