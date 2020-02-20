@@ -23,11 +23,11 @@ $background: #80808033;
     margin-top: -5px;
     p {
       margin: -5px 0 0 0;
-      -webkit-transition: transform 1s;
-      -moz-transition: transform 1s;
-      -o-transition: transform 1s;
-      -ms-transition: transform 1s;
-      transition: transform 1s;
+      -webkit-transition: transform 0.75s;
+      -moz-transition: transform 0.75s;
+      -o-transition: transform 0.75s;
+      -ms-transition: transform 0.75s;
+      transition: transform 0.75s;
     }
     &--reverse p {
       // margin: 0 0 -5px 0;

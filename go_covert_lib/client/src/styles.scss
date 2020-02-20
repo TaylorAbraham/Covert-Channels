@@ -19,10 +19,10 @@ $hidden_console_width: 54px;
     width: 60%;
     height: calc(100vh - #{$navbar_height});
     overflow-y: auto;
-    -webkit-transition: width 0.75s;
-    -moz-transition: width 0.75s;
-    -o-transition: width 0.75s;
-    transition: width 0.75s;
+    -webkit-transition: width 0.5s;
+    -moz-transition: width 0.5s;
+    -o-transition: width 0.5s;
+    transition: width 0.5s;
     &--expand {
       width: calc(100% - #{$hidden_console_width});
     }
@@ -33,10 +33,10 @@ $hidden_console_width: 54px;
     width: 40%;
     right: 0;
     position: fixed !important;
-    -webkit-transition: right 0.75s;
-    -moz-transition: right 0.75s;
-    -o-transition: right 0.75s;
-    transition: right 0.75s;
+    -webkit-transition: right 0.5s;
+    -moz-transition: right 0.5s;
+    -o-transition: right 0.5s;
+    transition: right 0.5s;
     &--hidden {
       right: calc(-40% + #{$hidden_console_width});
     }
@@ -69,6 +69,18 @@ $hidden_console_width: 54px;
     -moz-user-select: none; /* Firefox */
     -ms-user-select: none; /* IE10+/Edge */
     user-select: none; /* Standard */
+  }
+}
+
+.cc-ip-input {
+  &--invalid {
+    border: 1px solid red;
+    border-radius: 1px;
+  }
+  &__err-text {
+    color: red;
+    margin-bottom: 0;
+    font-size: small;
   }
 }
 
