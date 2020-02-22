@@ -50,8 +50,14 @@ func MakeChannel(conf Config) (*Channel, error) {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", c.handleFunc)
 
-		c.srv = &http.Server{Addr: ":" + strconv.Itoa(int(conf.OriginPort)), Handler: mux}
-		go func() { c.srv.ListenAndServe() }()
+		c.srv = &http.Server{ Handler: mux}
+
+		l, err := net.Listen("tcp4", ":"+strconv.Itoa(int(c.conf.OriginPort)))
+		if err != nil {
+			return nil, err
+		}
+
+		go func() { c.srv.Serve(l) }()
 
 		c.serverSendBuf = make(chan []byte, maxMsg)
 		c.serverRecBuf = make(chan []byte, maxMsg)
@@ -129,7 +135,6 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 	} else {
 		addr := &net.TCPAddr{IP: c.conf.FriendIP[:], Port: int(c.conf.FriendPort)}
 		resp, err := http.Get("http://" + addr.String() + "/")
-		log.Println("GET")
 		if err == nil {
 			buf := bytes.Buffer{}
 			buf.ReadFrom(resp.Body)
@@ -167,7 +172,6 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	} else {
 		addr := &net.TCPAddr{IP: c.conf.FriendIP[:], Port: int(c.conf.FriendPort)}
 		_, err := http.Post("http://"+addr.String()+"/", "text/plain", bytes.NewBuffer(data))
-		log.Println("POST")
 		if err == nil {
 			return uint64(len(data)), nil
 		} else {

@@ -112,7 +112,6 @@ func TestReceiveSendPost(t *testing.T) {
 			case <-time.After(time.Second * 5):
 			}
 		}()
-
 		sendAndCheck(t, input, sch)
 
 		receiveAndCheck(t, input, c)
