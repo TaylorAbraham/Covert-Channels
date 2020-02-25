@@ -15,14 +15,14 @@ const MessagingScreen = (props) => {
       <h2 className="m-1">Messaging</h2>
       <FormControl
         as="textarea"
-        className="w-75 m-1"
+        className="cc-messaging__input w-75 m-1"
         value={textToSend}
         onChange={e => setTextToSend(e.target.value)}
       />
       <Button
         variant="primary"
         onClick={sendMessage}
-        className="m-1"
+        className="cc-messaging__send m-1"
         disabled={!textToSend}
       >
         Send Message
