@@ -6,11 +6,11 @@ import MessagingScreen from './MessagingScreen';
 const covertMessages = [];
 const sendMessage = () => {};
 
-describe('Messaging screen', () => {
-  it('handles input ', () => {
-    const setTextToSend = jest.fn();
-    let textToSend = '';
+describe('Messaging sescreen', () => {
+  it('handles input in the input field', () => {
+    const textToSend = '';
     let msgScreen;
+    const setTextToSend = jest.fn(val => msgScreen.setProps({ textToSend: val }));
     act(() => {
       msgScreen = mount(<MessagingScreen
         textToSend={textToSend}
@@ -19,13 +19,15 @@ describe('Messaging screen', () => {
         sendMessage={sendMessage}
       />);
     });
-    expect(msgScreen.find('.cc-messaging__send').at(0).props().disabled).toBe(true);
+    let sendButtonIsDisabled = msgScreen.find('.cc-messaging__send').at(0).props().disabled;
+    expect(sendButtonIsDisabled).toBe(true);
     act(() => {
-      textToSend = 'a';
+      // Simulate typing a character
       msgScreen.find('.cc-messaging__input').at(0).simulate('change', { target: { value: 'a' } });
     });
+    sendButtonIsDisabled = msgScreen.find('.cc-messaging__send').at(0).props().disabled;
     expect(setTextToSend).toHaveBeenCalled();
-    expect(msgScreen.find('.cc-messaging__send').at(0).props().disabled).toBe(false);
+    expect(sendButtonIsDisabled).toBe(false);
     expect(msgScreen).toMatchSnapshot();
   });
 });
