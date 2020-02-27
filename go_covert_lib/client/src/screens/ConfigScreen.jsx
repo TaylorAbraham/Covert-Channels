@@ -180,7 +180,7 @@ const ConfigScreen = (props) => {
       <h3 className="m-1">Channel</h3>
       <Dropdown className="m-1">
         <Dropdown.Toggle
-          className="w-100"
+          className="cc-config__chan-select w-100"
           variant="outline-primary"
         >
           {channel.value || 'Select a Channel'}
@@ -280,7 +280,7 @@ const ConfigScreen = (props) => {
         <Button
           variant="success"
           onClick={openChannel}
-          className="m-1 w-100"
+          className="cc-config__submit m-1 w-100"
           hidden={Object.entries(channel).length === 0 && channel.constructor === Object}
         >
           Open Covert Channel

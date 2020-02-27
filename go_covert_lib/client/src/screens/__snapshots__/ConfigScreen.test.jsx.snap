@@ -1,0 +1,262 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Config Screen displays a configuration object correctly 1`] = `
+"<ConfigScreen openChannel={[Function: mockConstructor]} closeChannel={[Function: mockConstructor]} config={{...}} setConfig={[Function: mockConstructor]} processorList={{...}} processors={{...}} setProcessors={[Function: mockConstructor]} channelList={{...}} channel={{...}} setChannel={[Function: mockConstructor]} channelIsOpen={false}>
+  <div className=\\"m-2\\">
+    <h2 className=\\"m-1\\">
+      Configuration
+    </h2>
+    <h3 className=\\"m-1\\">
+      Processors
+    </h3>
+    <Button variant=\\"success\\" className=\\"m-1 w-100\\" onClick={[Function: onClick]} active={false} disabled={false} type=\\"button\\">
+      <button onClick={[Function: onClick]} disabled={false} type=\\"button\\" className=\\"m-1 w-100 btn btn-success\\">
+        Add Processor
+      </button>
+    </Button>
+    <h3 className=\\"m-1\\">
+      Channel
+    </h3>
+    <Dropdown className=\\"m-1\\" navbar={false}>
+      <ReactOverlaysDropdown drop={[undefined]} show={[undefined]} alignEnd={[undefined]} onToggle={[Function]} focusFirstItemOnShow={[undefined]} itemSelector=\\".dropdown-item:not(.disabled):not(:disabled)\\">
+        <div onKeyDown={[Function: handleKeyDown]} className=\\"m-1 dropdown\\">
+          <DropdownToggle className=\\"cc-config__chan-select w-100\\" variant=\\"outline-primary\\">
+            <Button onClick={[Function]} className=\\"cc-config__chan-select w-100 dropdown-toggle\\" aria-haspopup={true} aria-expanded={false} variant=\\"outline-primary\\" active={false} disabled={false} type=\\"button\\">
+              <button onClick={[Function]} aria-haspopup={true} aria-expanded={false} disabled={false} type=\\"button\\" className=\\"cc-config__chan-select w-100 dropdown-toggle btn btn-outline-primary\\">
+                Select a Channel
+              </button>
+            </Button>
+          </DropdownToggle>
+          <DropdownMenu className=\\"w-100\\" alignRight={false} flip={true} />
+        </div>
+      </ReactOverlaysDropdown>
+    </Dropdown>
+    <Button variant=\\"success\\" onClick={[Function: mockConstructor]} className=\\"cc-config__submit m-1 w-100\\" hidden={true} active={false} disabled={false} type=\\"button\\">
+      <button onClick={[Function: mockConstructor]} hidden={true} disabled={false} type=\\"button\\" className=\\"cc-config__submit m-1 w-100 btn btn-success\\">
+        Open Covert Channel
+      </button>
+    </Button>
+  </div>
+</ConfigScreen>"
+`;
+
+exports[`Config Screen displays a configuration object correctly 2`] = `
+"<ConfigScreen openChannel={[Function: mockConstructor]} closeChannel={[Function: mockConstructor]} config={{...}} setConfig={[Function: mockConstructor]} processorList={{...}} processors={{...}} setProcessors={[Function: mockConstructor]} channelList={{...}} channel={{...}} setChannel={[Function: mockConstructor]} channelIsOpen={false}>
+  <div className=\\"m-2\\">
+    <h2 className=\\"m-1\\">
+      Configuration
+    </h2>
+    <h3 className=\\"m-1\\">
+      Processors
+    </h3>
+    <Button variant=\\"success\\" className=\\"m-1 w-100\\" onClick={[Function: onClick]} active={false} disabled={false} type=\\"button\\">
+      <button onClick={[Function: onClick]} disabled={false} type=\\"button\\" className=\\"m-1 w-100 btn btn-success\\">
+        Add Processor
+      </button>
+    </Button>
+    <h3 className=\\"m-1\\">
+      Channel
+    </h3>
+    <Dropdown className=\\"m-1\\" navbar={false}>
+      <ReactOverlaysDropdown drop={[undefined]} show={false} alignEnd={[undefined]} onToggle={[Function]} focusFirstItemOnShow={[undefined]} itemSelector=\\".dropdown-item:not(.disabled):not(:disabled)\\">
+        <div onKeyDown={[Function: handleKeyDown]} className=\\"m-1 dropdown\\">
+          <DropdownToggle className=\\"cc-config__chan-select w-100\\" variant=\\"outline-primary\\">
+            <Button onClick={[Function]} className=\\"cc-config__chan-select w-100 dropdown-toggle\\" aria-haspopup={true} aria-expanded={false} variant=\\"outline-primary\\" active={false} disabled={false} type=\\"button\\">
+              <button onClick={[Function]} aria-haspopup={true} aria-expanded={false} disabled={false} type=\\"button\\" className=\\"cc-config__chan-select w-100 dropdown-toggle btn btn-outline-primary\\">
+                TcpSyn
+              </button>
+            </Button>
+          </DropdownToggle>
+          <DropdownMenu className=\\"w-100\\" alignRight={false} flip={true}>
+            <div x-placement=\\"bottom-start\\" aria-labelledby=\\"\\" style={{...}} className=\\"w-100 dropdown-menu\\">
+              <DropdownItem as=\\"option\\" active={true} onClick={[Function: onClick]} value=\\"TcpSyn\\" disabled={false}>
+                <option value=\\"TcpSyn\\" href={[undefined]} disabled={false} className=\\"dropdown-item active\\" onClick={[Function]}>
+                  TcpSyn
+                </option>
+              </DropdownItem>
+              <DropdownItem as=\\"option\\" active={false} onClick={[Function: onClick]} value=\\"TcpHandshake\\" disabled={false}>
+                <option value=\\"TcpHandshake\\" href={[undefined]} disabled={false} className=\\"dropdown-item\\" onClick={[Function]}>
+                  TcpHandshake
+                </option>
+              </DropdownItem>
+            </div>
+          </DropdownMenu>
+        </div>
+      </ReactOverlaysDropdown>
+    </Dropdown>
+    <IPInput label=\\"Friend\\\\'s IP\\" value=\\"127.0.0.1\\" tooltip=\\"Your friend\\\\'s IP address.\\" parentOnChange={[Function: parentOnChange]}>
+      <div>
+        <InputGroup className=\\"cc-ip-input m-1 w-100 \\">
+          <div className=\\"cc-ip-input m-1 w-100  input-group\\">
+            <InputGroupPrepend>
+              <div className=\\"input-group-prepend\\">
+                <InputGroupText className=\\"input-text\\">
+                  <span className=\\"input-text input-group-text\\">
+                    Friend&#39;s IP
+                  </span>
+                </InputGroupText>
+              </div>
+            </InputGroupPrepend>
+            <FormControl value=\\"127.0.0.1\\" onChange={[Function: onChange]} onBlur={[Function: onBlur]}>
+              <input value=\\"127.0.0.1\\" onChange={[Function: onChange]} onBlur={[Function: onBlur]} type={[undefined]} readOnly={[undefined]} id={[undefined]} className=\\"form-control\\" />
+            </FormControl>
+            <OverlayTrigger overlay={{...}} defaultOverlayShown={false} trigger={{...}}>
+              <RefHolder>
+                <span className=\\"cc-tooltip ml-1 mr-1\\" onFocus={[Function]} onBlur={[Function]} onMouseOver={[Function]} onMouseOut={[Function]}>
+                  <div className=\\"cc-tooltip__icon\\">
+                    ?
+                  </div>
+                </span>
+              </RefHolder>
+              <Overlay defaultOverlayShown={false} popperConfig={{...}} show={false} onHide={[Function]} target={[Function]} transition={{...}} rootClose={false} placement=\\"top\\">
+                <Overlay defaultOverlayShown={false} popperConfig={{...}} show={false} onHide={[Function]} target={[Function]} rootClose={false} placement=\\"top\\" transition={{...}} containerPadding={5} />
+              </Overlay>
+            </OverlayTrigger>
+          </div>
+        </InputGroup>
+      </div>
+    </IPInput>
+    <IPInput label=\\"Your IP\\" value=\\"127.0.0.1\\" tooltip=\\"Your IP address.\\" parentOnChange={[Function: parentOnChange]}>
+      <div>
+        <InputGroup className=\\"cc-ip-input m-1 w-100 \\">
+          <div className=\\"cc-ip-input m-1 w-100  input-group\\">
+            <InputGroupPrepend>
+              <div className=\\"input-group-prepend\\">
+                <InputGroupText className=\\"input-text\\">
+                  <span className=\\"input-text input-group-text\\">
+                    Your IP
+                  </span>
+                </InputGroupText>
+              </div>
+            </InputGroupPrepend>
+            <FormControl value=\\"127.0.0.1\\" onChange={[Function: onChange]} onBlur={[Function: onBlur]}>
+              <input value=\\"127.0.0.1\\" onChange={[Function: onChange]} onBlur={[Function: onBlur]} type={[undefined]} readOnly={[undefined]} id={[undefined]} className=\\"form-control\\" />
+            </FormControl>
+            <OverlayTrigger overlay={{...}} defaultOverlayShown={false} trigger={{...}}>
+              <RefHolder>
+                <span className=\\"cc-tooltip ml-1 mr-1\\" onFocus={[Function]} onBlur={[Function]} onMouseOver={[Function]} onMouseOut={[Function]}>
+                  <div className=\\"cc-tooltip__icon\\">
+                    ?
+                  </div>
+                </span>
+              </RefHolder>
+              <Overlay defaultOverlayShown={false} popperConfig={{...}} show={false} onHide={[Function]} target={[Function]} transition={{...}} rootClose={false} placement=\\"top\\">
+                <Overlay defaultOverlayShown={false} popperConfig={{...}} show={false} onHide={[Function]} target={[Function]} rootClose={false} placement=\\"top\\" transition={{...}} containerPadding={5} />
+              </Overlay>
+            </OverlayTrigger>
+          </div>
+        </InputGroup>
+      </div>
+    </IPInput>
+    <Button variant=\\"success\\" onClick={[Function: mockConstructor]} className=\\"cc-config__submit m-1 w-100\\" hidden={false} active={false} disabled={false} type=\\"button\\">
+      <button onClick={[Function: mockConstructor]} hidden={false} disabled={false} type=\\"button\\" className=\\"cc-config__submit m-1 w-100 btn btn-success\\">
+        Open Covert Channel
+      </button>
+    </Button>
+  </div>
+</ConfigScreen>"
+`;
+
+exports[`Config Screen submits a configuration correctly 1`] = `
+"<ConfigScreen openChannel={[Function: mockConstructor]} closeChannel={[Function: mockConstructor]} config={{...}} setConfig={[Function: mockConstructor]} processorList={{...}} processors={{...}} setProcessors={[Function: mockConstructor]} channelList={{...}} channel={{...}} setChannel={[Function: mockConstructor]} channelIsOpen={false}>
+  <div className=\\"m-2\\">
+    <h2 className=\\"m-1\\">
+      Configuration
+    </h2>
+    <h3 className=\\"m-1\\">
+      Processors
+    </h3>
+    <Button variant=\\"success\\" className=\\"m-1 w-100\\" onClick={[Function: onClick]} active={false} disabled={false} type=\\"button\\">
+      <button onClick={[Function: onClick]} disabled={false} type=\\"button\\" className=\\"m-1 w-100 btn btn-success\\">
+        Add Processor
+      </button>
+    </Button>
+    <h3 className=\\"m-1\\">
+      Channel
+    </h3>
+    <Dropdown className=\\"m-1\\" navbar={false}>
+      <ReactOverlaysDropdown drop={[undefined]} show={[undefined]} alignEnd={[undefined]} onToggle={[Function]} focusFirstItemOnShow={[undefined]} itemSelector=\\".dropdown-item:not(.disabled):not(:disabled)\\">
+        <div onKeyDown={[Function: handleKeyDown]} className=\\"m-1 dropdown\\">
+          <DropdownToggle className=\\"cc-config__chan-select w-100\\" variant=\\"outline-primary\\">
+            <Button onClick={[Function]} className=\\"cc-config__chan-select w-100 dropdown-toggle\\" aria-haspopup={true} aria-expanded={false} variant=\\"outline-primary\\" active={false} disabled={false} type=\\"button\\">
+              <button onClick={[Function]} aria-haspopup={true} aria-expanded={false} disabled={false} type=\\"button\\" className=\\"cc-config__chan-select w-100 dropdown-toggle btn btn-outline-primary\\">
+                TcpSyn
+              </button>
+            </Button>
+          </DropdownToggle>
+          <DropdownMenu className=\\"w-100\\" alignRight={false} flip={true} />
+        </div>
+      </ReactOverlaysDropdown>
+    </Dropdown>
+    <IPInput label=\\"Friend\\\\'s IP\\" value=\\"127.0.0.1\\" tooltip=\\"Your friend\\\\'s IP address.\\" parentOnChange={[Function: parentOnChange]}>
+      <div>
+        <InputGroup className=\\"cc-ip-input m-1 w-100 \\">
+          <div className=\\"cc-ip-input m-1 w-100  input-group\\">
+            <InputGroupPrepend>
+              <div className=\\"input-group-prepend\\">
+                <InputGroupText className=\\"input-text\\">
+                  <span className=\\"input-text input-group-text\\">
+                    Friend&#39;s IP
+                  </span>
+                </InputGroupText>
+              </div>
+            </InputGroupPrepend>
+            <FormControl value=\\"127.0.0.1\\" onChange={[Function: onChange]} onBlur={[Function: onBlur]}>
+              <input value=\\"127.0.0.1\\" onChange={[Function: onChange]} onBlur={[Function: onBlur]} type={[undefined]} readOnly={[undefined]} id={[undefined]} className=\\"form-control\\" />
+            </FormControl>
+            <OverlayTrigger overlay={{...}} defaultOverlayShown={false} trigger={{...}}>
+              <RefHolder>
+                <span className=\\"cc-tooltip ml-1 mr-1\\" onFocus={[Function]} onBlur={[Function]} onMouseOver={[Function]} onMouseOut={[Function]}>
+                  <div className=\\"cc-tooltip__icon\\">
+                    ?
+                  </div>
+                </span>
+              </RefHolder>
+              <Overlay defaultOverlayShown={false} popperConfig={{...}} show={false} onHide={[Function]} target={[Function]} transition={{...}} rootClose={false} placement=\\"top\\">
+                <Overlay defaultOverlayShown={false} popperConfig={{...}} show={false} onHide={[Function]} target={[Function]} rootClose={false} placement=\\"top\\" transition={{...}} containerPadding={5} />
+              </Overlay>
+            </OverlayTrigger>
+          </div>
+        </InputGroup>
+      </div>
+    </IPInput>
+    <IPInput label=\\"Your IP\\" value=\\"127.0.0.1\\" tooltip=\\"Your IP address.\\" parentOnChange={[Function: parentOnChange]}>
+      <div>
+        <InputGroup className=\\"cc-ip-input m-1 w-100 \\">
+          <div className=\\"cc-ip-input m-1 w-100  input-group\\">
+            <InputGroupPrepend>
+              <div className=\\"input-group-prepend\\">
+                <InputGroupText className=\\"input-text\\">
+                  <span className=\\"input-text input-group-text\\">
+                    Your IP
+                  </span>
+                </InputGroupText>
+              </div>
+            </InputGroupPrepend>
+            <FormControl value=\\"127.0.0.1\\" onChange={[Function: onChange]} onBlur={[Function: onBlur]}>
+              <input value=\\"127.0.0.1\\" onChange={[Function: onChange]} onBlur={[Function: onBlur]} type={[undefined]} readOnly={[undefined]} id={[undefined]} className=\\"form-control\\" />
+            </FormControl>
+            <OverlayTrigger overlay={{...}} defaultOverlayShown={false} trigger={{...}}>
+              <RefHolder>
+                <span className=\\"cc-tooltip ml-1 mr-1\\" onFocus={[Function]} onBlur={[Function]} onMouseOver={[Function]} onMouseOut={[Function]}>
+                  <div className=\\"cc-tooltip__icon\\">
+                    ?
+                  </div>
+                </span>
+              </RefHolder>
+              <Overlay defaultOverlayShown={false} popperConfig={{...}} show={false} onHide={[Function]} target={[Function]} transition={{...}} rootClose={false} placement=\\"top\\">
+                <Overlay defaultOverlayShown={false} popperConfig={{...}} show={false} onHide={[Function]} target={[Function]} rootClose={false} placement=\\"top\\" transition={{...}} containerPadding={5} />
+              </Overlay>
+            </OverlayTrigger>
+          </div>
+        </InputGroup>
+      </div>
+    </IPInput>
+    <Button variant=\\"success\\" onClick={[Function: mockConstructor]} className=\\"cc-config__submit m-1 w-100\\" hidden={false} active={false} disabled={false} type=\\"button\\">
+      <button onClick={[Function: mockConstructor]} hidden={false} disabled={false} type=\\"button\\" className=\\"cc-config__submit m-1 w-100 btn btn-success\\">
+        Open Covert Channel
+      </button>
+    </Button>
+  </div>
+</ConfigScreen>"
+`;
