@@ -2,7 +2,7 @@ import React from 'react';
 import { mount } from 'enzyme';
 import MessagingScreen from './MessagingScreen';
 
-describe('Messaging screen', () => {
+describe('Messaging Screen', () => {
   const covertMessages = [];
   const sendMessage = jest.fn();
   const textToSend = '';
@@ -28,16 +28,16 @@ describe('Messaging screen', () => {
     // Simulate typing a character
     msgScreen.find('.cc-messaging__input').at(0).simulate('change', { target: { value: 'a' } });
     sendButtonIsDisabled = msgScreen.find('.cc-messaging__send').at(0).props().disabled;
-    expect(setTextToSend).toHaveBeenCalled();
+    expect(setTextToSend).toHaveBeenCalledTimes(1);
     expect(sendButtonIsDisabled).toBe(false);
-    expect(msgScreen).toMatchSnapshot();
+    expect(msgScreen.debug()).toMatchSnapshot();
   });
 
   it('handles input submission', () => {
     msgScreen.find('.cc-messaging__input').at(0).simulate('change', { target: { value: 'a' } });
     const sendButton = msgScreen.find('.cc-messaging__send').at(0);
     sendButton.simulate('click');
-    expect(sendMessage).toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledTimes(1);
   });
 
   it('displays incoming messages', () => {
@@ -46,6 +46,6 @@ describe('Messaging screen', () => {
     msgScreen.setProps({ covertMessages: [msg1, msg2] });
     const outputField = msgScreen.find('.cc-messaging__output').at(0);
     expect(outputField.props().value).toEqual(`${msg1}\n${msg2}`);
-    expect(msgScreen).toMatchSnapshot();
+    expect(msgScreen.debug()).toMatchSnapshot();
   });
 });

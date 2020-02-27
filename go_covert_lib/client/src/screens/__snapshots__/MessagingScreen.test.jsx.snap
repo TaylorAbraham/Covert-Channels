@@ -1,15 +1,51 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Messaging screen displays incoming messages 1`] = `ReactWrapper {}`;
+exports[`Messaging Screen displays incoming messages 1`] = `
+"<MessagingScreen textToSend=\\"\\" setTextToSend={[Function: mockConstructor]} covertMessages={{...}} sendMessage={[Function: mockConstructor]}>
+  <div className=\\"cc-messaging m-2\\">
+    <h2 className=\\"m-1\\">
+      Messaging
+    </h2>
+    <FormControl as=\\"textarea\\" className=\\"cc-messaging__input w-75 m-1\\" value=\\"\\" onChange={[Function: onChange]}>
+      <textarea value=\\"\\" onChange={[Function: onChange]} type={[undefined]} readOnly={[undefined]} id={[undefined]} className=\\"cc-messaging__input w-75 m-1 form-control\\" />
+    </FormControl>
+    <Button variant=\\"primary\\" onClick={[Function: mockConstructor]} className=\\"cc-messaging__send m-1\\" disabled={true} active={false} type=\\"button\\">
+      <button onClick={[Function: mockConstructor]} disabled={true} type=\\"button\\" className=\\"cc-messaging__send m-1 btn btn-primary\\">
+        Send Message
+      </button>
+    </Button>
+    <br />
+    <div className=\\"m-1\\">
+      Incoming Messages
+    </div>
+    <FormControl as=\\"textarea\\" className=\\"cc-messaging__output w-75 m-1\\" value=\\"Coca-Cola\\\\nNever forget\\" readOnly={true}>
+      <textarea value=\\"Coca-Cola\\\\nNever forget\\" type={[undefined]} readOnly={true} id={[undefined]} className=\\"cc-messaging__output w-75 m-1 form-control\\" />
+    </FormControl>
+  </div>
+</MessagingScreen>"
+`;
 
-exports[`Messaging screen handles input in the input field 1`] = `ReactWrapper {}`;
-
-exports[`Messaging sescreen displays incoming messages 1`] = `ReactWrapper {}`;
-
-exports[`Messaging sescreen handles displaying messages 1`] = `ReactWrapper {}`;
-
-exports[`Messaging sescreen handles input in the input field 1`] = `ReactWrapper {}`;
-
-exports[`Messaging sescreen handles receiving a message 1`] = `ReactWrapper {}`;
-
-exports[`Messaging sescreen handles receiving messages 1`] = `ReactWrapper {}`;
+exports[`Messaging Screen handles input in the input field 1`] = `
+"<MessagingScreen textToSend=\\"a\\" setTextToSend={[Function: mockConstructor]} covertMessages={{...}} sendMessage={[Function: mockConstructor]}>
+  <div className=\\"cc-messaging m-2\\">
+    <h2 className=\\"m-1\\">
+      Messaging
+    </h2>
+    <FormControl as=\\"textarea\\" className=\\"cc-messaging__input w-75 m-1\\" value=\\"a\\" onChange={[Function: onChange]}>
+      <textarea value=\\"a\\" onChange={[Function: onChange]} type={[undefined]} readOnly={[undefined]} id={[undefined]} className=\\"cc-messaging__input w-75 m-1 form-control\\" />
+    </FormControl>
+    <Button variant=\\"primary\\" onClick={[Function: mockConstructor]} className=\\"cc-messaging__send m-1\\" disabled={false} active={false} type=\\"button\\">
+      <button onClick={[Function: mockConstructor]} disabled={false} type=\\"button\\" className=\\"cc-messaging__send m-1 btn btn-primary\\">
+        Send Message
+      </button>
+    </Button>
+    <br />
+    <div className=\\"m-1\\">
+      Incoming Messages
+    </div>
+    <FormControl as=\\"textarea\\" className=\\"cc-messaging__output w-75 m-1\\" value=\\"\\" readOnly={true}>
+      <textarea value=\\"\\" type={[undefined]} readOnly={true} id={[undefined]} className=\\"cc-messaging__output w-75 m-1 form-control\\" />
+    </FormControl>
+  </div>
+</MessagingScreen>"
+`;
