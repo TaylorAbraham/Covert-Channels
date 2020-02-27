@@ -31,7 +31,7 @@ const MessagingScreen = (props) => {
       <div className="m-1">Incoming Messages</div>
       <FormControl
         as="textarea"
-        className="w-75 m-1"
+        className="cc-messaging__output w-75 m-1"
         value={covertMessages.join('\n')}
         readOnly
       />

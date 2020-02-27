@@ -1,3 +1,15 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`Messaging screen displays incoming messages 1`] = `ReactWrapper {}`;
+
+exports[`Messaging screen handles input in the input field 1`] = `ReactWrapper {}`;
+
+exports[`Messaging sescreen displays incoming messages 1`] = `ReactWrapper {}`;
+
+exports[`Messaging sescreen handles displaying messages 1`] = `ReactWrapper {}`;
+
 exports[`Messaging sescreen handles input in the input field 1`] = `ReactWrapper {}`;
+
+exports[`Messaging sescreen handles receiving a message 1`] = `ReactWrapper {}`;
+
+exports[`Messaging sescreen handles receiving messages 1`] = `ReactWrapper {}`;
