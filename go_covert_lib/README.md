@@ -1,14 +1,53 @@
-Covert Channel
+A Toolkit for Constructing Covert Channels
 ==============
 
-To create the server:
+- [Installation / First-Time Setup](#installation--first-time-setup)
+  * [System Requirements](#system-requirements)
+  * [Dependencies](#dependencies)
+  * [Building the Application](#building-the-application)
+  * [Running the Application](#running-the-application)
+- [Other Examples](#other-examples)
+  * [Sender / Receiver Example](#sender--receiver-example)
 
-Build the code.
+# Installation / First-Time Setup
+A video demonstrating the setup process is available [by clicking here!](http://google.com)
+
+## System Requirements
+* This application runs on a Linux OS. It has been tested on Ubuntu 18 LTS, but is likely to work on other up-to-date Linux distributions.
+* It may work on Mac OS, but this is untested.
+* It will not work on Windows. This can be bypassed by using the Windows Subsytem for Linux (WSL) V2+, but this is not a recommended approach unless you are already highly familiar with it.
+* A virtual machine will **not** work.
+
+## Dependencies
+The following applications must be installed on the system. For setup instructions using Ubuntu 18, refer to the video linked below.
+* Node.JS version 12+
+* GoLang version 1.13+
+
+Using Ubuntu, the commands to install those would be as follows.
+```
+curl -sL https://deb.nodesource.com/setup_13.x | sudo -E bash -
+sudo apt install -y nodejs
+cd ~
+wget https://dl.google.com/go/go1.13.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.13.linux-amd64.tar.gz
+echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bash_profile
+```
+
+Verify these are installed and are the correct versions with the following commands:
+```
+nodejs -v
+go version
+```
+
+## Building the Application
+First, clone this repository to anywhere on your system. Open a terminal and navigate to the directory of this readme.
+
+Now, build the server:
 ```
 go build main.go
 ```
 
-Build the client.
+Lastly, build the client.
 ```
 cd client
 npm install
@@ -16,29 +55,20 @@ npm run build
 cd ..
 ```
 
-Run two instances of the server with different websocket ports (must run in super user mode).
-In one terminal, run:
+## Running the Application
+The server can be started through `sudo ./main -p <PORT>`. The -p flag is used to specify which port the server will run on. Note that superuser privilege (sudo) is required to run the application. An example of starting a server on port 8080 is as follows:
 ```
 sudo ./main -p 8080
 ```
-In a second terminal, run:
-```
-sudo ./main -p 8081
-```
 
-Open a browser tab and navigate to localhost:8080, and in another tab localhost:8081. The client will automatically connect to the server running at that port.
+Open a browser tab and navigate to localhost:8080 (or the port you chose). The client will automatically connect to the server running at that port, and the web interface of the application will be displayed.
 
-The config will open for the TCP covert channel. You will see inputs for FriendPort and
-OriginPort. These should start at 8123 and 8124. In one of the open tabs, switch these 
-ports (to 8124 and 8123 for the FriendPort and OriginPort). This will set up a channel that
-is complementary to the other channel.
+## Verifying the Application Works
+For a simple verification of functionality, open another terminal and launch a second server at port 8081. In another tab of your browser, navigate to localhost:8081. In this tab, set the channel type to "TCPSyn". Next, swap the values of the "Friend's Port" and "Your Port" and click the "Open Channel" button at the very bottom of the page. Do the same with your client opened on localhost:8080, but DO NOT switch port values. This will open up two complimentary channels which can communicate to each other.
 
-In both taps, click the `Open` button. If everything works, you should now be able to 
-exchange messages by typing into the input and clicking the `Send` button.
+Now navigate to the "Messaging" tab of each client. Here, try sending a message and it should be received on the other client. If this is the case, the application is successfully producing covert communication!
 
-Covert Channel
-==============
-
+# Other Examples
 The following contains a simple covert channel implemented
 with the TCP protocol.
 
@@ -62,8 +92,7 @@ of message transmission:
 	but hypothetically users could set it to a large time or even a random 
 	number based on some distribution to better match internet traffic.
 
-# Example
-
+## Sender / Receiver Example
 To run this example you will need to install rust.
 Instructions for installing can be found online.
 
