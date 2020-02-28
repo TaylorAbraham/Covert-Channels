@@ -115,10 +115,10 @@ const App = () => {
 
   useEffect(() => {
     // Matches just the "127.0.0.1:8080" portion of the address
-    // const addressRegex = /[a-zA-Z0-9.]+:[\d]+/g;
-    // const newWS = new WebSocket(`ws://${window.location.href.match(addressRegex)[0]}/api/ws`);
+    const addressRegex = /[a-zA-Z0-9.]+:[\d]+/g;
+    const newWS = new WebSocket(`ws://${window.location.href.match(addressRegex)[0]}/api/ws`);
     // TODO: The line below exists for easy personal debugging
-    const newWS = new WebSocket('ws://localhost:8080/api/ws');
+    // const newWS = new WebSocket('ws://localhost:8080/api/ws');
     newWS.binaryType = 'arraybuffer';
     newWS.onopen = _e => sendInitialConfig(newWS);
     newWS.onerror = _e => console.log('UNIMPLEMENTED'); // TODO:
