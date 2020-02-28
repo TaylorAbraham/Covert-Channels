@@ -8,6 +8,7 @@ import ConfigScreen from './screens/ConfigScreen';
 import Console from './screens/Console';
 import './styles.scss';
 import MessagingScreen from './screens/MessagingScreen';
+import HelpScreen from './screens/HelpScreen';
 
 const Screens = Object.freeze({
   CONFIG: 'config',
@@ -170,6 +171,8 @@ const App = () => {
               covertMessages={covertMessages}
               sendMessage={sendMessage}
             />
+          ) : (screen === Screens.HELP) ? (
+            <HelpScreen />
           ) : (
             <div>UNIMPLEMENTED</div>
           )}
