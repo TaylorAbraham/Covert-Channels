@@ -43,6 +43,7 @@ First, clone this repository to anywhere on your system. Open a terminal and nav
 
 Now, build the server:
 ```
+go get github.com/google/gopacket github.com/gorilla/websocket golang.org/x/net/ipv4
 go build main.go
 ```
 
