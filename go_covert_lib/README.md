@@ -25,9 +25,8 @@ The following applications must be installed on the system. For setup instructio
 
 Using Ubuntu, the commands to install those would be as follows.
 ```
-curl -sL https://deb.nodesource.com/setup_13.x | sudo -E bash -
-sudo apt install -y nodejs
-cd ~
+wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.2/install.sh | bash
+nvm install node
 wget https://dl.google.com/go/go1.13.linux-amd64.tar.gz
 sudo tar -C /usr/local -xzf go1.13.linux-amd64.tar.gz
 echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bash_profile
