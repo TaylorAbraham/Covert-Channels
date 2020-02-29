@@ -1,11 +1,15 @@
 A Toolkit for Constructing Covert Channels
 ==============
 
+- [Background](#background)
+- [System Functionality](#system-functionality)
 - [Installation / First-Time Setup](#installation--first-time-setup)
   * [System Requirements](#system-requirements)
   * [Dependencies](#dependencies)
   * [Building the Application](#building-the-application)
   * [Running the Application](#running-the-application)
+  * [Verifying the Application Works](#verifying-the-application-works)
+- [Help Page](#help-page)
 - [Other Examples](#other-examples)
   * [Sender / Receiver Example](#sender--receiver-example)
 
@@ -20,7 +24,7 @@ The purpose of the system is to be used as a research tool in the area of covert
 The user will interact with the system through a web application interface in which they will be able to interact with the covert channels. The user can create covert channels, configure them, and send covert messages across them. The user has the option to select from a variety of network protocols, encryption methods, and compression techniques to aid in the concealment of the message. Upon inputting this information through the web application front end, it will then be communicated to the back end program that handles the network connections and logic of the system. The information will then be communicated across to another computer running the system. These user interactions with the system will be detailed in the following sections.
 
 # Installation / First-Time Setup
-A video demonstrating the setup process is available [by clicking here!](http://google.com)
+A video demonstrating the setup process is available coming soon!
 
 ## System Requirements
 * This application runs on a Linux OS. It has been tested on Ubuntu 18 LTS, but is likely to work on other up-to-date Linux distributions.
