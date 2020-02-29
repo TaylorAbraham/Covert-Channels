@@ -39,11 +39,23 @@ go version
 ```
 
 ## Building the Application
-First, clone this repository to anywhere on your system. Open a terminal and navigate to the directory of this readme.
+First, clone this repository to anywhere on your system. 
+```
+git clone https://github.com/TaylorAbraham/Covert-Channels.git
+```
+
+Open a terminal and navigate to the directory of this readme.
+```
+cd Covert-Channels/go\_covert\_lib/
+```
+
+Install go dependencies.
+```
+go get github.com/google/gopacket github.com/gorilla/websocket golang.org/x/net/ipv4
+```
 
 Now, build the server:
 ```
-go get github.com/google/gopacket github.com/gorilla/websocket golang.org/x/net/ipv4
 go build main.go
 ```
 
