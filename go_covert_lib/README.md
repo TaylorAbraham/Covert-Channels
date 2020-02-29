@@ -9,6 +9,16 @@ A Toolkit for Constructing Covert Channels
 - [Other Examples](#other-examples)
   * [Sender / Receiver Example](#sender--receiver-example)
 
+# Background
+A covert channel is a messaging system that sends messages in a manner that attempts to prevent outside observers from realising the existence or nature of the communication. The system allows users to select from a set of covert channel implementations, configure the channels, and exchange messages with a peer user via said channel.
+
+The system is designed to help researchers investigate the nature of covert channel communication, allowing them to investigate detection methods for covert channels as well as the feasibility of sending messages in a covert manner.
+
+The purpose of the system is to be used as a research tool in the area of covert channel communication. To do so we have constructed a system that implements a set of covert channels that a user can select and configure for transmitting covert information over computer networks. These coverts channels will be implemented using a variety of common internet protocols to help obscure covert messages within normal traffic. This will be accomplished by burying information alongside modifying the existing information within the data packets. The packet will then be reassembled on the receiver side to display the covert message.
+
+# System Functionality
+The user will interact with the system through a web application interface in which they will be able to interact with the covert channels. The user can create covert channels, configure them, and send covert messages across them. The user has the option to select from a variety of network protocols, encryption methods, and compression techniques to aid in the concealment of the message. Upon inputting this information through the web application front end, it will then be communicated to the back end program that handles the network connections and logic of the system. The information will then be communicated across to another computer running the system. These user interactions with the system will be detailed in the following sections.
+
 # Installation / First-Time Setup
 A video demonstrating the setup process is available [by clicking here!](http://google.com)
 
@@ -67,6 +77,10 @@ Open a browser tab and navigate to localhost:8080 (or the port you chose). The c
 For a simple verification of functionality, open another terminal and launch a second server at port 8081. In another tab of your browser, navigate to localhost:8081. In this tab, set the channel type to "TCPSyn". Next, swap the values of the "Friend's Port" and "Your Port" and click the "Open Channel" button at the very bottom of the page. Do the same with your client opened on localhost:8080, but DO NOT switch port values. This will open up two complimentary channels which can communicate to each other.
 
 Now navigate to the "Messaging" tab of each client. Here, try sending a message and it should be received on the other client. If this is the case, the application is successfully producing covert communication!
+
+# Help Page
+The help page in the application displays more information on the application as well as some simple usage instructions.
+![Help Page Screenshot](resources/HelpPage.png)
 
 # Other Examples
 The following contains a simple covert channel implemented
