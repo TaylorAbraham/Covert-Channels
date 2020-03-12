@@ -7,6 +7,7 @@ import Checkbox from '../ui-components/Checkbox';
 import IPInput from '../ui-components/IPInput';
 import NumberInput from '../ui-components/NumberInput';
 import Select from '../ui-components/Select';
+import StringInput from '../ui-components/StringInput';
 import TextArea from '../ui-components/TextArea';
 
 const ConfigScreen = (props) => {
@@ -141,7 +142,7 @@ const ConfigScreen = (props) => {
                     />
                   );
                 case 'exactu64':
-                  return (<div>EXACTU64</div>);
+                  return (<StringInput {...propsForComponent} />);
                 case 'bool':
                   return (
                     <Checkbox
@@ -256,7 +257,7 @@ const ConfigScreen = (props) => {
               />
             );
           case 'exactu64':
-            return (<div>EXACTU64</div>);
+            return (<StringInput {...propsForComponent} />);
           case 'bool':
             return (
               <Checkbox
