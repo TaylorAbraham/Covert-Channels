@@ -3,10 +3,11 @@ import PropTypes from 'prop-types';
 import Button from 'react-bootstrap/Button';
 import Dropdown from 'react-bootstrap/Dropdown';
 
+import Checkbox from '../ui-components/Checkbox';
 import IPInput from '../ui-components/IPInput';
 import NumberInput from '../ui-components/NumberInput';
-import Checkbox from '../ui-components/Checkbox';
 import Select from '../ui-components/Select';
+import TextArea from '../ui-components/TextArea';
 
 const ConfigScreen = (props) => {
   const {
@@ -110,7 +111,6 @@ const ConfigScreen = (props) => {
                 case 'i8':
                 case 'u16':
                 case 'u64':
-                case 'exactu64':
                   if (opt.Range) {
                     propsForComponent = {
                       ...propsForComponent,
@@ -140,6 +140,8 @@ const ConfigScreen = (props) => {
                       ])}
                     />
                   );
+                case 'exactu64':
+                  return (<div>EXACTU64</div>);
                 case 'bool':
                   return (
                     <Checkbox
@@ -170,6 +172,10 @@ const ConfigScreen = (props) => {
                       items={opt.Range}
                     />
                   );
+                case 'hexkey':
+                  return (<div>hexkey</div>);
+                case 'key':
+                  return (<TextArea {...propsForComponent} />);
                 default:
                   return (<div key={key}>UNIMPLEMENTED</div>);
               }
@@ -230,7 +236,6 @@ const ConfigScreen = (props) => {
           case 'i8':
           case 'u16':
           case 'u64':
-          case 'exactu64':
             if (opt.Range) {
               propsForComponent = {
                 ...propsForComponent,
@@ -250,6 +255,8 @@ const ConfigScreen = (props) => {
                 })}
               />
             );
+          case 'exactu64':
+            return (<div>EXACTU64</div>);
           case 'bool':
             return (
               <Checkbox
@@ -270,6 +277,10 @@ const ConfigScreen = (props) => {
                 items={opt.Range}
               />
             );
+          case 'hexkey':
+            return (<div>hexkey</div>);
+          case 'key':
+            return (<TextArea {...propsForComponent} />);
           default:
             return (<div key={key}>UNIMPLEMENTED</div>);
         }
