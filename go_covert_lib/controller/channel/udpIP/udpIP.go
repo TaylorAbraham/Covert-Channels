@@ -82,7 +82,14 @@ type Channel struct {
 }
 
 func (c *Channel) Close() error {
-	return nil
+	select {
+		// Have we already closed
+		case <-c.cancel:
+			return nil
+		default:
+			close(c.cancel)
+		}
+	return c.rawConn.Close()
 }
 
 type UdpEncoder interface {
@@ -123,6 +130,10 @@ func MakeChannel(conf Config) (*Channel, error) {
 		writeMutex: &sync.Mutex{},
 		// Only 32 connections can be accepted before they begin to be dropped
 		acceptChan: make(chan acceptedConn, maxAccept),
+	}
+
+	if c.conf.Encoder == nil {
+		c.conf.Encoder = &IDEncoder{}
 	}
 
 	//ip network with udp protocol
@@ -206,11 +217,6 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 
 	//last payload determining the end of the message
 	var payload []byte = make([]byte, 24) //length 24 signifies the end of the message
-
-	var x []byte = make([]byte, 2)
-	if ipv4h, udph, rem, err = c.conf.Encoder.SetByte(ipv4h, udph, x); err != nil {
-		return n, err
-	}
 
 	if wbuf, udph, err = createUDPHeader(udph, c.conf.OriginIP, c.conf.FriendIP, c.conf.OriginReceivePort, c.conf.FriendReceivePort, payload); err != nil {
 		return n, err
@@ -306,14 +312,14 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 			// We check for the expected source IP, source port, and destination port
 			if bytes.Equal(h.Src.To4(), saddr[:]) {
 				if udph.SrcPort == layers.UDPPort(sport) && udph.DstPort == layers.UDPPort(dport) {
-					if(udph.Length == uint16(24)) { //end of message
+					if(udph.Length == uint16(32)) { //end of message
 						return pos, err
-					}else if(udph.Length == uint16(26)) { //the rest of the message
+					}else if(udph.Length == uint16(34)) { //the rest of the message
 						b, err := c.conf.Encoder.GetByte(*h, udph)
 						if err != nil {
 							return pos, err
 						}
-						if (pos == uint64(len(data))) { //overflow
+						if ((pos + uint64(len(b))) >= uint64(len(data))) { //overflow
 							return pos, errors.New("Overflow. End of message never received.")
 						}else { //add data to array, increment pos
 							i := 0
@@ -356,7 +362,7 @@ func createIPHeader(sip, dip [4]byte) ipv4.Header {
 		TOS:      0,
 		FragOff:  0,
 		TTL:      64,
-		Protocol: 6,
+		Protocol: 17,
 		Src:      sip[:],
 		Dst:      dip[:],
 	}

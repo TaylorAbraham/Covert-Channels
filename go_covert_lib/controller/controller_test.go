@@ -357,6 +357,40 @@ func TestMessageExchange(t *testing.T) {
 				conf.Channel.Data.TcpSyn.OriginPort.Value = 8090
 			},
 		},
+		channelTest{
+			name: "UdpNormal",
+			f1: func(conf *configData) {
+				conf.Channel.Data.UdpNormal.DestinationPort.Value = 8090
+				conf.Channel.Data.UdpNormal.OriginPort.Value = 8091
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.UdpNormal.DestinationPort.Value = 8091
+				conf.Channel.Data.UdpNormal.OriginPort.Value = 8090
+			},
+		},
+		channelTest{
+			name: "UdpIP",
+			f1: func(conf *configData) {
+				conf.Channel.Data.UdpIP.FriendReceivePort.Value = 8090
+				conf.Channel.Data.UdpIP.OriginReceivePort.Value = 8091
+
+				conf.Processors = []processorConfig{
+					processorConfig{
+						Type: "Caesar", Data: defaultProcessor(),
+					},
+				}
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.UdpIP.FriendReceivePort.Value = 8091
+				conf.Channel.Data.UdpIP.OriginReceivePort.Value = 8090
+
+				conf.Processors = []processorConfig{
+					processorConfig{
+						Type: "Caesar", Data: defaultProcessor(),
+					},
+				}
+			},
+		},
 	}
 
 	messages := []string{"", "A", "Hello World!", "🍌", "🍌🍌🍌", "Hello\nNewline!"}

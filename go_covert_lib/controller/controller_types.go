@@ -7,6 +7,8 @@ import (
 	"./channel/tcpHandshake"
 	"./channel/tcpNormal"
 	"./channel/tcpSyn"
+	"./channel/udpNormal"
+	"./channel/udpIP"
 	"./processor"
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
@@ -62,6 +64,8 @@ type channelData struct {
 	TcpSyn       tcpSyn.ConfigClient
 	TcpHandshake tcpHandshake.ConfigClient
 	TcpNormal    tcpNormal.ConfigClient
+	UdpNormal	udpNormal.ConfigClient
+	UdpIP	udpIP.ConfigClient
 }
 
 type processorData struct {
