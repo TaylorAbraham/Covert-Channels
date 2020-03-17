@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net"
 	"time"
+	"../embedders"
 )
 
 const (
@@ -58,48 +59,6 @@ type Config struct {
 	ReadTimeout  time.Duration
 }
 
-// An encoded may be provided to the TCP Channel
-// to configure where the covert message is hidden
-// A method is used to hide the byte during sending, and a second is used
-// extract it during reception
-type TcpEncoder interface {
-	// We use the prevSequence to indicate duplicate packets arriving
-	// on from the bouncer socket. It is this function's responsibility
-	// to ensure that any modifications to the tcp header ensure that the
-	// new sequence number is different than the previous sequence number
-	SetByte(tcph layers.TCP, b byte, prevSequence uint32) (layers.TCP, error)
-	GetByte(tcph layers.TCP, bounce bool) (byte, error)
-}
-
-// The default TcpEncoder that hides the covert message in the
-// sequence number
-type SeqEncoder struct{}
-
-// Since this function explicitely modifies the sequence number, we must ensure
-// we generate a random one in the same way as createPacket
-// Other implementations of this function may use other headers, and so would
-// not be required to duplicate this
-func (s *SeqEncoder) SetByte(tcph layers.TCP, b byte, prevSequence uint32) (layers.TCP, error) {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	tcph.Seq = (r.Uint32() & 0xFFFFFF00) | uint32(b)
-	// We hide the byte in the low 8 bits of the randomly generated sequence number
-	for tcph.Seq == prevSequence {
-		tcph.Seq = (r.Uint32() & 0xFFFFFF00) | uint32(b)
-	}
-	return tcph, nil
-}
-
-// Retrieve the byte from a packet encoded by the sequence number Encoder
-// If this covert channel was using the bounce functionality then the
-// value is moved to the acknowledgement number by the legitimate TCP socket
-func (s *SeqEncoder) GetByte(tcph layers.TCP, bounce bool) (byte, error) {
-	if bounce {
-		return byte((0xFF & tcph.Ack) - 1), nil
-	} else {
-		return byte(0xFF & tcph.Seq), nil
-	}
-}
-
 // A TCP covert channel
 type Channel struct {
 	conf        Config
@@ -115,7 +74,7 @@ type Channel struct {
 func MakeChannel(conf Config) (*Channel, error) {
 	c := &Channel{conf: conf, writeCancel: make(chan bool)}
 	if c.conf.Encoder == nil {
-		c.conf.Encoder = &SeqEncoder{}
+		c.conf.Encoder = &embedders.TcpIpSeqEncoder{}
 	}
 
 	conn, err := net.ListenPacket("ip4:6", "0.0.0.0")
@@ -141,7 +100,7 @@ func MakeChannel(conf Config) (*Channel, error) {
 // in which case data will have valid received bytes up to that point.
 func (c *Channel) Receive(data []byte) (uint64, error) {
 
-	if len(data) == 0 {
+	if len(data) == 0 && c.conf.Delimiter != Protocol{
 		return 0, nil
 	}
 
@@ -189,11 +148,12 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 							return pos, nil
 						}
 					}
+					// If in bounce mode, we extract the original sequence number
+					// from the acknowledgement number
 					if c.conf.Bounce {
-						prev_val = tcph.Ack
-					} else {
-						prev_val = tcph.Seq
+						tcph.Seq = tcph.Ack - 1
 					}
+					prev_val = tcph.Seq
 
 					// Check the expected flags
 					if (c.conf.Bounce && tcph.SYN && tcph.ACK) || (!c.conf.Bounce && tcph.SYN && !tcph.ACK) {
@@ -201,30 +161,33 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 							prev_val = current_val
 							first = false
 
-							b, err := c.conf.Encoder.GetByte(tcph, c.conf.Bounce)
+							buf, err := c.conf.Encoder.GetByte(*h, tcph)
 							if err != nil {
 								return pos, err
 							}
-							// Make sure we don't overflow the buffer
-							// The buffer can only overflow if we are in protocol delimiter mode
-							// Once the buffer fills in protocol delimiter mode we
-							// wait for the end packet. If a packet arrives that does not
-							// have the expected flags then we will reach this statement
-							// and be unable to put the new byte into the buffer
-							// In that case we return with an error indicating buffer overflow
-							// (see below)
-							if pos < uint64(len(data)) {
-								data[pos] = b
-							} else if pos == uint64(len(data)) && c.conf.Delimiter == Protocol {
-								// If we are using the protocol delimiter, then we can fill the full
-								// buffer and then wait for the end packet. It is only if more bytes
-								// are received that we must notify of an error
-								return pos, errors.New("End packet not received, buffer full")
-							}
-							pos += 1
-							// We have filled the buffer without protocol delimiter and we should return immediately
-							if pos == uint64(len(data)) && c.conf.Delimiter != Protocol {
-								return pos, nil
+
+							for _, b := range buf {
+								// Make sure we don't overflow the buffer
+								// The buffer can only overflow if we are in protocol delimiter mode
+								// Once the buffer fills in protocol delimiter mode we
+								// wait for the end packet. If a packet arrives that does not
+								// have the expected flags then we will reach this statement
+								// and be unable to put the new byte into the buffer
+								// In that case we return with an error indicating buffer overflow
+								// (see below)
+								if pos < uint64(len(data)) {
+									data[pos] = b
+								} else if pos == uint64(len(data)) && c.conf.Delimiter == Protocol {
+									// If we are using the protocol delimiter, then we can fill the full
+									// buffer and then wait for the end packet. It is only if more bytes
+									// are received that we must notify of an error
+									return pos, errors.New("End packet not received, buffer full")
+								}
+								pos += 1
+								// We have filled the buffer without protocol delimiter and we should return immediately
+								if pos == uint64(len(data)) && c.conf.Delimiter != Protocol {
+									return pos, nil
+								}
 							}
 							prevPacketTime = time.Now()
 						}
@@ -244,20 +207,21 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 // inter packet delay to help obscure the communication.
 // We return the number of bytes sent even if an error is encountered
 func (c *Channel) Send(data []byte) (uint64, error) {
-	// We make it clear that the error always starts as nil
-	var err error = nil
 
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+  r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	var (
 		prevSequence uint32 = r.Uint32()
 		saddr, daddr [4]byte
 		sport, dport uint16
 		num          uint64 = 0
-		h            *ipv4.Header
+		h            ipv4.Header
 		p            []byte
-		cm           *ipv4.ControlMessage
+		cm           ipv4.ControlMessage
 		wait         time.Duration
+		tcph 				 layers.TCP
+	  // We make it clear that the error always starts as nil
+		err					 error = nil
 	)
 
 	// The source and destination depend on whether or not we are in bounce mode
@@ -267,16 +231,22 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		saddr, daddr, sport, dport = c.conf.OriginIP, c.conf.FriendIP, c.conf.OriginPort, c.conf.FriendPort
 	}
 
-	for _, b := range data {
-		h = c.createIPHeader(saddr, daddr)
-		cm = c.createCM(saddr, daddr)
+	for len(data) > 0 {
+		h = createIPHeader(saddr, daddr)
+		cm = createCM(saddr, daddr)
 
-		p, prevSequence, err = c.createTcpHeadBuf(b, prevSequence, layers.TCP{SYN: true}, saddr, daddr, sport, dport)
+		h, tcph, data, err = c.createTcpHead(h, layers.TCP{SYN: true}, data, prevSequence)
+		if err != nil {
+			return num, err
+		}
+		prevSequence = tcph.Seq
+
+		p, err = createTcpHeadBuf(tcph, saddr, daddr, sport, dport)
 		if err != nil {
 			return num, err
 		}
 
-		if err = c.writeConn(h, p, cm); err != nil {
+		if err = c.writeConn(&h, p, &cm); err != nil {
 			return num, err
 		}
 
@@ -302,15 +272,21 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	// If we are using Protocol delimiting, we must send a final
 	// ACK packet to alert the receiver that the message is done sending
 	if c.conf.Delimiter == Protocol {
-		h = c.createIPHeader(saddr, daddr)
-		cm = c.createCM(saddr, daddr)
+		h = createIPHeader(saddr, daddr)
+		cm = createCM(saddr, daddr)
 
-		p, prevSequence, err = c.createTcpHeadBuf(uint8(r.Uint32()), prevSequence, layers.TCP{ACK: true}, saddr, daddr, sport, dport)
+		h, tcph, _, err = c.createTcpHead(h, layers.TCP{ACK: true}, []byte{byte(r.Uint32())},prevSequence)
+		if err != nil {
+			return num, err
+		}
+		prevSequence = tcph.Seq
+
+		p, err = createTcpHeadBuf(tcph, saddr, daddr, sport, dport)
 		if err != nil {
 			return num, err
 		}
 
-		if err = c.writeConn(h, p, cm); err != nil {
+		if err = c.writeConn(&h, p, &cm); err != nil {
 			return num, err
 		}
 	}
@@ -360,8 +336,8 @@ func (c *Channel) writeConn(h *ipv4.Header, p []byte, cm *ipv4.ControlMessage) e
 }
 
 // Creates the ip header message
-func (c *Channel) createIPHeader(sip, dip [4]byte) *ipv4.Header {
-	return &ipv4.Header{
+func createIPHeader(sip, dip [4]byte) ipv4.Header {
+	return ipv4.Header{
 		Version:  4,
 		Len:      20,
 		TOS:      0,
@@ -375,13 +351,32 @@ func (c *Channel) createIPHeader(sip, dip [4]byte) *ipv4.Header {
 }
 
 // Creates the control message
-func (c *Channel) createCM(sip, dip [4]byte) *ipv4.ControlMessage {
-	return &ipv4.ControlMessage{
+func createCM(sip, dip [4]byte) ipv4.ControlMessage {
+	return ipv4.ControlMessage{
 		TTL:     64,
 		Src:     sip[:],
 		Dst:     dip[:],
 		IfIndex: 0,
 	}
+}
+
+func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, prevSequence uint32) (ipv4.Header, layers.TCP, []byte, error) {
+	// Based on a preliminary investigation of my machine (running Ubuntu 18.04),
+	// SYN packets always seem to have a window of 65495
+	tcph.Window = 65495
+
+	// We must generate a random TCP sequence number.
+	// Changes in sequence number are used in bounce mode to detect duplicate
+	// SYN/ACK packets from the legitimate TCP server
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	tcph.Seq = r.Uint32() & 0xFFFFFFFF
+
+	newipv4h, newtcph, newbuf, _, err := c.conf.Encoder.SetByte(ipv4h, tcph, buf)
+	if tcph.Seq == prevSequence {
+		tcph.Seq = r.Uint32() & 0xFFFFFFFF
+		newipv4h, newtcph, newbuf, _, err =c.conf.Encoder.SetByte(ipv4h, tcph, buf)
+	}
+	return newipv4h, newtcph, newbuf, err
 }
 
 // Create the TCP header IP payload
@@ -392,7 +387,7 @@ func (c *Channel) createCM(sip, dip [4]byte) *ipv4.ControlMessage {
 // better resemble normal traffic
 // The data byte b will be added to the tcp header as specified by the
 // Encoder in the configuration
-func (c *Channel) createTcpHeadBuf(b byte, prevSequence uint32, tcph layers.TCP, sip, dip [4]byte, sport, dport uint16) ([]byte, uint32, error) {
+func createTcpHeadBuf(tcph layers.TCP, sip, dip [4]byte, sport, dport uint16) ([]byte, error) {
 	var err error
 
 	iph := layers.IPv4{
@@ -406,22 +401,9 @@ func (c *Channel) createTcpHeadBuf(b byte, prevSequence uint32, tcph layers.TCP,
 
 	tcph.SrcPort = layers.TCPPort(sport)
 	tcph.DstPort = layers.TCPPort(dport)
-	// Based on a preliminary investigation of my machine (running Ubuntu 18.04),
-	// SYN packets always seem to have a window of 65495
-	tcph.Window = 65495
-
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	tcph.Seq = r.Uint32() & 0xFFFFFFFF
-	for tcph.Seq == prevSequence {
-		tcph.Seq = r.Uint32() & 0xFFFFFFFF
-	}
-	tcph, err = c.conf.Encoder.SetByte(tcph, b, prevSequence)
-	if err != nil {
-		return nil, prevSequence, err
-	}
 
 	if err = tcph.SetNetworkLayerForChecksum(&iph); err != nil {
-		return nil, prevSequence, err
+		return nil, err
 	}
 
 	sb := gopacket.NewSerializeBuffer()
@@ -432,8 +414,8 @@ func (c *Channel) createTcpHeadBuf(b byte, prevSequence uint32, tcph layers.TCP,
 
 	// This will compute proper checksums
 	if err = tcph.SerializeTo(sb, op); err != nil {
-		return nil, prevSequence, err
+		return nil, err
 	}
 
-	return sb.Bytes(), tcph.Seq, nil
+	return sb.Bytes(), nil
 }
