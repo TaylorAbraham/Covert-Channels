@@ -1,6 +1,7 @@
 package udpIP
 
 import (
+	"../embedders"
 	"net"
 	"golang.org/x/net/ipv4"
 	"time"
@@ -9,7 +10,6 @@ import (
 	"github.com/google/gopacket"
 	"sync"
 	"errors"
-	"math/rand"
 	"bytes"
 )
 
@@ -98,32 +98,33 @@ type UdpEncoder interface {
 }
 
 // Encoder stores one byte per packet in the lowest order byte of the IPV4 header ID
-type IDEncoder struct{}
-
-func (id *IDEncoder) GetByte(ipv4h ipv4.Header, udph layers.UDP) ([]byte, error) {
-	return []byte{byte(ipv4h.ID & 0xFF)}, nil
+type IDEncoder struct{
+	emb *embedders.IDEncoder
 }
-func (id *IDEncoder) SetByte(ipv4h ipv4.Header, udph layers.UDP, buf []byte) (ipv4.Header, layers.UDP, []byte, error) {
+
+func (e *IDEncoder) GetByte(ipv4h ipv4.Header, udph layers.UDP) ([]byte, error) {
+	if b, err := e.emb.GetByte(ipv4h); err == nil {
+		return []byte{b}, nil
+	} else {
+		return nil, err
+	}
+}
+func (e *IDEncoder) SetByte(ipv4h ipv4.Header, udph layers.UDP, buf []byte) (ipv4.Header, layers.UDP, []byte, error) {
 	if len(buf) == 0 {
 		return ipv4h, udph, nil, errors.New("Cannot set byte if no data")
 	}
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	ipv4h.ID = (r.Int() & 0xFF00) | int(buf[0])
-	// Based on my experimental results, the raw socket will override
-	// an IP ID of zero. We use this loop to ensure that the ID is something
-	// other than zero so that our real data is transmitted
-	for ipv4h.ID == 0 {
-		ipv4h.ID = (r.Int() & 0xFF00) | int(buf[0])
+	if newipv4h, err := e.emb.SetByte(ipv4h, buf[0]); err == nil {
+		return newipv4h, udph, buf[1:], nil
+	} else {
+		return ipv4h, udph, buf, err
 	}
-
-	return ipv4h, udph, buf[1:], nil
 }
 
 //create channel
 func MakeChannel(conf Config) (*Channel, error) {
 
 	c := &Channel{
-		conf: conf, 
+		conf: conf,
 		cancel: make(chan bool),
 		sendPktLog:    MakeSyncMap(),
 		receivePktLog: MakeSyncMap(),
@@ -377,4 +378,3 @@ func createCM(sip, dip [4]byte) ipv4.ControlMessage {
 		IfIndex: 0,
 	}
 }
-
