@@ -1,9 +1,9 @@
 package tcpHandshake
 
 import (
+	"github.com/google/gopacket/layers"
 	"golang.org/x/net/ipv4"
 	"time"
-	"github.com/google/gopacket/layers"
 )
 
 type TcpEncoder interface {

@@ -208,9 +208,9 @@ func checkConfig(ch chan []byte, expt configData, t *testing.T) configData {
 }
 
 type channelTest struct {
-	name string
-	f1   func(*configData)
-	f2   func(*configData)
+	name     string
+	f1       func(*configData)
+	f2       func(*configData)
 	isTiming bool
 }
 

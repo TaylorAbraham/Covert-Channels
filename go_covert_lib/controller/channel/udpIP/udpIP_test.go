@@ -1,11 +1,10 @@
 package udpIP
 
 import (
-	"testing"
-	"log"
-	"time"
 	"bytes"
-
+	"log"
+	"testing"
+	"time"
 )
 
 var sconfTimeout Config = Config{

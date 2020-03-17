@@ -1,8 +1,8 @@
 package tcpHandshake
 
 import (
-	"../embedders"
 	"../../config"
+	"../embedders"
 	"errors"
 	"time"
 )

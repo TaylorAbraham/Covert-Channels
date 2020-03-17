@@ -1,6 +1,7 @@
 package tcpSyn
 
 import (
+	"../embedders"
 	"bytes"
 	"errors"
 	"github.com/google/gopacket"
@@ -9,7 +10,6 @@ import (
 	"math/rand"
 	"net"
 	"time"
-	"../embedders"
 )
 
 const (
@@ -100,7 +100,7 @@ func MakeChannel(conf Config) (*Channel, error) {
 // in which case data will have valid received bytes up to that point.
 func (c *Channel) Receive(data []byte) (uint64, error) {
 
-	if len(data) == 0 && c.conf.Delimiter != Protocol{
+	if len(data) == 0 && c.conf.Delimiter != Protocol {
 		return 0, nil
 	}
 
@@ -208,7 +208,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 // We return the number of bytes sent even if an error is encountered
 func (c *Channel) Send(data []byte) (uint64, error) {
 
-  r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	var (
 		prevSequence uint32 = r.Uint32()
@@ -219,9 +219,9 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		p            []byte
 		cm           ipv4.ControlMessage
 		wait         time.Duration
-		tcph 				 layers.TCP
-	  // We make it clear that the error always starts as nil
-		err					 error = nil
+		tcph         layers.TCP
+		// We make it clear that the error always starts as nil
+		err error = nil
 	)
 
 	// The source and destination depend on whether or not we are in bounce mode
@@ -275,7 +275,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		h = createIPHeader(saddr, daddr)
 		cm = createCM(saddr, daddr)
 
-		h, tcph, _, err = c.createTcpHead(h, layers.TCP{ACK: true}, []byte{byte(r.Uint32())},prevSequence)
+		h, tcph, _, err = c.createTcpHead(h, layers.TCP{ACK: true}, []byte{byte(r.Uint32())}, prevSequence)
 		if err != nil {
 			return num, err
 		}
@@ -374,7 +374,7 @@ func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, 
 	newipv4h, newtcph, newbuf, _, err := c.conf.Encoder.SetByte(ipv4h, tcph, buf)
 	if tcph.Seq == prevSequence {
 		tcph.Seq = r.Uint32() & 0xFFFFFFFF
-		newipv4h, newtcph, newbuf, _, err =c.conf.Encoder.SetByte(ipv4h, tcph, buf)
+		newipv4h, newtcph, newbuf, _, err = c.conf.Encoder.SetByte(ipv4h, tcph, buf)
 	}
 	return newipv4h, newtcph, newbuf, err
 }

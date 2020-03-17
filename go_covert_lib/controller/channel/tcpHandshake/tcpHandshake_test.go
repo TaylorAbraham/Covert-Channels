@@ -1,13 +1,13 @@
 package tcpHandshake
 
 import (
+	"../embedders"
 	"bytes"
 	"log"
 	"math/rand"
 	"sort"
 	"testing"
 	"time"
-	"../embedders"
 )
 
 // These tests must be run in sudo mode
@@ -49,10 +49,10 @@ var sconfTimeout Config = Config{
 	OriginIP:          [4]byte{127, 0, 0, 1},
 	FriendReceivePort: 8080,
 	OriginReceivePort: 8081,
-	DialTimeout:       time.Second*2,
-	AcceptTimeout:     time.Second*2,
-	ReadTimeout:       time.Second*2,
-	WriteTimeout:      time.Second*2,
+	DialTimeout:       time.Second * 2,
+	AcceptTimeout:     time.Second * 2,
+	ReadTimeout:       time.Second * 2,
+	WriteTimeout:      time.Second * 2,
 }
 
 var rconfTimeout Config = Config{
@@ -60,10 +60,10 @@ var rconfTimeout Config = Config{
 	OriginIP:          [4]byte{127, 0, 0, 1},
 	FriendReceivePort: 8081,
 	OriginReceivePort: 8080,
-	DialTimeout:       time.Second*2,
-	AcceptTimeout:     time.Second*2,
-	ReadTimeout:       time.Second*2,
-	WriteTimeout:      time.Second*2,
+	DialTimeout:       time.Second * 2,
+	AcceptTimeout:     time.Second * 2,
+	ReadTimeout:       time.Second * 2,
+	WriteTimeout:      time.Second * 2,
 }
 
 func sendReceive(t *testing.T, sch, rch *Channel, input []byte) {
@@ -103,28 +103,28 @@ func messageExcange(t *testing.T, ch1, ch2 *Channel, inputs [][]byte) {
 	}
 }
 
-var confList []Config = []Config {
+var confList []Config = []Config{
 
 	Config{
 		FriendIP:          [4]byte{127, 0, 0, 1},
 		OriginIP:          [4]byte{127, 0, 0, 1},
 		FriendReceivePort: 8080,
 		OriginReceivePort: 8081,
-		Encoder: &embedders.TcpIpIDEncoder{},
+		Encoder:           &embedders.TcpIpIDEncoder{},
 	},
 	Config{
 		FriendIP:          [4]byte{127, 0, 0, 1},
 		OriginIP:          [4]byte{127, 0, 0, 1},
 		FriendReceivePort: 8080,
 		OriginReceivePort: 8081,
-		Encoder: &embedders.TcpIpURGEncoder{},
+		Encoder:           &embedders.TcpIpURGEncoder{},
 	},
 	Config{
 		FriendIP:          [4]byte{127, 0, 0, 1},
 		OriginIP:          [4]byte{127, 0, 0, 1},
 		FriendReceivePort: 8080,
 		OriginReceivePort: 8081,
-		Encoder: &embedders.TcpIpTimeEncoder{},
+		Encoder:           &embedders.TcpIpTimeEncoder{},
 	},
 }
 
@@ -268,9 +268,9 @@ func runMultiTest(t *testing.T, sconf, rconf Config) {
 
 	var (
 		// Test with message with many characters and with 0 characters
-		inputs   []string
-		rec1 chan opOutput = make(chan opOutput)
-		rec2 chan opOutput = make(chan opOutput)
+		inputs []string
+		rec1   chan opOutput = make(chan opOutput)
+		rec2   chan opOutput = make(chan opOutput)
 		sen1   chan opOutput = make(chan opOutput)
 		sen2   chan opOutput = make(chan opOutput)
 	)
@@ -316,7 +316,7 @@ func runMultiTest(t *testing.T, sconf, rconf Config) {
 	var out1 []string
 	var out2 []string
 
-	fCheckMsg := func (csend, creceive chan opOutput, outputs []string) []string {
+	fCheckMsg := func(csend, creceive chan opOutput, outputs []string) []string {
 		select {
 		case sOut := <-csend:
 			if sOut.err != nil {
@@ -596,12 +596,12 @@ func TestCloseMultiple(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		select {
 		case <-rDones[i]:
-		case <- time.After(time.Second * 2):
+		case <-time.After(time.Second * 2):
 			t.Errorf("Close Timeout")
 		}
 		select {
 		case <-sDones[i]:
-		case <- time.After(time.Second * 2):
+		case <-time.After(time.Second * 2):
 			t.Errorf("Close Timeout")
 		}
 	}

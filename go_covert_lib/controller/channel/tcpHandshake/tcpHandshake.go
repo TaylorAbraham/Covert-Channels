@@ -4,6 +4,7 @@ import (
 	"../embedders"
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -14,7 +15,6 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	"encoding/binary"
 )
 
 const maxAccept = 32
@@ -327,7 +327,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 	defer c.receiveRouter.donePktChan(ac.friendPort, true, c.cancel)
 
 	var (
-		nPayload int = 0
+		nPayload   int    = 0
 		payloadBuf []byte = make([]byte, 256)
 	)
 
@@ -385,22 +385,22 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 	}
 
 	/*
-	// This code allows the TCP conn to reply with a proper FIN/Ack
-	// Unfortunately, it causes the sender to get confused and send a FIN/ACK
-	// packet, which seems to cause a large number of FIN/ACK exchanges that is
-	// not covert at all
-	// Read any tcp stream data that has been received on the channel
-	for {
-		dummyBuffer := make([]byte, 256)
-		// We always set a short timeout here. That way, we can check handle the case
-		// where even though a fin packet was received the channel did not close properly
-		ac.conn.SetReadDeadline(time.Now().Add(time.Second * 1))
+		// This code allows the TCP conn to reply with a proper FIN/Ack
+		// Unfortunately, it causes the sender to get confused and send a FIN/ACK
+		// packet, which seems to cause a large number of FIN/ACK exchanges that is
+		// not covert at all
+		// Read any tcp stream data that has been received on the channel
+		for {
+			dummyBuffer := make([]byte, 256)
+			// We always set a short timeout here. That way, we can check handle the case
+			// where even though a fin packet was received the channel did not close properly
+			ac.conn.SetReadDeadline(time.Now().Add(time.Second * 1))
 
-		readn, err := ac.conn.Read(dummyBuffer)
-		if err != nil || readn == 0 {
-			break
+			readn, err := ac.conn.Read(dummyBuffer)
+			if err != nil || readn == 0 {
+				break
+			}
 		}
-	}
 	*/
 	return n, nil
 }
@@ -497,7 +497,6 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	// we close the doneMsg channel to ensure that the go routine always exits
 	defer close(doneMsg)
 
-
 	// DialContext
 	conn, err := nd.DialContext(ctx, "tcp4", (&net.TCPAddr{IP: c.conf.FriendIP[:], Port: int(c.conf.FriendReceivePort)}).String())
 	if err != nil {
@@ -514,7 +513,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		rem        []byte = data
 		n          uint64
 		originPort uint16
-		timestamp *layers.TCPOption
+		timestamp  *layers.TCPOption
 	)
 
 	if tcpAddr, ok := conn.LocalAddr().(*net.TCPAddr); !ok {
@@ -545,10 +544,10 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 							optData := []byte{}
 							optData = append(optData, p.Tcph.Options[i].OptionData[4:]...)
 							optData = append(optData, p.Tcph.Options[i].OptionData[:4]...)
-							timestamp = &layers.TCPOption {
-								OptionType : layers.TCPOptionKindTimestamps,
-								OptionLength : 10,
-								OptionData : optData,
+							timestamp = &layers.TCPOption{
+								OptionType:   layers.TCPOptionKindTimestamps,
+								OptionLength: 10,
+								OptionData:   optData,
 							}
 						}
 					}
@@ -567,13 +566,13 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		cm    ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
 		tcph  layers.TCP
 		wbuf  []byte
-		tm time.Duration
+		tm    time.Duration
 	)
 
 	if timestamp != nil {
-		binary.BigEndian.PutUint32(timestamp.OptionData[:4], binary.BigEndian.Uint32(timestamp.OptionData[:4]) + uint32(time.Now().Sub(systemTime)/time.Millisecond))
-		tcph.Options = append(tcph.Options, layers.TCPOption{ OptionType : layers.TCPOptionKindNop, OptionLength : 2})
-		tcph.Options = append(tcph.Options, layers.TCPOption{ OptionType : layers.TCPOptionKindNop, OptionLength : 2})
+		binary.BigEndian.PutUint32(timestamp.OptionData[:4], binary.BigEndian.Uint32(timestamp.OptionData[:4])+uint32(time.Now().Sub(systemTime)/time.Millisecond))
+		tcph.Options = append(tcph.Options, layers.TCPOption{OptionType: layers.TCPOptionKindNop, OptionLength: 2})
+		tcph.Options = append(tcph.Options, layers.TCPOption{OptionType: layers.TCPOptionKindNop, OptionLength: 2})
 		tcph.Options = append(tcph.Options, *timestamp)
 	}
 
@@ -586,7 +585,6 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		if ipv4h, tcph, rem, tm, err = c.conf.Encoder.SetByte(ipv4h, tcph, rem); err != nil {
 			return n, err
 		}
-
 
 		time.Sleep(tm)
 

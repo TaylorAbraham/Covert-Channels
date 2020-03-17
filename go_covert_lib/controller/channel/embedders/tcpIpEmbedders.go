@@ -1,13 +1,12 @@
 package embedders
 
 import (
+	"errors"
+	"github.com/google/gopacket/layers"
 	"golang.org/x/net/ipv4"
 	"math/rand"
 	"time"
-	"github.com/google/gopacket/layers"
-	"errors"
 )
-
 
 // The default TcpEncoder that hides the covert message in the
 // sequence number
@@ -32,7 +31,7 @@ func (s *TcpIpSeqEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP) ([]byte, e
 }
 
 // Encoder stores one byte per packet in the lowest order byte of the IPV4 header ID
-type TcpIpIDEncoder struct{
+type TcpIpIDEncoder struct {
 	emb *IDEncoder
 }
 
@@ -55,8 +54,8 @@ func (e *TcpIpIDEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP) ([]byte, er
 	}
 }
 
-type TcpIpURGEncoder struct{
-		emb *URGEncoder
+type TcpIpURGEncoder struct {
+	emb *URGEncoder
 }
 
 func (e *TcpIpURGEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte) (ipv4.Header, layers.TCP, []byte, time.Duration, error) {
@@ -78,7 +77,7 @@ func (e *TcpIpURGEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP) ([]byte, e
 	}
 }
 
-type TcpIpTimeEncoder struct{
+type TcpIpTimeEncoder struct {
 	emb *TimeEncoder
 }
 

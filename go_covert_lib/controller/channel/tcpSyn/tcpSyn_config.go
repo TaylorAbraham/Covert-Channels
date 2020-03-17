@@ -1,8 +1,8 @@
 package tcpSyn
 
 import (
-	"../embedders"
 	"../../config"
+	"../embedders"
 	"errors"
 	"time"
 )

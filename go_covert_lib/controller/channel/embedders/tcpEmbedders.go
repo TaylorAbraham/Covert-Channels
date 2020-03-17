@@ -1,9 +1,9 @@
 package embedders
 
 import (
+	"encoding/binary"
 	"errors"
 	"github.com/google/gopacket/layers"
-	"encoding/binary"
 	"time"
 )
 
@@ -60,10 +60,10 @@ func (id *TimeEncoder) SetByte(tcph layers.TCP, b byte) (layers.TCP, time.Durati
 
 		binary.BigEndian.PutUint32(opt.OptionData[:4], newTime)
 
-		delay = time.Duration(newTime - currTime) * time.Millisecond
+		delay = time.Duration(newTime-currTime) * time.Millisecond
 		tcph.Options[optIndex] = opt
 	} else {
-		binary.BigEndian.PutUint32(opt.OptionData[:4], uint32(time.Now().UnixNano() / 10000000))
+		binary.BigEndian.PutUint32(opt.OptionData[:4], uint32(time.Now().UnixNano()/10000000))
 		opt.OptionData[3] = b
 		tcph.Options = append(tcph.Options, opt)
 	}

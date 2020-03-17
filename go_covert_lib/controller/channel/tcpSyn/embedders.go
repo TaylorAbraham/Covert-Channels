@@ -1,9 +1,9 @@
 package tcpSyn
 
 import (
+	"github.com/google/gopacket/layers"
 	"golang.org/x/net/ipv4"
 	"time"
-	"github.com/google/gopacket/layers"
 )
 
 // An encoded may be provided to the TCP Channel
