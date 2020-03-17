@@ -1,4 +1,4 @@
-package httpNormal
+package httpCovert
 
 import (
 	"bytes"
@@ -14,8 +14,8 @@ import (
 
 const maxMsg = 32
 
-// This is a normal, non-covert HTTP messaging channel
-// The message is sent using normal HTTP packets with the proper OS tcp functions
+// This is a normal, covert HTTP messaging channel
+// The message is sent using HTTP packets with the proper OS tcp functions
 type Config struct {
 	FriendIP   [4]byte
 	OriginIP   [4]byte
