@@ -19,13 +19,13 @@ type ConfigClient struct {
 
 func GetDefault() ConfigClient {
 	return ConfigClient{
-		FriendIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "Your friends IP Address."}),
-		OriginIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "Your IP Address."}),
-		FriendPort:   config.MakeU16(8123, [2]uint16{0, 65535}, config.Display{Description: "Your friends tcp receive Port. Their send port is chosen randomly."}),
-		OriginPort:   config.MakeU16(8124, [2]uint16{0, 65535}, config.Display{Description: "Your tcp receive Port. Send port is chosen randomly."}),
+		FriendIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "Your friend's IP address.", Name: "Friend's IP", Group: "IP Addresses"}),
+		OriginIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "Your IP address.", Name: "Your IP", Group: "IP Addresses"}),
+		FriendPort:   config.MakeU16(8123, [2]uint16{0, 65535}, config.Display{Description: "Your friend's port.", Name: "Friend's Port", Group: "Ports"}),
+		OriginPort:   config.MakeU16(8124, [2]uint16{0, 65535}, config.Display{Description: "Your port.", Name: "Your Port", Group: "Ports"}),
 		UserType:     config.MakeSelect("client", []string{"client", "server"}, config.Display{Description: "Should this covert channel act as a client or server?", Name: "UserType", Group: "Settings"}),
-		ReadTimeout:  config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The intra-packet read timeout for the receive method in milliseconds. Zero for no timeout."}),
-		WriteTimeout: config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The a timeout for writing packets to the raw socket, in milliseconds. Zero for no timeout."}),
+		WriteTimeout: config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The write timeout in milliseconds.", Name: "Write Timeout", Group: "Timing"}),
+		ReadTimeout:  config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The read timeout in milliseconds.", Name: "Read Timeout", Group: "Timing"}),
 	}
 }
 
