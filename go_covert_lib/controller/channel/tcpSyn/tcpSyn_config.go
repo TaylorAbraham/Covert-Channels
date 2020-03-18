@@ -1,9 +1,10 @@
 package tcpSyn
 
 import (
-	"../../config"
 	"errors"
 	"time"
+
+	"../../config"
 )
 
 type ConfigClient struct {

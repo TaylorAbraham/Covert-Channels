@@ -13,6 +13,10 @@ import (
 )
 
 const maxMsg = 32
+const (
+	Client = 0
+	Server = 1
+)
 
 // This is a normal, non-covert HTTP messaging channel
 // The message is sent using normal HTTP packets with the proper OS tcp functions
@@ -21,7 +25,7 @@ type Config struct {
 	OriginIP   [4]byte
 	FriendPort uint16
 	OriginPort uint16
-	UserType   bool
+	UserType   uint8
 
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
@@ -48,7 +52,7 @@ func MakeChannel(conf Config) (*Channel, error) {
 	c := &Channel{conf: conf, cancel: make(chan bool)}
 
 	// if the channel has been specified as the server
-	if conf.UserType {
+	if c.conf.UserType == Server {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", c.handleFunc)
 
@@ -107,7 +111,7 @@ func (c *Channel) Close() error {
 		return nil
 	default:
 		close(c.cancel)
-		if c.conf.UserType {
+		if c.conf.UserType == Server {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			return c.srv.Shutdown(ctx)
@@ -120,7 +124,7 @@ func (c *Channel) Close() error {
 func (c *Channel) Receive(data []byte) (uint64, error) {
 
 	// if the user is a server type computer
-	if c.conf.UserType {
+	if c.conf.UserType == Server {
 
 		//Determines whether the channel is handling timeout or not
 		//then read from the servers receive buffer
@@ -185,15 +189,15 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	copy(dataCopy, data)
 
 	// if the user is a server type computer
-	if c.conf.UserType {
+	if c.conf.UserType == Server {
 
 		//Determines whether the channel is handling timeout or not
 		//then read from the servers send buffer
 		//this is without timeout
 		if c.conf.WriteTimeout == 0 {
 			select {
-			case c.serverSendBuf <- data:
-				return uint64(len(data)), nil
+			case c.serverSendBuf <- dataCopy:
+				return uint64(len(dataCopy)), nil
 			case <-c.cancel:
 				return 0, errors.New("Channel closed")
 			}
@@ -201,8 +205,8 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 			//this is with timeout
 		} else {
 			select {
-			case c.serverSendBuf <- data:
-				return uint64(len(data)), nil
+			case c.serverSendBuf <- dataCopy:
+				return uint64(len(dataCopy)), nil
 			case <-time.After(c.conf.WriteTimeout):
 				return 0, errors.New("Write Timeout")
 			case <-c.cancel:
@@ -215,12 +219,12 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 
 		//post the http request message
 		addr := &net.TCPAddr{IP: c.conf.FriendIP[:], Port: int(c.conf.FriendPort)}
-		_, err := http.Post("http://"+addr.String()+"/", "text/plain", bytes.NewBuffer(data))
+		_, err := http.Post("http://"+addr.String()+"/", "text/plain", bytes.NewBuffer(dataCopy))
 
 		//as long as there is no error
 		//return an integer with the length of the data to be sent
 		if err == nil {
-			return uint64(len(data)), nil
+			return uint64(len(dataCopy)), nil
 		} else {
 			return 0, err
 		}

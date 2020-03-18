@@ -1,10 +1,9 @@
 package httpCovert
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"io"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -78,7 +77,7 @@ func (c *Channel) handleFunc(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		select {
 		case data := <-c.serverSendBuf:
-			io.WriteString(w, string(data))
+			w.Header().Add("Cookie", string(data))
 		case <-time.After(time.Millisecond * 50):
 			log.Println("GET Request timeout")
 		case <-c.cancel:
@@ -87,10 +86,9 @@ func (c *Channel) handleFunc(w http.ResponseWriter, r *http.Request) {
 		// if the request message is a post request
 		// extract the data from the body of the request message and prepare it to be displayed to the user
 	} else if r.Method == "POST" {
-		buf := bytes.Buffer{}
-		buf.ReadFrom(r.Body)
+		buf := []byte(r.Header.Get("Cookie"))
 		select {
-		case c.serverRecBuf <- buf.Bytes():
+		case c.serverRecBuf <- buf:
 		case <-time.After(time.Millisecond * 50):
 			log.Println("GET Request timeout")
 		case <-c.cancel:
@@ -153,22 +151,29 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 				return 0, errors.New("Channel closed")
 			}
 		}
+
 		// if the user is client type computer
 	} else {
-		//get the http response message
+
+		// get the http response message
 		addr := &net.TCPAddr{IP: c.conf.FriendIP[:], Port: int(c.conf.FriendPort)}
 		resp, err := http.Get("http://" + addr.String() + "/")
+
+		// req, err := http.NewRequest("GET", "http://"+addr.String()+"/", nil)
+
+		// req.Header.Add("Cookie", data)
+		// resp, err = client.Do(req)
+		fmt.Println("Get Header: " + resp.Header.Get("Cookie"))
 
 		//as long as there is no error
 		//extract the information from the body of the reponse message
 		if err == nil {
-			buf := bytes.Buffer{}
-			buf.ReadFrom(resp.Body)
-			copy(data, buf.Bytes())
-			if len(buf.Bytes()) > len(data) {
+			buf := []byte(resp.Header.Get("Cookie"))
+			copy(data, buf)
+			if len(buf) > len(data) {
 				return uint64(len(data)), errors.New("Buffer overflow")
 			} else {
-				return uint64(len(buf.Bytes())), nil
+				return uint64(len(buf)), nil
 			}
 		} else {
 			return 0, err
@@ -192,8 +197,8 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		//this is without timeout
 		if c.conf.WriteTimeout == 0 {
 			select {
-			case c.serverSendBuf <- data:
-				return uint64(len(data)), nil
+			case c.serverSendBuf <- dataCopy:
+				return uint64(len(dataCopy)), nil
 			case <-c.cancel:
 				return 0, errors.New("Channel closed")
 			}
@@ -201,8 +206,8 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 			//this is with timeout
 		} else {
 			select {
-			case c.serverSendBuf <- data:
-				return uint64(len(data)), nil
+			case c.serverSendBuf <- dataCopy:
+				return uint64(len(dataCopy)), nil
 			case <-time.After(c.conf.WriteTimeout):
 				return 0, errors.New("Write Timeout")
 			case <-c.cancel:
@@ -215,12 +220,20 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 
 		//post the http request message
 		addr := &net.TCPAddr{IP: c.conf.FriendIP[:], Port: int(c.conf.FriendPort)}
-		_, err := http.Post("http://"+addr.String()+"/", "text/plain", bytes.NewBuffer(data))
+		// _, err := http.Post("http://"+addr.String()+"/", "text/plain", bytes.NewBuffer(dataCopy))
+
+		client := &http.Client{}
+
+		req, err := http.NewRequest("POST", "http://"+addr.String()+"/", nil)
+
+		req.Header.Add("Cookie", string(data))
+		fmt.Printf("Post Header: %v", req.Header)
+		_, err = client.Do(req)
 
 		//as long as there is no error
 		//return an integer with the length of the data to be sent
 		if err == nil {
-			return uint64(len(data)), nil
+			return uint64(len(dataCopy)), nil
 		} else {
 			return 0, err
 		}
