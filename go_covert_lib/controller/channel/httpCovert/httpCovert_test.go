@@ -12,7 +12,7 @@ var sconf Config = Config{
 	OriginIP:   [4]byte{127, 0, 0, 1},
 	FriendPort: 8000,
 	OriginPort: 8001,
-	UserType:   true,
+	UserType:   Server,
 }
 
 var rconf Config = Config{
@@ -20,7 +20,7 @@ var rconf Config = Config{
 	OriginIP:   [4]byte{127, 0, 0, 1},
 	FriendPort: 8001,
 	OriginPort: 8000,
-	UserType:   false,
+	UserType:   Client,
 }
 
 func TestReceiveSendGet(t *testing.T) {
@@ -78,7 +78,7 @@ func TestReceiveSendPost(t *testing.T) {
 	sconfcopy := sconf
 	sconfcopy.FriendPort = 3001
 	sconfcopy.OriginPort = 3002
-	sconfcopy.UserType = false
+	sconfcopy.UserType = Client
 
 	sch, err := MakeChannel(sconfcopy)
 	if err != nil {
@@ -88,7 +88,7 @@ func TestReceiveSendPost(t *testing.T) {
 	rconfcopy := rconf
 	rconfcopy.FriendPort = 3002
 	rconfcopy.OriginPort = 3001
-	rconfcopy.UserType = true
+	rconfcopy.UserType = Server
 
 	rch, err := MakeChannel(rconfcopy)
 	if err != nil {

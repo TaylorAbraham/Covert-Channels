@@ -3,7 +3,6 @@ package httpCovert
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -12,6 +11,10 @@ import (
 )
 
 const maxMsg = 32
+const (
+	Client = 0
+	Server = 1
+)
 
 // This is a normal, covert HTTP messaging channel
 // The message is sent using HTTP packets with the proper OS tcp functions
@@ -20,7 +23,7 @@ type Config struct {
 	OriginIP   [4]byte
 	FriendPort uint16
 	OriginPort uint16
-	UserType   bool
+	UserType   uint8
 
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
@@ -47,7 +50,7 @@ func MakeChannel(conf Config) (*Channel, error) {
 	c := &Channel{conf: conf, cancel: make(chan bool)}
 
 	// if the channel has been specified as the server
-	if conf.UserType {
+	if c.conf.UserType == Server {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", c.handleFunc)
 
@@ -105,7 +108,7 @@ func (c *Channel) Close() error {
 		return nil
 	default:
 		close(c.cancel)
-		if c.conf.UserType {
+		if c.conf.UserType == Server {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			return c.srv.Shutdown(ctx)
@@ -118,7 +121,7 @@ func (c *Channel) Close() error {
 func (c *Channel) Receive(data []byte) (uint64, error) {
 
 	// if the user is a server type computer
-	if c.conf.UserType {
+	if c.conf.UserType == Server {
 
 		//Determines whether the channel is handling timeout or not
 		//then read from the servers receive buffer
@@ -159,12 +162,6 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		addr := &net.TCPAddr{IP: c.conf.FriendIP[:], Port: int(c.conf.FriendPort)}
 		resp, err := http.Get("http://" + addr.String() + "/")
 
-		// req, err := http.NewRequest("GET", "http://"+addr.String()+"/", nil)
-
-		// req.Header.Add("Cookie", data)
-		// resp, err = client.Do(req)
-		fmt.Println("Get Header: " + resp.Header.Get("Cookie"))
-
 		//as long as there is no error
 		//extract the information from the body of the reponse message
 		if err == nil {
@@ -190,7 +187,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	copy(dataCopy, data)
 
 	// if the user is a server type computer
-	if c.conf.UserType {
+	if c.conf.UserType == Server {
 
 		//Determines whether the channel is handling timeout or not
 		//then read from the servers send buffer
@@ -220,14 +217,13 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 
 		//post the http request message
 		addr := &net.TCPAddr{IP: c.conf.FriendIP[:], Port: int(c.conf.FriendPort)}
-		// _, err := http.Post("http://"+addr.String()+"/", "text/plain", bytes.NewBuffer(dataCopy))
 
 		client := &http.Client{}
 
 		req, err := http.NewRequest("POST", "http://"+addr.String()+"/", nil)
 
 		req.Header.Add("Cookie", string(data))
-		fmt.Printf("Post Header: %v", req.Header)
+
 		_, err = client.Do(req)
 
 		//as long as there is no error

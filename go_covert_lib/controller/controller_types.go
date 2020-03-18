@@ -4,6 +4,8 @@ import (
 	"sync"
 
 	"./channel"
+	"./channel/httpCovert"
+	"./channel/httpNormal"
 	"./channel/tcpHandshake"
 	"./channel/tcpNormal"
 	"./channel/tcpSyn"
@@ -62,6 +64,8 @@ type channelData struct {
 	TcpSyn       tcpSyn.ConfigClient
 	TcpHandshake tcpHandshake.ConfigClient
 	TcpNormal    tcpNormal.ConfigClient
+	HttpCovert   httpCovert.ConfigClient
+	HttpNormal   httpNormal.ConfigClient
 }
 
 type processorData struct {
