@@ -1,16 +1,16 @@
 package udpIP
 
 import (
-	"net"
-	"golang.org/x/net/ipv4"
-	"time"
-	"context"
-	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket"
-	"sync"
-	"errors"
-	"math/rand"
+	"../embedders"
 	"bytes"
+	"context"
+	"errors"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"golang.org/x/net/ipv4"
+	"net"
+	"sync"
+	"time"
 )
 
 const maxAccept = 32
@@ -47,11 +47,11 @@ type Config struct {
 	OriginIP          [4]byte
 	FriendReceivePort uint16
 	OriginReceivePort uint16
-	DialTimeout time.Duration
+	DialTimeout       time.Duration
 	Encoder           UdpEncoder
 
 	// For debugging purposes, log all packets that are sent or received
-	logPackets        bool
+	logPackets bool
 
 	AcceptTimeout time.Duration
 
@@ -62,13 +62,12 @@ type Config struct {
 	ReadTimeout time.Duration
 	// The timeout for writing the packet to a raw socket. Set zero for no timeout.
 	WriteTimeout time.Duration
-
 }
 
 type Channel struct {
-	conf     Config
-	rawConn  *ipv4.RawConn
-	cancel chan bool
+	conf    Config
+	rawConn *ipv4.RawConn
+	cancel  chan bool
 
 	// For debugging purposes, log all packets received and sent
 	sendPktLog    *syncPktMap
@@ -78,17 +77,16 @@ type Channel struct {
 	writeMutex *sync.Mutex
 
 	acceptChan chan acceptedConn
-
 }
 
 func (c *Channel) Close() error {
 	select {
-		// Have we already closed
-		case <-c.cancel:
-			return nil
-		default:
-			close(c.cancel)
-		}
+	// Have we already closed
+	case <-c.cancel:
+		return nil
+	default:
+		close(c.cancel)
+	}
 	return c.rawConn.Close()
 }
 
@@ -98,36 +96,37 @@ type UdpEncoder interface {
 }
 
 // Encoder stores one byte per packet in the lowest order byte of the IPV4 header ID
-type IDEncoder struct{}
-
-func (id *IDEncoder) GetByte(ipv4h ipv4.Header, udph layers.UDP) ([]byte, error) {
-	return []byte{byte(ipv4h.ID & 0xFF)}, nil
+type IDEncoder struct {
+	emb *embedders.IDEncoder
 }
-func (id *IDEncoder) SetByte(ipv4h ipv4.Header, udph layers.UDP, buf []byte) (ipv4.Header, layers.UDP, []byte, error) {
+
+func (e *IDEncoder) GetByte(ipv4h ipv4.Header, udph layers.UDP) ([]byte, error) {
+	if b, err := e.emb.GetByte(ipv4h); err == nil {
+		return []byte{b}, nil
+	} else {
+		return nil, err
+	}
+}
+func (e *IDEncoder) SetByte(ipv4h ipv4.Header, udph layers.UDP, buf []byte) (ipv4.Header, layers.UDP, []byte, error) {
 	if len(buf) == 0 {
 		return ipv4h, udph, nil, errors.New("Cannot set byte if no data")
 	}
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	ipv4h.ID = (r.Int() & 0xFF00) | int(buf[0])
-	// Based on my experimental results, the raw socket will override
-	// an IP ID of zero. We use this loop to ensure that the ID is something
-	// other than zero so that our real data is transmitted
-	for ipv4h.ID == 0 {
-		ipv4h.ID = (r.Int() & 0xFF00) | int(buf[0])
+	if newipv4h, err := e.emb.SetByte(ipv4h, buf[0]); err == nil {
+		return newipv4h, udph, buf[1:], nil
+	} else {
+		return ipv4h, udph, buf, err
 	}
-
-	return ipv4h, udph, buf[1:], nil
 }
 
 //create channel
 func MakeChannel(conf Config) (*Channel, error) {
 
 	c := &Channel{
-		conf: conf, 
-		cancel: make(chan bool),
+		conf:          conf,
+		cancel:        make(chan bool),
 		sendPktLog:    MakeSyncMap(),
 		receivePktLog: MakeSyncMap(),
-		writeMutex: &sync.Mutex{},
+		writeMutex:    &sync.Mutex{},
 		// Only 32 connections can be accepted before they begin to be dropped
 		acceptChan: make(chan acceptedConn, maxAccept),
 	}
@@ -148,12 +147,10 @@ func MakeChannel(conf Config) (*Channel, error) {
 		return nil, err
 	}
 
-
 	return c, nil
 }
 
 func (c *Channel) Send(data []byte) (uint64, error) {
-
 
 	nd := net.Dialer{
 		Timeout: c.conf.DialTimeout,
@@ -190,8 +187,8 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		cm    ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
 		udph  layers.UDP
 		wbuf  []byte
-		rem        []byte = data
-		n          uint64
+		rem   []byte = data
+		n     uint64
 	)
 
 	// Send each packet
@@ -300,7 +297,6 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 
 	prevPacketTime = time.Now()
 
-
 	for {
 
 		h, p, _, err := c.readConn(buf)
@@ -312,24 +308,24 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 			// We check for the expected source IP, source port, and destination port
 			if bytes.Equal(h.Src.To4(), saddr[:]) {
 				if udph.SrcPort == layers.UDPPort(sport) && udph.DstPort == layers.UDPPort(dport) {
-					if(udph.Length == uint16(32)) { //end of message
+					if udph.Length == uint16(32) { //end of message
 						return pos, err
-					}else if(udph.Length == uint16(34)) { //the rest of the message
+					} else if udph.Length == uint16(34) { //the rest of the message
 						b, err := c.conf.Encoder.GetByte(*h, udph)
 						if err != nil {
 							return pos, err
 						}
-						if ((pos + uint64(len(b))) >= uint64(len(data))) { //overflow
+						if (pos + uint64(len(b))) >= uint64(len(data)) { //overflow
 							return pos, errors.New("Overflow. End of message never received.")
-						}else { //add data to array, increment pos
+						} else { //add data to array, increment pos
 							i := 0
-							for(i < len(b)) {
+							for i < len(b) {
 								data[pos] = b[i]
 								i++
 								pos++
 							}
 						}
-					}else { //not packet from friend port
+					} else { //not packet from friend port
 						continue
 					}
 				}
@@ -377,4 +373,3 @@ func createCM(sip, dip [4]byte) ipv4.ControlMessage {
 		IfIndex: 0,
 	}
 }
-

@@ -1,14 +1,15 @@
 package tcpHandshake
 
 import (
+	"../embedders"
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"golang.org/x/net/ipv4"
 	"log"
-	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -139,33 +140,6 @@ type Channel struct {
 	writeMutex *sync.Mutex
 }
 
-type TcpEncoder interface {
-	GetByte(ipv4h ipv4.Header, tcph layers.TCP) ([]byte, error)
-	SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte) (ipv4.Header, layers.TCP, []byte, error)
-}
-
-// Encoder stores one byte per packet in the lowest order byte of the IPV4 header ID
-type IDEncoder struct{}
-
-func (id *IDEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP) ([]byte, error) {
-	return []byte{byte(ipv4h.ID & 0xFF)}, nil
-}
-func (id *IDEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte) (ipv4.Header, layers.TCP, []byte, error) {
-	if len(buf) == 0 {
-		return ipv4h, tcph, nil, errors.New("Cannot set byte if no data")
-	}
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	ipv4h.ID = (r.Int() & 0xFF00) | int(buf[0])
-	// Based on my experimental results, the raw socket will override
-	// an IP ID of zero. We use this loop to ensure that the ID is something
-	// other than zero so that our real data is transmitted
-	for ipv4h.ID == 0 {
-		ipv4h.ID = (r.Int() & 0xFF00) | int(buf[0])
-	}
-
-	return ipv4h, tcph, buf[1:], nil
-}
-
 // Create the covert channel, filling in the SeqEncoder
 // with a default if none is provided
 // Although the error is not yet used, it is anticipated
@@ -196,7 +170,7 @@ func MakeChannel(conf Config) (*Channel, error) {
 	}
 
 	if c.conf.Encoder == nil {
-		c.conf.Encoder = &IDEncoder{}
+		c.conf.Encoder = &embedders.TcpIpIDEncoder{}
 	}
 
 	conn, err := net.ListenPacket("ip4:6", "0.0.0.0")
@@ -353,7 +327,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 	defer c.receiveRouter.donePktChan(ac.friendPort, true, c.cancel)
 
 	var (
-		nPayload int = 0
+		nPayload   int    = 0
 		payloadBuf []byte = make([]byte, 256)
 	)
 
@@ -411,22 +385,22 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 	}
 
 	/*
-	// This code allows the TCP conn to reply with a proper FIN/Ack
-	// Unfortunately, it causes the sender to get confused and send a FIN/ACK
-	// packet, which seems to cause a large number of FIN/ACK exchanges that is
-	// not covert at all
-	// Read any tcp stream data that has been received on the channel
-	for {
-		dummyBuffer := make([]byte, 256)
-		// We always set a short timeout here. That way, we can check handle the case
-		// where even though a fin packet was received the channel did not close properly
-		ac.conn.SetReadDeadline(time.Now().Add(time.Second * 1))
+		// This code allows the TCP conn to reply with a proper FIN/Ack
+		// Unfortunately, it causes the sender to get confused and send a FIN/ACK
+		// packet, which seems to cause a large number of FIN/ACK exchanges that is
+		// not covert at all
+		// Read any tcp stream data that has been received on the channel
+		for {
+			dummyBuffer := make([]byte, 256)
+			// We always set a short timeout here. That way, we can check handle the case
+			// where even though a fin packet was received the channel did not close properly
+			ac.conn.SetReadDeadline(time.Now().Add(time.Second * 1))
 
-		readn, err := ac.conn.Read(dummyBuffer)
-		if err != nil || readn == 0 {
-			break
+			readn, err := ac.conn.Read(dummyBuffer)
+			if err != nil || readn == 0 {
+				break
+			}
 		}
-	}
 	*/
 	return n, nil
 }
@@ -483,9 +457,7 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 		fin = true
 	} else {
 		// Normal transmission packet
-		if receivedBytes, err = c.conf.Encoder.GetByte(p.Ipv4h, p.Tcph); err != nil {
-			err = errors.New("Decode Error")
-		} else {
+		if receivedBytes, err = c.conf.Encoder.GetByte(p.Ipv4h, p.Tcph); err == nil {
 			valid = true
 			for _, b := range receivedBytes {
 				if n < uint64(len(data)) {
@@ -502,7 +474,7 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 }
 
 func (c *Channel) Send(data []byte) (uint64, error) {
-
+	var systemTime time.Time
 	nd := net.Dialer{
 		Timeout: c.conf.DialTimeout,
 	}
@@ -530,6 +502,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+	systemTime = time.Now()
 
 	defer conn.Close()
 
@@ -540,6 +513,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		rem        []byte = data
 		n          uint64
 		originPort uint16
+		timestamp  *layers.TCPOption
 	)
 
 	if tcpAddr, ok := conn.LocalAddr().(*net.TCPAddr); !ok {
@@ -562,12 +536,29 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		if p.Tcph.ACK && p.Tcph.SYN {
 			seq = p.Tcph.Ack
 			ack = p.Tcph.Seq + 1
+
+			if _, ok := c.conf.Encoder.(*embedders.TcpIpTimeEncoder); ok {
+				for i := range p.Tcph.Options {
+					if p.Tcph.Options[i].OptionType == layers.TCPOptionKindTimestamps {
+						if len(p.Tcph.Options[i].OptionData) == 8 {
+							optData := []byte{}
+							optData = append(optData, p.Tcph.Options[i].OptionData[4:]...)
+							optData = append(optData, p.Tcph.Options[i].OptionData[:4]...)
+							timestamp = &layers.TCPOption{
+								OptionType:   layers.TCPOptionKindTimestamps,
+								OptionLength: 10,
+								OptionData:   optData,
+							}
+						}
+					}
+				}
+			}
 			return true, nil
 		}
 		return false, nil
 	}, c.cancel)
 	if err != nil {
-		return 0, err
+		return 0, errors.New("SYN/ACK Error: " + err.Error())
 	}
 
 	var (
@@ -575,7 +566,15 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		cm    ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
 		tcph  layers.TCP
 		wbuf  []byte
+		tm    time.Duration
 	)
+
+	if timestamp != nil {
+		binary.BigEndian.PutUint32(timestamp.OptionData[:4], binary.BigEndian.Uint32(timestamp.OptionData[:4])+uint32(time.Now().Sub(systemTime)/time.Millisecond))
+		tcph.Options = append(tcph.Options, layers.TCPOption{OptionType: layers.TCPOptionKindNop, OptionLength: 2})
+		tcph.Options = append(tcph.Options, layers.TCPOption{OptionType: layers.TCPOptionKindNop, OptionLength: 2})
+		tcph.Options = append(tcph.Options, *timestamp)
+	}
 
 	tcph.ACK = true
 	tcph.PSH = true
@@ -583,9 +582,11 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	// Send each packet
 	for len(rem) > 0 {
 		var payload []byte = make([]byte, 5)
-		if ipv4h, tcph, rem, err = c.conf.Encoder.SetByte(ipv4h, tcph, rem); err != nil {
+		if ipv4h, tcph, rem, tm, err = c.conf.Encoder.SetByte(ipv4h, tcph, rem); err != nil {
 			return n, err
 		}
+
+		time.Sleep(tm)
 
 		if wbuf, tcph, err = createTCPHeader(tcph, seq, ack, c.conf.OriginIP, c.conf.FriendIP, originPort, c.conf.FriendReceivePort, payload); err != nil {
 			return n, err
@@ -595,10 +596,18 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 			c.sendPktLog.Add(originPort, packet{Ipv4h: ipv4h, Tcph: tcph})
 		}
 
+		// Sending a packet seems to overwrite at least the current timestamp option value to zero
+		// in the backing array (probably cause it is incorrect)
+		// Therefore, before sending, we copy all option data to new arrays
+		for i := range tcph.Options {
+			tcph.Options[i].OptionData = append([]byte{}, tcph.Options[i].OptionData...)
+		}
+
 		if err = c.sendPacket(&ipv4h, wbuf, &cm); err != nil {
 			return n, err
 		}
 		n = uint64(len(data) - len(rem))
+
 		seq = seq + uint32(len(payload))
 	}
 	tcph.ACK = true
@@ -612,20 +621,20 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		return n, err
 	}
 
-	// This delay reduces the weirdness of the final close
+	// We craft a packet for the fin packet
 	// Otherwise the close method for the socket conn mediates the close and
 	// it ends up with the wrong sequence number, causing the close to look weird.
 	err = waitPacket(recvPktChan, time.Second*1, func(p packet) (bool, error) {
-		// We empty packets from the channel until we get the SYN/ACK packet
-		// from the 3-way handshake. This packet can be used to retrieve
-		// the seq and ack numbers
 		if p.Tcph.ACK && (p.Tcph.FIN || p.Tcph.RST) {
 			return true, nil
 		}
 		return false, nil
 	}, c.cancel)
-
-	return n, err
+	if err == nil {
+		return n, nil
+	} else {
+		return n, nil // errors.New("FIN/ACK Error: " + strconv.Itoa(int(originPort)) + " " + err.Error())
+	}
 }
 
 // Based on some experimental results, it appears that it is not necessarily
@@ -741,6 +750,14 @@ func (c *Channel) readLoop(recieverChan chan packet, senderChan chan packet) {
 				// Packets may be received as ACKs to our sent messages or as packets sent to this channel
 				// We must route accordingly
 				if tcph.DstPort == layers.TCPPort(c.conf.OriginReceivePort) {
+
+					// When reading options DecodeFromBytes does not copy option data,
+					// it merely slices into the array. We copy here to make sure that the data
+					// does not get overwritten when the underlying array is used for later reads
+					for i := range tcph.Options {
+						tcph.Options[i].OptionData = append([]byte{}, tcph.Options[i].OptionData...)
+					}
+
 					// If the port number is to our receive port, then it is potentially
 					// an incomming message, so we route it to the Receive methods
 					pckChan = recieverChan

@@ -208,12 +208,13 @@ func checkConfig(ch chan []byte, expt configData, t *testing.T) configData {
 }
 
 type channelTest struct {
-	name string
-	f1   func(*configData)
-	f2   func(*configData)
+	name     string
+	f1       func(*configData)
+	f2       func(*configData)
+	isTiming bool
 }
 
-func runMultiChannelWrite(t *testing.T, cl []channelTest, messages []string) {
+func runMultiChannelWrite(t *testing.T, cl []channelTest, messages []string, timingMessages []string) {
 	ctr1, _ := CreateController()
 	ctr2, _ := CreateController()
 
@@ -223,6 +224,13 @@ func runMultiChannelWrite(t *testing.T, cl []channelTest, messages []string) {
 	varCurrConf1 := DefaultConfig()
 
 	for i := range cl {
+		var useMessages []string
+		if cl[i].isTiming {
+			useMessages = timingMessages
+		} else {
+			useMessages = messages
+		}
+
 		write1 <- []byte("{\"OpCode\" : \"config\"}")
 		conf := checkConfig(read1, varCurrConf1, t)
 
@@ -238,8 +246,8 @@ func runMultiChannelWrite(t *testing.T, cl []channelTest, messages []string) {
 		checkMsgType(read1, "open", "Open success", t)
 		checkMsgType(read2, "open", "Open success", t)
 
-		for i := range messages {
-			msg := messageType{OpCode: "write", Message: messages[i]}
+		for i := range useMessages {
+			msg := messageType{OpCode: "write", Message: useMessages[i]}
 			if b, err := json.Marshal(msg); err == nil {
 				// The marshaller will convert the string into a format that can be interpreted on the other side
 				// This will change invalid utf8 into valid, so we must use that string.
@@ -299,6 +307,34 @@ func TestMessageExchange(t *testing.T) {
 			f1: func(conf *configData) {
 				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
 				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
+				conf.Channel.Data.TcpHandshake.Encoder.Value = "urg"
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
+				conf.Channel.Data.TcpHandshake.Encoder.Value = "urg"
+			},
+		},
+		channelTest{
+			name: "TcpHandshake",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 9090
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 9091
+				conf.Channel.Data.TcpHandshake.Encoder.Value = "time"
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 9091
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 9090
+				conf.Channel.Data.TcpHandshake.Encoder.Value = "time"
+			},
+			isTiming: true,
+		},
+		channelTest{
+			name: "TcpHandshake",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
+				conf.Channel.Data.TcpHandshake.Encoder.Value = "id"
 
 				conf.Processors = []processorConfig{
 					processorConfig{
@@ -312,6 +348,7 @@ func TestMessageExchange(t *testing.T) {
 			f2: func(conf *configData) {
 				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
 				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
+				conf.Channel.Data.TcpHandshake.Encoder.Value = "id"
 
 				conf.Processors = []processorConfig{
 					processorConfig{
@@ -351,10 +388,51 @@ func TestMessageExchange(t *testing.T) {
 			f1: func(conf *configData) {
 				conf.Channel.Data.TcpSyn.FriendPort.Value = 8090
 				conf.Channel.Data.TcpSyn.OriginPort.Value = 8091
+				conf.Channel.Data.TcpSyn.Encoder.Value = "sequence"
 			},
 			f2: func(conf *configData) {
 				conf.Channel.Data.TcpSyn.FriendPort.Value = 8091
 				conf.Channel.Data.TcpSyn.OriginPort.Value = 8090
+				conf.Channel.Data.TcpSyn.Encoder.Value = "sequence"
+			},
+		},
+		channelTest{
+			name: "TcpSyn",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8090
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8091
+				conf.Channel.Data.TcpSyn.Encoder.Value = "urg"
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8091
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8090
+				conf.Channel.Data.TcpSyn.Encoder.Value = "urg"
+			},
+		},
+		channelTest{
+			name: "TcpSyn",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8090
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8091
+				conf.Channel.Data.TcpSyn.Encoder.Value = "time"
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8091
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8090
+				conf.Channel.Data.TcpSyn.Encoder.Value = "time"
+			},
+		},
+		channelTest{
+			name: "TcpSyn",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8090
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8091
+				conf.Channel.Data.TcpSyn.Encoder.Value = "id"
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8091
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8090
+				conf.Channel.Data.TcpSyn.Encoder.Value = "id"
 			},
 		},
 		channelTest{
@@ -398,7 +476,11 @@ func TestMessageExchange(t *testing.T) {
 		messages = append(messages, randomValidString(32))
 	}
 
-	runMultiChannelWrite(t, cl, messages)
+	// We have to use shorter messages for timing to prevent timeouts later
+	// on and to make the tests run in reasonable time
+	timingMessages := []string{"", "A", "Hello!", "🍌🍌🍌"}
+
+	runMultiChannelWrite(t, cl, messages, timingMessages)
 }
 
 func randomValidString(maxLen int) string {

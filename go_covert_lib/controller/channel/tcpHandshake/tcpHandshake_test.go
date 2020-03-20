@@ -1,6 +1,7 @@
 package tcpHandshake
 
 import (
+	"../embedders"
 	"bytes"
 	"log"
 	"math/rand"
@@ -48,10 +49,10 @@ var sconfTimeout Config = Config{
 	OriginIP:          [4]byte{127, 0, 0, 1},
 	FriendReceivePort: 8080,
 	OriginReceivePort: 8081,
-	DialTimeout:       time.Second,
-	AcceptTimeout:     time.Second,
-	ReadTimeout:       time.Second,
-	WriteTimeout:      time.Second,
+	DialTimeout:       time.Second * 2,
+	AcceptTimeout:     time.Second * 2,
+	ReadTimeout:       time.Second * 2,
+	WriteTimeout:      time.Second * 2,
 }
 
 var rconfTimeout Config = Config{
@@ -59,10 +60,10 @@ var rconfTimeout Config = Config{
 	OriginIP:          [4]byte{127, 0, 0, 1},
 	FriendReceivePort: 8081,
 	OriginReceivePort: 8080,
-	DialTimeout:       time.Second,
-	AcceptTimeout:     time.Second,
-	ReadTimeout:       time.Second,
-	WriteTimeout:      time.Second,
+	DialTimeout:       time.Second * 2,
+	AcceptTimeout:     time.Second * 2,
+	ReadTimeout:       time.Second * 2,
+	WriteTimeout:      time.Second * 2,
 }
 
 func sendReceive(t *testing.T, sch, rch *Channel, input []byte) {
@@ -102,21 +103,57 @@ func messageExcange(t *testing.T, ch1, ch2 *Channel, inputs [][]byte) {
 	}
 }
 
-func TestReceiveSend(t *testing.T) {
+var confList []Config = []Config{
+
+	Config{
+		FriendIP:          [4]byte{127, 0, 0, 1},
+		OriginIP:          [4]byte{127, 0, 0, 1},
+		FriendReceivePort: 8080,
+		OriginReceivePort: 8081,
+		Encoder:           &embedders.TcpIpIDEncoder{},
+	},
+	Config{
+		FriendIP:          [4]byte{127, 0, 0, 1},
+		OriginIP:          [4]byte{127, 0, 0, 1},
+		FriendReceivePort: 8080,
+		OriginReceivePort: 8081,
+		Encoder:           &embedders.TcpIpURGEncoder{},
+	},
+	Config{
+		FriendIP:          [4]byte{127, 0, 0, 1},
+		OriginIP:          [4]byte{127, 0, 0, 1},
+		FriendReceivePort: 8080,
+		OriginReceivePort: 8081,
+		Encoder:           &embedders.TcpIpTimeEncoder{},
+	},
+}
+
+func TestSendReceive(t *testing.T) {
 
 	log.Println("Starting TestReceiveSend")
+	for i := range confList {
+		confcp := confList[i]
+		confcp.FriendReceivePort = confList[i].OriginReceivePort
+		confcp.OriginReceivePort = confList[i].FriendReceivePort
+		runSendReceiveTest(t, confList[i], confcp)
+	}
+}
 
-	sch, err := MakeChannel(sconf)
+func runSendReceiveTest(t *testing.T, conf1, conf2 Config) {
+
+	sch, err := MakeChannel(conf1)
 	if err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
+		return
 	}
 
-	rch, err := MakeChannel(rconf)
+	rch, err := MakeChannel(conf2)
 	if err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
+		return
 	}
 
-	messageExcange(t, sch, rch, [][]byte{[]byte("Hello world!"), []byte(""), []byte("A"), []byte("Hello\nworld!")})
+	messageExcange(t, sch, rch, [][]byte{[]byte("Hello world!"), []byte(""), []byte("A"), []byte("Hello\nworld!"), []byte("🍌🍌🍌")})
 }
 
 func TestReceiveSendSelf(t *testing.T) {
@@ -231,9 +268,9 @@ func runMultiTest(t *testing.T, sconf, rconf Config) {
 
 	var (
 		// Test with message with many characters and with 0 characters
-		inputs   []string
-		rec1 chan opOutput = make(chan opOutput)
-		rec2 chan opOutput = make(chan opOutput)
+		inputs []string
+		rec1   chan opOutput = make(chan opOutput)
+		rec2   chan opOutput = make(chan opOutput)
 		sen1   chan opOutput = make(chan opOutput)
 		sen2   chan opOutput = make(chan opOutput)
 	)
@@ -251,7 +288,7 @@ func runMultiTest(t *testing.T, sconf, rconf Config) {
 	}
 
 	// Randomly generate input strings
-	for i := 0; i < 8; i++ {
+	for i := 0; i < 4; i++ {
 		inputs = append(inputs, randomString(0x1F))
 		// Test simultaneous receives
 		go fRch(ch1, rec1)
@@ -279,7 +316,7 @@ func runMultiTest(t *testing.T, sconf, rconf Config) {
 	var out1 []string
 	var out2 []string
 
-	fCheckMsg := func (csend, creceive chan opOutput, outputs []string) []string {
+	fCheckMsg := func(csend, creceive chan opOutput, outputs []string) []string {
 		select {
 		case sOut := <-csend:
 			if sOut.err != nil {
@@ -304,7 +341,7 @@ func runMultiTest(t *testing.T, sconf, rconf Config) {
 		return outputs
 	}
 
-	for i := 0; i < 8; i++ {
+	for i := 0; i < len(inputs); i++ {
 		out1 = fCheckMsg(sen1, rec1, out1)
 		out2 = fCheckMsg(sen2, rec2, out2)
 	}
@@ -408,30 +445,6 @@ func TestStress(t *testing.T) {
 	}
 }
 
-/*
-func TestReceiveNone(t *testing.T) {
-
-	rch, err := MakeChannel(rconf)
-	if err != nil {
-		t.Errorf("err = '%s'; want nil", err.Error())
-	}
-
-	var nr uint64
-
-	var data [5]byte
-	nr, err = rch.Receive(data[0:0], nil)
-	if err != nil {
-		t.Errorf("err = '%s'; want nil", err.Error())
-	}
-	if nr != 0 {
-		t.Errorf("send n = %d; want %d", nr, 0)
-	}
-
-	if err := rch.Close(); err != nil {
-		t.Errorf("err = '%s'; want nil", err.Error())
-	}
-}
-*/
 func sendAndCheck(t *testing.T, input []byte, sch *Channel) {
 	n, err := sch.Send(input)
 	if err != nil {
@@ -583,12 +596,12 @@ func TestCloseMultiple(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		select {
 		case <-rDones[i]:
-		case <- time.After(time.Second * 2):
+		case <-time.After(time.Second * 2):
 			t.Errorf("Close Timeout")
 		}
 		select {
 		case <-sDones[i]:
-		case <- time.After(time.Second * 2):
+		case <-time.After(time.Second * 2):
 			t.Errorf("Close Timeout")
 		}
 	}

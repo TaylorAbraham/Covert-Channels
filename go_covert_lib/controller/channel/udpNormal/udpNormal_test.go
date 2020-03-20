@@ -1,25 +1,24 @@
 package udpNormal
 
 import (
-	"testing"
-	"log"
-	"time"
 	"bytes"
-
+	"log"
+	"testing"
+	"time"
 )
 
 var sconf Config = Config{
-	FriendIP:          [4]byte{127, 0, 0, 1},
-	OriginIP:          [4]byte{127, 0, 0, 1},
+	FriendIP:        [4]byte{127, 0, 0, 1},
+	OriginIP:        [4]byte{127, 0, 0, 1},
 	DestinationPort: 8080,
-	OriginPort: 8081,
+	OriginPort:      8081,
 }
 
 var rconf Config = Config{
-	FriendIP:          [4]byte{127, 0, 0, 1},
-	OriginIP:          [4]byte{127, 0, 0, 1},
+	FriendIP:        [4]byte{127, 0, 0, 1},
+	OriginIP:        [4]byte{127, 0, 0, 1},
 	DestinationPort: 8081,
-	OriginPort: 8080,
+	OriginPort:      8080,
 }
 
 func TestReceiveSend(t *testing.T) {

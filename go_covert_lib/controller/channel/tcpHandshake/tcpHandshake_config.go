@@ -2,6 +2,7 @@ package tcpHandshake
 
 import (
 	"../../config"
+	"../embedders"
 	"errors"
 	"time"
 )
@@ -28,7 +29,7 @@ func GetDefault() ConfigClient {
 		AcceptTimeout:     config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The accept timeout for the receive method in milliseconds. Zero for no timeout.", Name: "Accept Timeout", Group: "Timing"}),
 		ReadTimeout:       config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The intra-packet read timeout for the receive method in milliseconds. Zero for no timeout.", Name: "Read Timeout", Group: "Timing"}),
 		WriteTimeout:      config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The a timeout for writing packets to the raw socket, in milliseconds. Zero for no timeout.", Name: "Write Timeout", Group: "Timing"}),
-		Encoder:           config.MakeSelect("id", []string{"id"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
+		Encoder:           config.MakeSelect("id", []string{"id", "urg", "time"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
 	}
 }
 
@@ -55,7 +56,11 @@ func ToChannel(cc ConfigClient) (*Channel, error) {
 
 	switch cc.Encoder.Value {
 	case "id":
-		c.Encoder = &IDEncoder{}
+		c.Encoder = &embedders.TcpIpIDEncoder{}
+	case "urg":
+		c.Encoder = &embedders.TcpIpURGEncoder{}
+	case "time":
+		c.Encoder = &embedders.TcpIpTimeEncoder{}
 	default:
 		return nil, errors.New("Invalid encoder value")
 	}
