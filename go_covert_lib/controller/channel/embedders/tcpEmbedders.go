@@ -7,13 +7,27 @@ import (
 	"time"
 )
 
-type URGEncoder struct{}
+type UrgPtrEncoder struct{}
 
-func (id *URGEncoder) GetByte(tcph layers.TCP) (byte, error) {
+func (id *UrgPtrEncoder) GetByte(tcph layers.TCP) (byte, error) {
 	return byte(tcph.Urgent & 0xFF), nil
 }
-func (id *URGEncoder) SetByte(tcph layers.TCP, b byte) (layers.TCP, error) {
+func (id *UrgPtrEncoder) SetByte(tcph layers.TCP, b byte) (layers.TCP, error) {
 	tcph.Urgent = uint16(b)
+	return tcph, nil
+}
+
+type UrgFlgEncoder struct{}
+
+func (id *UrgFlgEncoder) GetByte(tcph layers.TCP) (byte, error) {
+	if tcph.URG {
+		return 1, nil
+	} else {
+		return 0, nil
+	}
+}
+func (id *UrgFlgEncoder) SetByte(tcph layers.TCP, b byte) (layers.TCP, error) {
+	tcph.URG = b != 0
 	return tcph, nil
 }
 

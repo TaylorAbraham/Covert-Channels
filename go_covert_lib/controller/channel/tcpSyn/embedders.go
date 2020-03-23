@@ -15,6 +15,7 @@ type TcpEncoder interface {
 	// on from the bouncer socket. It is this function's responsibility
 	// to ensure that any modifications to the tcp header ensure that the
 	// new sequence number is different than the previous sequence number
-	SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte) (ipv4.Header, layers.TCP, []byte, time.Duration, error)
-	GetByte(ipv4h ipv4.Header, tcph layers.TCP) ([]byte, error)
+	SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, maskIndex int) (ipv4.Header, layers.TCP, []byte, time.Duration, error)
+	GetByte(ipv4h ipv4.Header, tcph layers.TCP, maskIndex int) ([]byte, error)
+	GetMask() [][]byte
 }

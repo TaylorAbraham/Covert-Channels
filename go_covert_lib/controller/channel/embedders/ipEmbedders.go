@@ -24,3 +24,24 @@ func (id *IDEncoder) SetByte(ipv4h ipv4.Header, b byte) (ipv4.Header, error) {
 
 	return ipv4h, nil
 }
+
+type EcnEncoder struct{}
+
+func (id *EcnEncoder) GetByte(ipv4h ipv4.Header) (byte, error) {
+	if ipv4h.TOS & 0x02 != 0 {
+		return 1, nil
+	} else {
+		return 0, nil
+	}
+}
+
+func (id *EcnEncoder) SetByte(ipv4h ipv4.Header, b byte) (ipv4.Header, error) {
+
+	if b != 0 {
+		ipv4h.TOS = (ipv4h.TOS & 0xFC) | 0x03
+	} else {
+		ipv4h.TOS = (ipv4h.TOS & 0xFC) | 0x01
+	}
+
+	return ipv4h, nil
+}
