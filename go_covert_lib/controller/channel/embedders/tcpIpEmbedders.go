@@ -117,7 +117,6 @@ func (s *TcpIpUrgFlgEncoder) GetMask() [][]byte {
 									[]byte{0x01}, []byte{0x01}, []byte{0x01}, []byte{0x01}}
 }
 
-
 type TcpIpTimeEncoder struct {
 	emb *TimeEncoder
 }
@@ -143,4 +142,33 @@ func (e *TcpIpTimeEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byt
 
 func (s *TcpIpTimeEncoder) GetMask() [][]byte {
 	return [][]byte{[]byte{0xFF}}
+}
+
+
+type TcpIpEcnEncoder struct {
+	emb *EcnEncoder
+}
+
+func (e *TcpIpEcnEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, maskIndex int) (ipv4.Header, layers.TCP, []byte, time.Duration, error) {
+	if len(buf) == 0 {
+		return ipv4h, tcph, nil, time.Duration(0), errors.New("Cannot set byte if no data")
+	}
+	if ipv4h, err := e.emb.SetByte(ipv4h, buf[0]); err == nil {
+		return ipv4h, tcph, buf[1:], time.Duration(0), nil
+	} else {
+		return ipv4h, tcph, buf, time.Duration(0), err
+	}
+}
+
+func (e *TcpIpEcnEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP, maskIndex int) ([]byte, error) {
+	if b, err := e.emb.GetByte(ipv4h); err == nil {
+		return []byte{b}, nil
+	} else {
+		return nil, err
+	}
+}
+
+func (s *TcpIpEcnEncoder) GetMask() [][]byte {
+	return [][]byte{[]byte{0x01}, []byte{0x01}, []byte{0x01}, []byte{0x01},
+									[]byte{0x01}, []byte{0x01}, []byte{0x01}, []byte{0x01}}
 }

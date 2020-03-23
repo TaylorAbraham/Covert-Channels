@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net"
 	"time"
+	"sync"
 )
 
 const (
@@ -64,6 +65,7 @@ type Channel struct {
 	conf        Config
 	rawConn     *ipv4.RawConn
 	writeCancel chan bool
+	closeMutex *sync.Mutex
 }
 
 // Create the covert channel, filling in the SeqEncoder
@@ -72,7 +74,7 @@ type Channel struct {
 // that this function may one day be used for validating
 // the data structure
 func MakeChannel(conf Config) (*Channel, error) {
-	c := &Channel{conf: conf, writeCancel: make(chan bool)}
+	c := &Channel{conf: conf, writeCancel: make(chan bool), closeMutex: &sync.Mutex{}}
 	if c.conf.Encoder == nil {
 		c.conf.Encoder = &embedders.TcpIpSeqEncoder{}
 	}
@@ -342,6 +344,8 @@ readloop:
 // If the covert channel is closed while a read or write is occuring then
 // the function function will return with an OpCancel error
 func (c *Channel) Close() error {
+	c.closeMutex.Lock()
+	defer c.closeMutex.Unlock()
 	// The write operation allows the user to specify
 	// a delay between packets
 	// We can't just rely on the raw connection being

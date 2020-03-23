@@ -138,6 +138,7 @@ type Channel struct {
 
 	// We make the mutex a pointer to avoid the risk of copying
 	writeMutex *sync.Mutex
+	closeMutex *sync.Mutex
 }
 
 // Create the covert channel, filling in the SeqEncoder
@@ -167,6 +168,7 @@ func MakeChannel(conf Config) (*Channel, error) {
 		receivePktLog: MakeSyncMap(),
 
 		writeMutex: &sync.Mutex{},
+		closeMutex: &sync.Mutex{},
 	}
 
 	if c.conf.Encoder == nil {
@@ -217,6 +219,8 @@ type portRouter struct {
 }
 
 func (c *Channel) Close() error {
+	c.closeMutex.Lock()
+	defer c.closeMutex.Unlock()
 	select {
 	// Have we already closed
 	case <-c.cancel:

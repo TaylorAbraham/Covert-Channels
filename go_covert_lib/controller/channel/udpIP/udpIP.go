@@ -75,11 +75,14 @@ type Channel struct {
 
 	// We make the mutex a pointer to avoid the risk of copying
 	writeMutex *sync.Mutex
+	closeMutex *sync.Mutex
 
 	acceptChan chan acceptedConn
 }
 
 func (c *Channel) Close() error {
+	c.closeMutex.Lock()
+	defer c.closeMutex.Unlock()
 	select {
 	// Have we already closed
 	case <-c.cancel:
@@ -88,34 +91,6 @@ func (c *Channel) Close() error {
 		close(c.cancel)
 	}
 	return c.rawConn.Close()
-}
-
-type UdpEncoder interface {
-	GetByte(ipv4h ipv4.Header, udph layers.UDP) ([]byte, error)
-	SetByte(ipv4h ipv4.Header, udph layers.UDP, buf []byte) (ipv4.Header, layers.UDP, []byte, error)
-}
-
-// Encoder stores one byte per packet in the lowest order byte of the IPV4 header ID
-type IDEncoder struct {
-	emb *embedders.IDEncoder
-}
-
-func (e *IDEncoder) GetByte(ipv4h ipv4.Header, udph layers.UDP) ([]byte, error) {
-	if b, err := e.emb.GetByte(ipv4h); err == nil {
-		return []byte{b}, nil
-	} else {
-		return nil, err
-	}
-}
-func (e *IDEncoder) SetByte(ipv4h ipv4.Header, udph layers.UDP, buf []byte) (ipv4.Header, layers.UDP, []byte, error) {
-	if len(buf) == 0 {
-		return ipv4h, udph, nil, errors.New("Cannot set byte if no data")
-	}
-	if newipv4h, err := e.emb.SetByte(ipv4h, buf[0]); err == nil {
-		return newipv4h, udph, buf[1:], nil
-	} else {
-		return ipv4h, udph, buf, err
-	}
 }
 
 //create channel
@@ -127,6 +102,7 @@ func MakeChannel(conf Config) (*Channel, error) {
 		sendPktLog:    MakeSyncMap(),
 		receivePktLog: MakeSyncMap(),
 		writeMutex:    &sync.Mutex{},
+		closeMutex:    &sync.Mutex{},
 		// Only 32 connections can be accepted before they begin to be dropped
 		acceptChan: make(chan acceptedConn, maxAccept),
 	}
@@ -151,6 +127,11 @@ func MakeChannel(conf Config) (*Channel, error) {
 }
 
 func (c *Channel) Send(data []byte) (uint64, error) {
+
+	data, err := embedders.EncodeFromMask(c.conf.Encoder.GetMask(), data)
+	if err != nil {
+		return 0, err
+	}
 
 	nd := net.Dialer{
 		Timeout: c.conf.DialTimeout,
@@ -189,17 +170,19 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		wbuf  []byte
 		rem   []byte = data
 		n     uint64
+		maskIndex int = 0
 	)
 
 	// Send each packet
 	for len(rem) > 0 {
 		var payload []byte = make([]byte, 26) //set payload of length 26
-		if ipv4h, udph, rem, err = c.conf.Encoder.SetByte(ipv4h, udph, rem); err != nil {
-			return n, err
+		if ipv4h, udph, rem, err = c.conf.Encoder.SetByte(ipv4h, udph, rem, maskIndex); err != nil {
+			break
 		}
+		maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
 
 		if wbuf, udph, err = createUDPHeader(udph, c.conf.OriginIP, c.conf.FriendIP, c.conf.OriginReceivePort, c.conf.FriendReceivePort, payload); err != nil {
-			return n, err
+			break
 		}
 
 		if c.conf.logPackets {
@@ -207,9 +190,15 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		}
 
 		if err = c.sendPacket(&ipv4h, wbuf, &cm); err != nil {
-			return n, err
+			break
 		}
 		n = uint64(len(data) - len(rem))
+	}
+
+	// Readjust size to represent number of bytes sent
+	n, err = embedders.GetSentSize(c.conf.Encoder.GetMask(), n, err)
+	if err != nil {
+		return n, err
 	}
 
 	//last payload determining the end of the message
@@ -223,12 +212,8 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		c.sendPktLog.Add(c.conf.OriginReceivePort, packet{Ipv4h: ipv4h, Udph: udph})
 	}
 
-	if err = c.sendPacket(&ipv4h, wbuf, &cm); err != nil {
-		return n, err
-	}
-
+	err = c.sendPacket(&ipv4h, wbuf, &cm)
 	return n, err
-
 }
 
 func (c *Channel) sendPacket(h *ipv4.Header, b []byte, cm *ipv4.ControlMessage) error {
@@ -273,7 +258,14 @@ func createUDPHeader(udph layers.UDP, sip, dip [4]byte, sport, dport uint16, pay
 
 func (c *Channel) Receive(data []byte) (uint64, error) {
 
-	if len(data) == 0 {
+	// We must expand out the input storage array to
+	// the correct size to potentially handle variable size inputs
+	dataBuf, err := embedders.GetBuf(c.conf.Encoder.GetMask(), data)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(dataBuf) == 0 {
 		return 0, nil
 	}
 
@@ -291,6 +283,9 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		// This timer is used to timeout if packets are received, but they
 		// are not the correct type
 		prevPacketTime time.Time
+		maskIndex int = 0
+		h *ipv4.Header
+		p []byte
 	)
 
 	saddr, sport, dport = c.conf.FriendIP, c.conf.FriendReceivePort, c.conf.OriginReceivePort
@@ -299,9 +294,9 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 
 	for {
 
-		h, p, _, err := c.readConn(buf)
+		h, p, _, err = c.readConn(buf)
 		if err != nil {
-			return pos, err
+			break
 		}
 		udph := layers.UDP{}
 		if err = udph.DecodeFromBytes(p, gopacket.NilDecodeFeedback); err == nil {
@@ -309,19 +304,19 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 			if bytes.Equal(h.Src.To4(), saddr[:]) {
 				if udph.SrcPort == layers.UDPPort(sport) && udph.DstPort == layers.UDPPort(dport) {
 					if udph.Length == uint16(32) { //end of message
-						return pos, err
+						break
 					} else if udph.Length == uint16(34) { //the rest of the message
-						b, err := c.conf.Encoder.GetByte(*h, udph)
+						var b []byte
+						b, err = c.conf.Encoder.GetByte(*h, udph, maskIndex)
 						if err != nil {
-							return pos, err
+							break
 						}
-						if (pos + uint64(len(b))) >= uint64(len(data)) { //overflow
-							return pos, errors.New("Overflow. End of message never received.")
+						if (pos + uint64(len(b))) >= uint64(len(dataBuf)) { //overflow
+							err = errors.New("Overflow. End of message never received.")
+							break
 						} else { //add data to array, increment pos
-							i := 0
-							for i < len(b) {
-								data[pos] = b[i]
-								i++
+							for i := 0; i < len(b); i++ {
+								dataBuf[pos] = b[i]
 								pos++
 							}
 						}
@@ -332,10 +327,11 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 			}
 		}
 		if c.conf.ReadTimeout > 0 && time.Now().Sub(prevPacketTime) > c.conf.ReadTimeout {
-			return pos, errors.New("Covert Packet Timeout")
+			err = errors.New("Covert Packet Timeout")
+			break
 		}
 	}
-
+	return embedders.CopyData(c.conf.Encoder.GetMask(), pos, dataBuf, data, err)
 }
 
 // Read from a raw connection whil setting a timeout if necessary

@@ -133,6 +133,13 @@ var confList []Config = []Config{
 		OriginReceivePort: 8081,
 		Encoder:           &embedders.TcpIpTimeEncoder{},
 	},
+	Config{
+		FriendIP:          [4]byte{127, 0, 0, 1},
+		OriginIP:          [4]byte{127, 0, 0, 1},
+		FriendReceivePort: 8080,
+		OriginReceivePort: 8081,
+		Encoder:           &embedders.TcpIpEcnEncoder{},
+	},
 }
 
 func TestSendReceive(t *testing.T) {
