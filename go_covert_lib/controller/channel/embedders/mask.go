@@ -167,3 +167,12 @@ func GetSentSize(mask [][]byte, n uint64, err error) (uint64, error) {
 		return n, nil
 	}
 }
+
+func UpdateMaskIndex(mask [][]byte, maskIndex int) int {
+	maskIndex += 1
+	if maskIndex < len(mask) {
+		return maskIndex
+	} else {
+		return 0
+	}
+}

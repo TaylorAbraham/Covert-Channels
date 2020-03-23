@@ -16,7 +16,7 @@ type TcpIpSeqEncoder struct{}
 // we generate a random one in the same way as createPacket
 // Other implementations of this function may use other headers, and so would
 // not be required to duplicate this
-func (s *TcpIpSeqEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte) (ipv4.Header, layers.TCP, []byte, time.Duration, error) {
+func (s *TcpIpSeqEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, maskIndex int) (ipv4.Header, layers.TCP, []byte, time.Duration, error) {
 	if len(buf) == 0 {
 		return ipv4h, tcph, nil, time.Duration(0), errors.New("Cannot set byte if no data")
 	}
@@ -26,7 +26,7 @@ func (s *TcpIpSeqEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte
 }
 
 // Retrieve the byte from a packet encoded by the sequence number Encoder
-func (s *TcpIpSeqEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP) ([]byte, error) {
+func (s *TcpIpSeqEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP, maskIndex int) ([]byte, error) {
 	return []byte{byte(0xFF & tcph.Seq)}, nil
 }
 
@@ -39,7 +39,7 @@ type TcpIpIDEncoder struct {
 	emb *IDEncoder
 }
 
-func (e *TcpIpIDEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte) (ipv4.Header, layers.TCP, []byte, time.Duration, error) {
+func (e *TcpIpIDEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, maskIndex int) (ipv4.Header, layers.TCP, []byte, time.Duration, error) {
 	if len(buf) == 0 {
 		return ipv4h, tcph, nil, time.Duration(0), errors.New("Cannot set byte if no data")
 	}
@@ -50,7 +50,7 @@ func (e *TcpIpIDEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte)
 	}
 }
 
-func (e *TcpIpIDEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP) ([]byte, error) {
+func (e *TcpIpIDEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP, maskIndex int) ([]byte, error) {
 	if b, err := e.emb.GetByte(ipv4h); err == nil {
 		return []byte{b}, nil
 	} else {
@@ -66,7 +66,7 @@ type TcpIpUrgPtrEncoder struct {
 	emb *UrgPtrEncoder
 }
 
-func (e *TcpIpUrgPtrEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte) (ipv4.Header, layers.TCP, []byte, time.Duration, error) {
+func (e *TcpIpUrgPtrEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, maskIndex int) (ipv4.Header, layers.TCP, []byte, time.Duration, error) {
 	if len(buf) == 0 {
 		return ipv4h, tcph, nil, time.Duration(0), errors.New("Cannot set byte if no data")
 	}
@@ -77,7 +77,7 @@ func (e *TcpIpUrgPtrEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []b
 	}
 }
 
-func (e *TcpIpUrgPtrEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP) ([]byte, error) {
+func (e *TcpIpUrgPtrEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP, maskIndex int) ([]byte, error) {
 	if b, err := e.emb.GetByte(tcph); err == nil {
 		return []byte{b}, nil
 	} else {
@@ -93,7 +93,7 @@ type TcpIpUrgFlgEncoder struct {
 	emb *UrgFlgEncoder
 }
 
-func (e *TcpIpUrgFlgEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte) (ipv4.Header, layers.TCP, []byte, time.Duration, error) {
+func (e *TcpIpUrgFlgEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, maskIndex int) (ipv4.Header, layers.TCP, []byte, time.Duration, error) {
 	if len(buf) == 0 {
 		return ipv4h, tcph, nil, time.Duration(0), errors.New("Cannot set byte if no data")
 	}
@@ -104,7 +104,7 @@ func (e *TcpIpUrgFlgEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []b
 	}
 }
 
-func (e *TcpIpUrgFlgEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP) ([]byte, error) {
+func (e *TcpIpUrgFlgEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP, maskIndex int) ([]byte, error) {
 	if b, err := e.emb.GetByte(tcph); err == nil {
 		return []byte{b}, nil
 	} else {
@@ -122,7 +122,7 @@ type TcpIpTimeEncoder struct {
 	emb *TimeEncoder
 }
 
-func (e *TcpIpTimeEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP) ([]byte, error) {
+func (e *TcpIpTimeEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP, maskIndex int) ([]byte, error) {
 	if b, err := e.emb.GetByte(tcph); err == nil {
 		return []byte{b}, nil
 	} else {
@@ -130,7 +130,7 @@ func (e *TcpIpTimeEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP) ([]byte, 
 	}
 }
 
-func (e *TcpIpTimeEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte) (ipv4.Header, layers.TCP, []byte, time.Duration, error) {
+func (e *TcpIpTimeEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, maskIndex int) (ipv4.Header, layers.TCP, []byte, time.Duration, error) {
 	if len(buf) == 0 {
 		return ipv4h, tcph, nil, time.Duration(0), errors.New("Cannot set byte if no data")
 	}

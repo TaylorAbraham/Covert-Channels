@@ -291,6 +291,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		handshake byte   = 0
 		n         uint64 // the number of bytes received
 		fin       bool   // if the FIN packet has arrived
+		maskIndex int = 0
 	)
 
 	// Check if we should timeout
@@ -352,7 +353,8 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 				valid bool
 				err   error
 			)
-			n, handshake, valid, fin, err = c.handleReceivedPacket(p, dataBuf, n, ac.friendPort, handshake)
+			n, handshake, valid, fin, err = c.handleReceivedPacket(p, dataBuf, n, ac.friendPort, handshake, maskIndex)
+			maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
 
 			// If packets are sent with payload then it will fill up the internal
 			// tcp buffer.
@@ -421,7 +423,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 // TCP connection). RST or second SYN packets are interpreted as an error in the connection and
 // cause the Receive method to abort.
 // We return a valid flag to indicate if the packet forms part of the TCP covert communication (three way handshake, message, or FIN packet )
-func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPort uint16, handshake byte) (uint64, byte, bool, bool, error) {
+func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPort uint16, handshake byte, maskIndex int) (uint64, byte, bool, bool, error) {
 
 	var (
 		valid         bool // Was this packet a valid part of the message
@@ -464,7 +466,7 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 		fin = true
 	} else {
 		// Normal transmission packet
-		if receivedBytes, err = c.conf.Encoder.GetByte(p.Ipv4h, p.Tcph); err == nil {
+		if receivedBytes, err = c.conf.Encoder.GetByte(p.Ipv4h, p.Tcph, maskIndex); err == nil {
 			valid = true
 			for _, b := range receivedBytes {
 				if n < uint64(len(data)) {
@@ -527,6 +529,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		n          uint64
 		originPort uint16
 		timestamp  *layers.TCPOption
+		maskIndex int = 0
 	)
 
 	if tcpAddr, ok := conn.LocalAddr().(*net.TCPAddr); !ok {
@@ -595,18 +598,15 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	// Send each packet
 	for len(rem) > 0 {
 		var payload []byte = make([]byte, 5)
-		if ipv4h, tcph, rem, tm, err = c.conf.Encoder.SetByte(ipv4h, tcph, rem); err != nil {
+		if ipv4h, tcph, rem, tm, err = c.conf.Encoder.SetByte(ipv4h, tcph, rem, maskIndex); err != nil {
 			break
 		}
+		maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
 
 		time.Sleep(tm)
 
 		if wbuf, tcph, err = createTCPHeader(tcph, seq, ack, c.conf.OriginIP, c.conf.FriendIP, originPort, c.conf.FriendReceivePort, payload); err != nil {
 			break
-		}
-
-		if c.conf.logPackets {
-			c.sendPktLog.Add(originPort, packet{Ipv4h: ipv4h, Tcph: tcph})
 		}
 
 		// Sending a packet seems to overwrite at least the current timestamp option value to zero

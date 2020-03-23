@@ -128,6 +128,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		// This timer is used to timeout if packets are received, but they
 		// are not the correct type
 		prevPacketTime time.Time
+		maskIndex int = 0
 	)
 
 	// Figure out the expected source and destination IP address
@@ -174,10 +175,11 @@ readloop:
 							first = false
 
 							var newBytes []byte
-							newBytes, err = c.conf.Encoder.GetByte(*h, tcph)
+							newBytes, err = c.conf.Encoder.GetByte(*h, tcph, maskIndex)
 							if err != nil {
 								break readloop
 							}
+							maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
 
 							for _, b := range newBytes {
 								// Make sure we don't overflow the buffer
@@ -239,6 +241,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		tcph         layers.TCP
 		// We make it clear that the error always starts as nil
 		err error = nil
+		maskIndex int = 0
 	)
 
 	data, err = embedders.EncodeFromMask(c.conf.Encoder.GetMask(), data)
@@ -257,10 +260,11 @@ readloop:
 		h = createIPHeader(saddr, daddr)
 		cm = createCM(saddr, daddr)
 
-		h, tcph, data, err = c.createTcpHead(h, layers.TCP{SYN: true}, data, prevSequence)
+		h, tcph, data, err = c.createTcpHead(h, layers.TCP{SYN: true}, data, prevSequence, maskIndex)
 		if err != nil {
 			break readloop
 		}
+		maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
 		prevSequence = tcph.Seq
 
 		p, err = createTcpHeadBuf(tcph, saddr, daddr, sport, dport)
@@ -305,7 +309,17 @@ readloop:
 		h = createIPHeader(saddr, daddr)
 		cm = createCM(saddr, daddr)
 
-		h, tcph, _, err = c.createTcpHead(h, layers.TCP{ACK: true}, []byte{byte(r.Uint32())}, prevSequence)
+		// We want to still encode data so that this final packet looks
+		// like others. To do that, we need to provide enough bytes
+		// to fit the mask at this maskIndex
+		// We create a buffer with the appropriate size and fill it with
+		// random numbers
+		var fakeBuf []byte = make([]byte, len(c.conf.Encoder.GetMask()[maskIndex]))
+		for i := range fakeBuf {
+			fakeBuf[i] = byte(r.Uint32())
+		}
+
+		h, tcph, _, err = c.createTcpHead(h, layers.TCP{ACK: true}, fakeBuf, prevSequence, maskIndex)
 		if err != nil {
 			return num, err
 		}
@@ -390,7 +404,7 @@ func createCM(sip, dip [4]byte) ipv4.ControlMessage {
 	}
 }
 
-func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, prevSequence uint32) (ipv4.Header, layers.TCP, []byte, error) {
+func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, prevSequence uint32, maskIndex int) (ipv4.Header, layers.TCP, []byte, error) {
 	// Based on a preliminary investigation of my machine (running Ubuntu 18.04),
 	// SYN packets always seem to have a window of 65495
 	tcph.Window = 65495
@@ -401,10 +415,17 @@ func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	tcph.Seq = r.Uint32() & 0xFFFFFFFF
 
-	newipv4h, newtcph, newbuf, _, err := c.conf.Encoder.SetByte(ipv4h, tcph, buf)
+	var (
+		newipv4h ipv4.Header
+		newtcph  layers.TCP
+		newbuf   []byte
+		err 		 error
+	)
+
+	newipv4h, newtcph, newbuf, _, err = c.conf.Encoder.SetByte(ipv4h, tcph, buf, maskIndex)
 	if tcph.Seq == prevSequence {
 		tcph.Seq = r.Uint32() & 0xFFFFFFFF
-		newipv4h, newtcph, newbuf, _, err = c.conf.Encoder.SetByte(ipv4h, tcph, buf)
+		newipv4h, newtcph, newbuf, _, err = c.conf.Encoder.SetByte(ipv4h, tcph, buf, maskIndex)
 	}
 	return newipv4h, newtcph, newbuf, err
 }
