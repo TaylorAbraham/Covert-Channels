@@ -164,12 +164,12 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	defer conn.Close()
 
 	var (
-		ipv4h ipv4.Header         = createIPHeader(c.conf.OriginIP, c.conf.FriendIP)
-		cm    ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
-		udph  layers.UDP
-		wbuf  []byte
-		rem   []byte = data
-		n     uint64
+		ipv4h     ipv4.Header         = createIPHeader(c.conf.OriginIP, c.conf.FriendIP)
+		cm        ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
+		udph      layers.UDP
+		wbuf      []byte
+		rem       []byte = data
+		n         uint64
 		maskIndex int = 0
 	)
 
@@ -283,9 +283,9 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		// This timer is used to timeout if packets are received, but they
 		// are not the correct type
 		prevPacketTime time.Time
-		maskIndex int = 0
-		h *ipv4.Header
-		p []byte
+		maskIndex      int = 0
+		h              *ipv4.Header
+		p              []byte
 	)
 
 	saddr, sport, dport = c.conf.FriendIP, c.conf.FriendReceivePort, c.conf.OriginReceivePort

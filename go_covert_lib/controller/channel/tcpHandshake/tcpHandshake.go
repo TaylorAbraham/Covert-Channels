@@ -295,7 +295,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		handshake byte   = 0
 		n         uint64 // the number of bytes received
 		fin       bool   // if the FIN packet has arrived
-		maskIndex int = 0
+		maskIndex int    = 0
 	)
 
 	// Check if we should timeout
@@ -533,7 +533,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		n          uint64
 		originPort uint16
 		timestamp  *layers.TCPOption
-		maskIndex int = 0
+		maskIndex  int = 0
 	)
 
 	if tcpAddr, ok := conn.LocalAddr().(*net.TCPAddr); !ok {
