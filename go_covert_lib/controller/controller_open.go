@@ -10,6 +10,8 @@ import (
 	"./channel/tcpHandshake"
 	"./channel/tcpNormal"
 	"./channel/tcpSyn"
+	"./channel/udpIP"
+	"./channel/udpNormal"
 	"./config"
 	"./processor"
 	"./processor/asymmetricEncryption"
@@ -140,6 +142,14 @@ func (ctr *Controller) retrieveChannel(cconf channelConfig) (channel.Channel, *c
 		}
 	case "HttpNormal":
 		if c, err = httpNormal.ToChannel(newConf.Data.HttpNormal); err != nil {
+      return nil, nil, err
+		}
+	case "UdpNormal":
+		if c, err = udpNormal.ToChannel(newConf.Data.UdpNormal); err != nil {
+			return nil, nil, err
+		}
+	case "UdpIP":
+		if c, err = udpIP.ToChannel(newConf.Data.UdpIP); err != nil {
 			return nil, nil, err
 		}
 	default:

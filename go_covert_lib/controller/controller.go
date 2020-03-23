@@ -13,6 +13,8 @@ import (
 	"./channel/tcpHandshake"
 	"./channel/tcpNormal"
 	"./channel/tcpSyn"
+	"./channel/udpIP"
+	"./channel/udpNormal"
 	"./config"
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
@@ -82,6 +84,8 @@ func defaultChannel() channelData {
 		TcpNormal:    tcpNormal.GetDefault(),
 		HttpCovert:   httpCovert.GetDefault(),
 		HttpNormal:   httpNormal.GetDefault(),
+		UdpNormal:    udpNormal.GetDefault(),
+		UdpIP:        udpIP.GetDefault(),
 	}
 }
 

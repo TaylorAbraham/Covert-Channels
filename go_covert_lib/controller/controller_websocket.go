@@ -10,7 +10,7 @@ import (
 
 // The HTTP handler function for initializing and running the websocket
 func (ctr *Controller) HandleFunc(w http.ResponseWriter, r *http.Request) {
-	r.Header.Del("Origin")
+
 	ctr.clientLock.Lock()
 
 	select {
