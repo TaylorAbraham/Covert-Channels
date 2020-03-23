@@ -345,6 +345,19 @@ func TestMessageExchange(t *testing.T) {
 		channelTest{
 			name: "TcpHandshake",
 			f1: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 9090
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 9091
+				conf.Channel.Data.TcpHandshake.Encoder.Value = "ecn"
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 9091
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 9090
+				conf.Channel.Data.TcpHandshake.Encoder.Value = "ecn"
+			},
+		},
+		channelTest{
+			name: "TcpHandshake",
+			f1: func(conf *configData) {
 				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
 				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
 				conf.Channel.Data.TcpHandshake.Encoder.Value = "id"
@@ -462,6 +475,19 @@ func TestMessageExchange(t *testing.T) {
 			},
 		},
 		channelTest{
+			name: "TcpSyn",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8090
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8091
+				conf.Channel.Data.TcpSyn.Encoder.Value = "ecn"
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8091
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8090
+				conf.Channel.Data.TcpSyn.Encoder.Value = "ecn"
+			},
+		},
+		channelTest{
 			name: "UdpNormal",
 			f1: func(conf *configData) {
 				conf.Channel.Data.UdpNormal.DestinationPort.Value = 8090
@@ -499,7 +525,7 @@ func TestMessageExchange(t *testing.T) {
 
 	messages := []string{"", "A", "Hello World!", "🍌", "🍌🍌🍌", "Hello\nNewline!"}
 	for i := 0; i < 10; i++ {
-		messages = append(messages, randomValidString(32))
+		messages = append(messages, randomValidString(16))
 	}
 
 	// We have to use shorter messages for timing to prevent timeouts later

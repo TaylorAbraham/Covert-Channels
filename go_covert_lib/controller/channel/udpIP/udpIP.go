@@ -311,6 +311,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 						if err != nil {
 							break
 						}
+						maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
 						if (pos + uint64(len(b))) >= uint64(len(dataBuf)) { //overflow
 							err = errors.New("Overflow. End of message never received.")
 							break
