@@ -24,3 +24,7 @@ func (id *IDEncoder) SetByte(ipv4h ipv4.Header, b byte) (ipv4.Header, error) {
 
 	return ipv4h, nil
 }
+
+func (s *IDEncoder) NumPacket() int {
+	return 1
+}

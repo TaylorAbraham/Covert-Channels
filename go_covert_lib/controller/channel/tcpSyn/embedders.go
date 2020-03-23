@@ -17,4 +17,5 @@ type TcpEncoder interface {
 	// new sequence number is different than the previous sequence number
 	SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte) (ipv4.Header, layers.TCP, []byte, time.Duration, error)
 	GetByte(ipv4h ipv4.Header, tcph layers.TCP) ([]byte, error)
+	GetMask() [][]byte
 }

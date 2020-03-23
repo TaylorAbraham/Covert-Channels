@@ -100,7 +100,14 @@ func MakeChannel(conf Config) (*Channel, error) {
 // in which case data will have valid received bytes up to that point.
 func (c *Channel) Receive(data []byte) (uint64, error) {
 
-	if len(data) == 0 && c.conf.Delimiter != Protocol {
+	// We must expand out the input storage array to
+	// the correct size to potentially handle variable size inputs
+	dataBuf, err := embedders.GetBuf(c.conf.Encoder.GetMask(), data)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(dataBuf) == 0 && c.conf.Delimiter == Buffer {
 		return 0, nil
 	}
 
@@ -133,10 +140,15 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 
 	prevPacketTime = time.Now()
 
+	var (
+		h *ipv4.Header
+		p []byte
+	)
+readloop:
 	for {
-		h, p, _, err := c.readConn(buf)
+		h, p, _, err = c.readConn(buf)
 		if err != nil {
-			return pos, err
+			break readloop
 		}
 		tcph := layers.TCP{}
 		if err = tcph.DecodeFromBytes(p, gopacket.NilDecodeFeedback); err == nil {
@@ -145,7 +157,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 				if tcph.SrcPort == layers.TCPPort(sport) && tcph.DstPort == layers.TCPPort(dport) {
 					if c.conf.Delimiter == Protocol {
 						if (!c.conf.Bounce && tcph.ACK && !tcph.RST) || (c.conf.Bounce && tcph.RST) {
-							return pos, nil
+							break readloop
 						}
 					}
 					// If in bounce mode, we extract the original sequence number
@@ -161,12 +173,13 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 							prev_val = current_val
 							first = false
 
-							buf, err := c.conf.Encoder.GetByte(*h, tcph)
+							var newBytes []byte
+							newBytes, err = c.conf.Encoder.GetByte(*h, tcph)
 							if err != nil {
-								return pos, err
+								break readloop
 							}
 
-							for _, b := range buf {
+							for _, b := range newBytes {
 								// Make sure we don't overflow the buffer
 								// The buffer can only overflow if we are in protocol delimiter mode
 								// Once the buffer fills in protocol delimiter mode we
@@ -175,18 +188,19 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 								// and be unable to put the new byte into the buffer
 								// In that case we return with an error indicating buffer overflow
 								// (see below)
-								if pos < uint64(len(data)) {
-									data[pos] = b
-								} else if pos == uint64(len(data)) && c.conf.Delimiter == Protocol {
+								if pos < uint64(len(dataBuf)) {
+									dataBuf[pos] = b
+								} else if pos == uint64(len(dataBuf)) && c.conf.Delimiter == Protocol {
 									// If we are using the protocol delimiter, then we can fill the full
 									// buffer and then wait for the end packet. It is only if more bytes
 									// are received that we must notify of an error
-									return pos, errors.New("End packet not received, buffer full")
+									err = errors.New("End packet not received, buffer full")
+									break readloop
 								}
 								pos += 1
 								// We have filled the buffer without protocol delimiter and we should return immediately
-								if pos == uint64(len(data)) && c.conf.Delimiter != Protocol {
-									return pos, nil
+								if pos == uint64(len(dataBuf)) && c.conf.Delimiter != Protocol {
+									break readloop
 								}
 							}
 							prevPacketTime = time.Now()
@@ -196,9 +210,12 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 			}
 		}
 		if c.conf.ReadTimeout > 0 && time.Now().Sub(prevPacketTime) > c.conf.ReadTimeout {
-			return pos, errors.New("Covert Packet Timeout")
+			err = errors.New("Covert Packet Timeout")
+			break readloop
 		}
 	}
+
+	return embedders.CopyData(c.conf.Encoder.GetMask(), pos, dataBuf, data, err)
 }
 
 // Send a covert message
@@ -224,30 +241,35 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		err error = nil
 	)
 
+	data, err = embedders.EncodeFromMask(c.conf.Encoder.GetMask(), data)
+	if err != nil {
+		return 0, err
+	}
+
 	// The source and destination depend on whether or not we are in bounce mode
 	if c.conf.Bounce {
 		saddr, daddr, sport, dport = c.conf.FriendIP, c.conf.BounceIP, c.conf.FriendPort, c.conf.BouncePort
 	} else {
 		saddr, daddr, sport, dport = c.conf.OriginIP, c.conf.FriendIP, c.conf.OriginPort, c.conf.FriendPort
 	}
-
+readloop:
 	for len(data) > 0 {
 		h = createIPHeader(saddr, daddr)
 		cm = createCM(saddr, daddr)
 
 		h, tcph, data, err = c.createTcpHead(h, layers.TCP{SYN: true}, data, prevSequence)
 		if err != nil {
-			return num, err
+			break readloop
 		}
 		prevSequence = tcph.Seq
 
 		p, err = createTcpHeadBuf(tcph, saddr, daddr, sport, dport)
 		if err != nil {
-			return num, err
+			break readloop
 		}
 
 		if err = c.writeConn(&h, p, &cm); err != nil {
-			return num, err
+			break readloop
 		}
 
 		// If the user did not supply a GetDelay function,
@@ -266,9 +288,17 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		select {
 		case <-time.After(wait):
 		case <-c.writeCancel:
-			return num, &WriteWaitCancel{}
+			err = &WriteWaitCancel{}
+			break readloop
 		}
 	}
+
+	// Readjust size to represent number of bytes sent
+	num, err = embedders.GetSentSize(c.conf.Encoder.GetMask(), num, err)
+	if err != nil {
+		return num, err
+	}
+
 	// If we are using Protocol delimiting, we must send a final
 	// ACK packet to alert the receiver that the message is done sending
 	if c.conf.Delimiter == Protocol {

@@ -307,12 +307,25 @@ func TestMessageExchange(t *testing.T) {
 			f1: func(conf *configData) {
 				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
 				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
-				conf.Channel.Data.TcpHandshake.Encoder.Value = "urg"
+				conf.Channel.Data.TcpHandshake.Encoder.Value = "urgflg"
 			},
 			f2: func(conf *configData) {
 				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
 				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
-				conf.Channel.Data.TcpHandshake.Encoder.Value = "urg"
+				conf.Channel.Data.TcpHandshake.Encoder.Value = "urgflg"
+			},
+		},
+		channelTest{
+			name: "TcpHandshake",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8090
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8091
+				conf.Channel.Data.TcpHandshake.Encoder.Value = "urgptr"
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 8091
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 8090
+				conf.Channel.Data.TcpHandshake.Encoder.Value = "urgptr"
 			},
 		},
 		channelTest{
@@ -401,12 +414,25 @@ func TestMessageExchange(t *testing.T) {
 			f1: func(conf *configData) {
 				conf.Channel.Data.TcpSyn.FriendPort.Value = 8090
 				conf.Channel.Data.TcpSyn.OriginPort.Value = 8091
-				conf.Channel.Data.TcpSyn.Encoder.Value = "urg"
+				conf.Channel.Data.TcpSyn.Encoder.Value = "urgflg"
 			},
 			f2: func(conf *configData) {
 				conf.Channel.Data.TcpSyn.FriendPort.Value = 8091
 				conf.Channel.Data.TcpSyn.OriginPort.Value = 8090
-				conf.Channel.Data.TcpSyn.Encoder.Value = "urg"
+				conf.Channel.Data.TcpSyn.Encoder.Value = "urgflg"
+			},
+		},
+		channelTest{
+			name: "TcpSyn",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8090
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8091
+				conf.Channel.Data.TcpSyn.Encoder.Value = "urgptr"
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8091
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8090
+				conf.Channel.Data.TcpSyn.Encoder.Value = "urgptr"
 			},
 		},
 		channelTest{

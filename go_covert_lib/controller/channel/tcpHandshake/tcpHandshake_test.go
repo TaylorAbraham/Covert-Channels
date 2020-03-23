@@ -117,7 +117,14 @@ var confList []Config = []Config{
 		OriginIP:          [4]byte{127, 0, 0, 1},
 		FriendReceivePort: 8080,
 		OriginReceivePort: 8081,
-		Encoder:           &embedders.TcpIpURGEncoder{},
+		Encoder:           &embedders.TcpIpUrgFlgEncoder{},
+	},
+	Config{
+		FriendIP:          [4]byte{127, 0, 0, 1},
+		OriginIP:          [4]byte{127, 0, 0, 1},
+		FriendReceivePort: 8080,
+		OriginReceivePort: 8081,
+		Encoder:           &embedders.TcpIpUrgPtrEncoder{},
 	},
 	Config{
 		FriendIP:          [4]byte{127, 0, 0, 1},

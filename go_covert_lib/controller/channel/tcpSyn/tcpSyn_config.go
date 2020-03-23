@@ -35,7 +35,7 @@ func GetDefault() ConfigClient {
 		WriteTimeout: config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The write timeout in milliseconds.", Name: "Write Timeout", Group: "Timing"}),
 		ReadTimeout:  config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The read timeout in milliseconds.", Name: "Read Timeout", Group: "Timing"}),
 		Delimiter:    config.MakeSelect("protocol", []string{"buffer", "protocol"}, config.Display{Description: "The delimiter to use for deciding when to return after having received a message.", Name: "Delimeter", Group: "Settings"}),
-		Encoder:      config.MakeSelect("sequence", []string{"sequence", "id", "urg", "time"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
+		Encoder:      config.MakeSelect("sequence", []string{"sequence", "id", "urgptr", "urgflg", "time"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
 	}
 }
 
@@ -77,8 +77,10 @@ func ToChannel(cc ConfigClient) (*Channel, error) {
 		c.Encoder = &embedders.TcpIpSeqEncoder{}
 	case "id":
 		c.Encoder = &embedders.TcpIpIDEncoder{}
-	case "urg":
-		c.Encoder = &embedders.TcpIpURGEncoder{}
+	case "urgflg":
+		c.Encoder = &embedders.TcpIpUrgFlgEncoder{}
+	case "urgptr":
+		c.Encoder = &embedders.TcpIpUrgPtrEncoder{}
 	case "time":
 		c.Encoder = &embedders.TcpIpTimeEncoder{}
 	default:

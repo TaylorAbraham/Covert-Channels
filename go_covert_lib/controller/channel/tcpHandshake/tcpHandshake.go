@@ -275,6 +275,13 @@ func waitPacket(pktChan chan packet, timeout time.Duration, f func(p packet) (bo
 
 func (c *Channel) Receive(data []byte) (uint64, error) {
 
+	// We must expand out the input storage array to
+	// the correct size to potentially handle variable size inputs
+	dataBuf, err := embedders.GetBuf(c.conf.Encoder.GetMask(), data)
+	if err != nil {
+		return 0, err
+	}
+
 	var (
 		ac acceptedConn
 		//    ack uint32
@@ -333,7 +340,6 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 
 	// Exit when the fin packet is received
 	for !fin {
-		var err error
 		// Wait until a valid packet is received
 		// This way we measure the time between valid packets.
 		// If no valid packet is received within timeout of the previous valid packet
@@ -346,7 +352,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 				valid bool
 				err   error
 			)
-			n, handshake, valid, fin, err = c.handleReceivedPacket(p, data, n, ac.friendPort, handshake)
+			n, handshake, valid, fin, err = c.handleReceivedPacket(p, dataBuf, n, ac.friendPort, handshake)
 
 			// If packets are sent with payload then it will fill up the internal
 			// tcp buffer.
@@ -380,9 +386,11 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 			return valid, err
 		}, c.cancel)
 		if err != nil {
-			return n, err
+			break
 		}
 	}
+
+	return embedders.CopyData(c.conf.Encoder.GetMask(), n, dataBuf, data, err)
 
 	/*
 		// This code allows the TCP conn to reply with a proper FIN/Ack
@@ -402,7 +410,6 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 			}
 		}
 	*/
-	return n, nil
 }
 
 // Once the three way handshake is complete we must read the incoming packets
@@ -474,6 +481,12 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 }
 
 func (c *Channel) Send(data []byte) (uint64, error) {
+
+	data, err := embedders.EncodeFromMask(c.conf.Encoder.GetMask(), data)
+	if err != nil {
+		return 0, err
+	}
+
 	var systemTime time.Time
 	nd := net.Dialer{
 		Timeout: c.conf.DialTimeout,
@@ -583,13 +596,13 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	for len(rem) > 0 {
 		var payload []byte = make([]byte, 5)
 		if ipv4h, tcph, rem, tm, err = c.conf.Encoder.SetByte(ipv4h, tcph, rem); err != nil {
-			return n, err
+			break
 		}
 
 		time.Sleep(tm)
 
 		if wbuf, tcph, err = createTCPHeader(tcph, seq, ack, c.conf.OriginIP, c.conf.FriendIP, originPort, c.conf.FriendReceivePort, payload); err != nil {
-			return n, err
+			break
 		}
 
 		if c.conf.logPackets {
@@ -604,12 +617,19 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		}
 
 		if err = c.sendPacket(&ipv4h, wbuf, &cm); err != nil {
-			return n, err
+			break
 		}
 		n = uint64(len(data) - len(rem))
 
 		seq = seq + uint32(len(payload))
 	}
+
+	// Readjust size to represent number of bytes sent
+	n, err = embedders.GetSentSize(c.conf.Encoder.GetMask(), n, err)
+	if err != nil {
+		return n, err
+	}
+
 	tcph.ACK = true
 	tcph.FIN = true
 	tcph.PSH = false
