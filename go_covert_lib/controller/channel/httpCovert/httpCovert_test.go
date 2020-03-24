@@ -13,8 +13,8 @@ var sconf Config = Config{
 	FriendPort:     8000,
 	OriginPort:     8001,
 	UserType:       Server,
-	ClientPollRate: time.Second,
-	ClientTimeout:  5 * time.Second,
+	ClientPollRate: time.Millisecond * 500,
+	ClientTimeout:  2 * time.Second,
 }
 
 var rconf Config = Config{
@@ -23,8 +23,8 @@ var rconf Config = Config{
 	FriendPort:     8001,
 	OriginPort:     8000,
 	UserType:       Client,
-	ClientPollRate: time.Second,
-	ClientTimeout:  5 * time.Second,
+	ClientPollRate: time.Millisecond * 500,
+	ClientTimeout:  2 * time.Second,
 }
 
 func TestReceiveSendGet(t *testing.T) {

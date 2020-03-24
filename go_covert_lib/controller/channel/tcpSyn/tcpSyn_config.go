@@ -1,13 +1,11 @@
 package tcpSyn
 
 import (
-
-	"../../config"
-	"../embedders"
 	"errors"
 	"time"
 
 	"../../config"
+	"../embedders"
 )
 
 type ConfigClient struct {
