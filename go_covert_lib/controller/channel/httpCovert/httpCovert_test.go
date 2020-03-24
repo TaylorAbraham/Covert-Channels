@@ -8,19 +8,23 @@ import (
 )
 
 var sconf Config = Config{
-	FriendIP:   [4]byte{127, 0, 0, 1},
-	OriginIP:   [4]byte{127, 0, 0, 1},
-	FriendPort: 8000,
-	OriginPort: 8001,
-	UserType:   Server,
+	FriendIP:       [4]byte{127, 0, 0, 1},
+	OriginIP:       [4]byte{127, 0, 0, 1},
+	FriendPort:     8000,
+	OriginPort:     8001,
+	UserType:       Server,
+	ClientPollRate: time.Second,
+	ClientTimeout:  5 * time.Second,
 }
 
 var rconf Config = Config{
-	FriendIP:   [4]byte{127, 0, 0, 1},
-	OriginIP:   [4]byte{127, 0, 0, 1},
-	FriendPort: 8001,
-	OriginPort: 8000,
-	UserType:   Client,
+	FriendIP:       [4]byte{127, 0, 0, 1},
+	OriginIP:       [4]byte{127, 0, 0, 1},
+	FriendPort:     8001,
+	OriginPort:     8000,
+	UserType:       Client,
+	ClientPollRate: time.Second,
+	ClientTimeout:  5 * time.Second,
 }
 
 func TestReceiveSendGet(t *testing.T) {
@@ -42,7 +46,7 @@ func TestReceiveSendGet(t *testing.T) {
 		rErr error
 		nr   uint64
 		// Test with message with many characters and with 0 characters
-		inputs [][]byte = [][]byte{[]byte("Hello world!")}
+		inputs [][]byte = [][]byte{[]byte("Hello world!"), []byte("")}
 	)
 
 	for _, input := range inputs {
@@ -100,7 +104,7 @@ func TestReceiveSendPost(t *testing.T) {
 		rErr error
 		nr   uint64
 		// Test with message with many characters and with 0 characters
-		inputs [][]byte = [][]byte{[]byte("Hello world!")}
+		inputs [][]byte = [][]byte{[]byte("Hello world!"), []byte("")}
 	)
 
 	for _, input := range inputs {

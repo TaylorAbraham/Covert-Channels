@@ -27,8 +27,10 @@ type Config struct {
 	OriginPort uint16
 	UserType   uint8
 
-	ReadTimeout  time.Duration
-	WriteTimeout time.Duration
+	ClientPollRate time.Duration
+	ClientTimeout  time.Duration
+	ReadTimeout    time.Duration
+	WriteTimeout   time.Duration
 }
 
 // A HTTP covert channel
@@ -157,25 +159,44 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 				return 0, errors.New("Channel closed")
 			}
 		}
+
 		// if the user is client type computer
 	} else {
-		//get the http response message
-		addr := &net.TCPAddr{IP: c.conf.FriendIP[:], Port: int(c.conf.FriendPort)}
-		resp, err := http.Get("http://" + addr.String() + "/")
-
-		//as long as there is no error
-		//extract the information from the body of the reponse message
-		if err == nil {
-			buf := bytes.Buffer{}
-			buf.ReadFrom(resp.Body)
-			copy(data, buf.Bytes())
-			if len(buf.Bytes()) > len(data) {
-				return uint64(len(data)), errors.New("Buffer overflow")
-			} else {
-				return uint64(len(buf.Bytes())), nil
-			}
+		n, success, err := c.clientRequest(data)
+		if success || err != nil {
+			return n, err
 		} else {
-			return 0, err
+			// Loop while making requests
+			var ticker *time.Ticker = time.NewTicker(c.conf.ClientPollRate)
+			defer ticker.Stop()
+			if c.conf.ClientTimeout == time.Duration(0) {
+				// No timeout
+				for {
+					select {
+					case <-ticker.C:
+						n, success, err := c.clientRequest(data)
+						if success || err != nil {
+							return n, err
+						}
+					case <-c.cancel:
+						return 0, errors.New("Channel closed")
+					}
+				}
+			} else {
+				for {
+					select {
+					case <-ticker.C:
+						n, success, err := c.clientRequest(data)
+						if success || err != nil {
+							return n, err
+						}
+					case <-time.After(c.conf.ClientTimeout):
+						return 0, errors.New("Client Timeout")
+					case <-c.cancel:
+						return 0, errors.New("Channel closed")
+					}
+				}
+			}
 		}
 	}
 }
@@ -228,5 +249,29 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		} else {
 			return 0, err
 		}
+	}
+}
+
+func (c *Channel) clientRequest(data []byte) (uint64, bool, error) {
+	addr := &net.TCPAddr{IP: c.conf.FriendIP[:], Port: int(c.conf.FriendPort)}
+	resp, err := http.Get("http://" + addr.String() + "/")
+
+	//as long as there is no error
+	//extract the information from the body of the reponse message
+	if err == nil {
+		if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
+			buf := bytes.Buffer{}
+			buf.ReadFrom(resp.Body)
+			copy(data, buf.Bytes())
+			if len(buf.Bytes()) > len(data) {
+				return uint64(len(data)), true, errors.New("Buffer overflow")
+			} else {
+				return uint64(len(buf.Bytes())), true, nil
+			}
+		} else {
+			return 0, false, nil
+		}
+	} else {
+		return 0, false, err
 	}
 }

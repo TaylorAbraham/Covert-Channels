@@ -8,19 +8,23 @@ import (
 )
 
 var sconf Config = Config{
-	FriendIP:   [4]byte{127, 0, 0, 1},
-	OriginIP:   [4]byte{127, 0, 0, 1},
-	FriendPort: 2001,
-	OriginPort: 2000,
-	UserType:   Server,
+	FriendIP:       [4]byte{127, 0, 0, 1},
+	OriginIP:       [4]byte{127, 0, 0, 1},
+	FriendPort:     2001,
+	OriginPort:     2000,
+	UserType:       Server,
+	ClientPollRate: time.Second,
+	ClientTimeout:  5 * time.Second,
 }
 
 var rconf Config = Config{
-	FriendIP:   [4]byte{127, 0, 0, 1},
-	OriginIP:   [4]byte{127, 0, 0, 1},
-	FriendPort: 2000,
-	OriginPort: 2001,
-	UserType:   Client,
+	FriendIP:       [4]byte{127, 0, 0, 1},
+	OriginIP:       [4]byte{127, 0, 0, 1},
+	FriendPort:     2000,
+	OriginPort:     2001,
+	UserType:       Client,
+	ClientPollRate: time.Second,
+	ClientTimeout:  5 * time.Second,
 }
 
 func TestReceiveSendGet(t *testing.T) {
