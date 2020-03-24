@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"./channel/icmpIP"
 	"./channel/icmpNormal"
 	"./channel/tcpHandshake"
 	"./channel/tcpNormal"
@@ -77,7 +78,8 @@ func DefaultConfig() configData {
 
 func defaultChannel() channelData {
 	return channelData{
-		icmpNormal:	icmpNormal.GetDefault(),
+		icmpIP:       icmpIP.GetDefault(),
+		icmpNormal:   icmpNormal.GetDefault(),
 		TcpSyn:       tcpSyn.GetDefault(),
 		TcpHandshake: tcpHandshake.GetDefault(),
 		TcpNormal:    tcpNormal.GetDefault(),

@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"./channel"
+	"./channel/icmpIP"
 	"./channel/icmpNormal"
 	"./channel/tcpHandshake"
 	"./channel/tcpNormal"
@@ -123,6 +124,10 @@ func (ctr *Controller) retrieveChannel(cconf channelConfig) (channel.Channel, *c
 	}
 
 	switch newConf.Type {
+	case "icmpIP":
+		if c, err = icmpIP.ToChannel(newConf.Data.icmpIP); err != nil {
+			return nil, nil, err
+		}
 	case "icmpNormal":
 		if c, err = icmpNormal.ToChannel(newConf.Data.icmpNormal); err != nil {
 			return nil, nil, err
