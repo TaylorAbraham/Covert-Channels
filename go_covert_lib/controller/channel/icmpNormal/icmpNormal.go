@@ -1,33 +1,33 @@
 package icmpNormal
 
-import(
-	"net"
+import (
 	"errors"
-	"golang.org/x/net/ipv4"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"golang.org/x/net/ipv4"
+	"net"
 )
 
 type Config struct {
-	FriendIP          [4]byte
-	OriginIP          [4]byte
+	FriendIP        [4]byte
+	OriginIP        [4]byte
 	DestinationPort uint16
-	OriginPort uint16
+	OriginPort      uint16
 }
 
 // This is a normal, non-covert IMCP messaging channel
 // The message is sent using normal simiply ICMP packets
 type Channel struct {
-	conf     Config
+	conf       Config
 	clientConn net.Conn
-	rawConn     *ipv4.RawConn
+	rawConn    *ipv4.RawConn
 }
 
 // closes the ICMP channel
 func (c *Channel) Close() error {
 	// close the channel and check if any errors occur
 	err := c.rawConn.Close()
-	if(err != nil) {
+	if err != nil {
 		c.clientConn.Close()
 		return err
 	}
@@ -87,7 +87,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 func (c *Channel) Send(data []byte) (uint64, error) {
 
 	var icmph layers.ICMPv4 = layers.ICMPv4{
-		TypeCode : layers.CreateICMPv4TypeCode(1, 0),
+		TypeCode: layers.CreateICMPv4TypeCode(1, 0),
 	}
 
 	sb := gopacket.NewSerializeBuffer()

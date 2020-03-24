@@ -1,25 +1,24 @@
 package icmpNormal
 
 import (
-	"testing"
-	"log"
-	"time"
 	"bytes"
-
+	"log"
+	"testing"
+	"time"
 )
 
 var sconf Config = Config{
-	FriendIP:          [4]byte{127, 0, 0, 1},
-	OriginIP:          [4]byte{127, 0, 0, 1},
+	FriendIP:        [4]byte{127, 0, 0, 1},
+	OriginIP:        [4]byte{127, 0, 0, 1},
 	DestinationPort: 8080,
-	OriginPort: 8081,
+	OriginPort:      8081,
 }
 
 var rconf Config = Config{
-	FriendIP:          [4]byte{127, 0, 0, 1},
-	OriginIP:          [4]byte{127, 0, 0, 1},
+	FriendIP:        [4]byte{127, 0, 0, 1},
+	OriginIP:        [4]byte{127, 0, 0, 1},
 	DestinationPort: 8081,
-	OriginPort: 8080,
+	OriginPort:      8080,
 }
 
 // testing sending and receiving feature of the covert channel
@@ -39,9 +38,9 @@ func TestReceiveSend(t *testing.T) {
 	}
 
 	var (
-		c    chan []byte = make(chan []byte)
-		rErr error
-		nr   uint64
+		c      chan []byte = make(chan []byte)
+		rErr   error
+		nr     uint64
 		inputs [][]byte = [][]byte{[]byte("This is a normal channel"), []byte("")}
 	)
 
