@@ -44,9 +44,9 @@ $hidden_console_width: 54px;
 }
 
 .input-text {
-  width: 160px;
+  width: 180px;
   text-align: right !important;
-  display: inline-block !important; /* This centers text */
+  display: inline-block !important; // This centers text
 }
 
 .cc-tooltip {

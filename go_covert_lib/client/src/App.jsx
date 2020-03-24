@@ -53,7 +53,7 @@ const App = () => {
   };
 
   const addCovertMessage = (newMsg) => {
-    setCovertMessages(sm => sm.concat(`[${getTimestamp()}] ${newMsg}`));
+    setCovertMessages(cm => cm.concat(`[${getTimestamp()}] ${newMsg}`));
   };
 
   const openChannel = () => {
