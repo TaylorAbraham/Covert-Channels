@@ -4,6 +4,7 @@ import Button from 'react-bootstrap/Button';
 import Dropdown from 'react-bootstrap/Dropdown';
 
 import Checkbox from '../ui-components/Checkbox';
+import HexKey from '../ui-components/HexKey';
 import IPInput from '../ui-components/IPInput';
 import NumberInput from '../ui-components/NumberInput';
 import Select from '../ui-components/Select';
@@ -174,7 +175,7 @@ const ConfigScreen = (props) => {
                     />
                   );
                 case 'hexkey':
-                  return (<div>hexkey</div>);
+                  return (<HexKey {...propsForComponent} values={opt.Range} />);
                 case 'key':
                   return (<TextArea {...propsForComponent} />);
                 default:
@@ -279,7 +280,7 @@ const ConfigScreen = (props) => {
               />
             );
           case 'hexkey':
-            return (<div>hexkey</div>);
+            return (<HexKey {...propsForComponent} />);
           case 'key':
             return (<TextArea {...propsForComponent} />);
           default:
