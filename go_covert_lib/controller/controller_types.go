@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"./channel"
+	"./channel/icmpNormal"
 	"./channel/tcpHandshake"
 	"./channel/tcpNormal"
 	"./channel/tcpSyn"
@@ -61,6 +62,7 @@ type channelConfig struct {
 }
 
 type channelData struct {
+	icmpNormal	icmpNormal.ConfigClient
 	TcpSyn       tcpSyn.ConfigClient
 	TcpHandshake tcpHandshake.ConfigClient
 	TcpNormal    tcpNormal.ConfigClient
