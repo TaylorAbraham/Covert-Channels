@@ -45,10 +45,10 @@ func TestReceiveSend(t *testing.T) {
 		inputs [][]byte = [][]byte{[]byte("This is a normal channel"), []byte("")}
 	)
 
-	// construct the packets 
+	// construct the packets
 	for _, input := range inputs {
 		go func() {
-			var data [15]byte
+			var data [50]byte
 			nr, rErr = rch.Receive(data[:])
 			select {
 			case c <- data[:nr]:
@@ -56,10 +56,10 @@ func TestReceiveSend(t *testing.T) {
 			}
 		}()
 
-		// send the packet 
+		// send the packet
 		sendAndCheck(t, input, sch)
 
-		// receive the packet 
+		// receive the packet
 		receiveAndCheck(t, input, c)
 
 		if rErr != nil {
@@ -67,7 +67,7 @@ func TestReceiveSend(t *testing.T) {
 		}
 	}
 
-	// close the channel 
+	// close the channel
 	if err := sch.Close(); err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
@@ -77,7 +77,7 @@ func TestReceiveSend(t *testing.T) {
 	}
 }
 
-// just send the ICMP packets 
+// just send the ICMP packets
 func sendAndCheck(t *testing.T, input []byte, sch *Channel) {
 	n, err := sch.Send(input)
 	if err != nil {
@@ -88,7 +88,7 @@ func sendAndCheck(t *testing.T, input []byte, sch *Channel) {
 	}
 }
 
-// just receive the IMCP packets 
+// just receive the IMCP packets
 func receiveAndCheck(t *testing.T, input []byte, c chan []byte) {
 	select {
 	case received := <-c:
