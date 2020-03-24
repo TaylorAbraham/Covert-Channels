@@ -1,26 +1,26 @@
 package udpNormal
 
-import(
+import (
 	"net"
 )
 
 type Config struct {
-	FriendIP          [4]byte
-	OriginIP          [4]byte
+	FriendIP        [4]byte
+	OriginIP        [4]byte
 	DestinationPort uint16
-	OriginPort uint16
+	OriginPort      uint16
 }
 
 // A UDP channel
 type Channel struct {
-	conf     Config
+	conf       Config
 	packetConn net.PacketConn
 	clientConn net.Conn
 }
 
 func (c *Channel) Close() error {
 	err := c.packetConn.Close()
-	if(err != nil) {
+	if err != nil {
 		c.clientConn.Close()
 		return err
 	}
@@ -35,7 +35,6 @@ func MakeChannel(conf Config) (*Channel, error) {
 
 	c := &Channel{
 		conf: conf,
-
 	}
 
 	//server ready for incoming udp interaction to server address
