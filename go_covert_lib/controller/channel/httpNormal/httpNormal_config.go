@@ -26,7 +26,7 @@ func GetDefault() ConfigClient {
 		FriendPort:     config.MakeU16(8123, [2]uint16{0, 65535}, config.Display{Description: "Your friend's port.", Name: "Friend's Port", Group: "Ports"}),
 		OriginPort:     config.MakeU16(8124, [2]uint16{0, 65535}, config.Display{Description: "Your port.", Name: "Your Port", Group: "Ports"}),
 		UserType:       config.MakeSelect("client", []string{"client", "server"}, config.Display{Description: "Should this covert channel act as a client or server?", Name: "UserType", Group: "Settings"}),
-		ClientPollRate: config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The poll rate in milliseconds.", Name: "Poll Rate", Group: "Timing"}),
+		ClientPollRate: config.MakeU64(5, [2]uint64{0, 65535}, config.Display{Description: "The poll rate in milliseconds.", Name: "Poll Rate", Group: "Timing"}),
 		ClientTimeout:  config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The client timeout in milliseconds.", Name: "Client Timeout", Group: "Timing"}),
 		WriteTimeout:   config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The write timeout in milliseconds.", Name: "Write Timeout", Group: "Timing"}),
 		ReadTimeout:    config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The read timeout in milliseconds.", Name: "Read Timeout", Group: "Timing"}),
@@ -48,6 +48,8 @@ func ToChannel(cc ConfigClient) (*Channel, error) {
 	c.OriginIP = originIP
 	c.FriendPort = cc.FriendPort.Value
 	c.OriginPort = cc.OriginPort.Value
+	c.ClientPollRate = time.Duration(cc.ClientPollRate.Value) * time.Millisecond
+	c.ClientTimeout = time.Duration(cc.ClientTimeout.Value) * time.Millisecond
 	c.ReadTimeout = time.Duration(cc.ReadTimeout.Value) * time.Millisecond
 	c.WriteTimeout = time.Duration(cc.WriteTimeout.Value) * time.Millisecond
 

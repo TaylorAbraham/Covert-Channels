@@ -84,10 +84,13 @@ func (c *Channel) handleFunc(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		select {
 		case data := <-c.serverSendBuf:
+			w.Header().Add("Valid", "0")
 			io.WriteString(w, string(data))
 		case <-time.After(time.Millisecond * 50):
-			log.Println("GET Request timeout")
+			//log.Println("GET Request timeout")
+			w.Header().Add("Valid", "1")
 		case <-c.cancel:
+			w.Header().Add("Valid", "1")
 		}
 
 		// if the request message is a post request
@@ -98,7 +101,7 @@ func (c *Channel) handleFunc(w http.ResponseWriter, r *http.Request) {
 		select {
 		case c.serverRecBuf <- buf.Bytes():
 		case <-time.After(time.Millisecond * 50):
-			log.Println("GET Request timeout")
+			//log.Println("POST Request timeout")
 		case <-c.cancel:
 		}
 	} else {
@@ -166,36 +169,40 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		if success || err != nil {
 			return n, err
 		} else {
-			// Loop while making requests
-			var ticker *time.Ticker = time.NewTicker(c.conf.ClientPollRate)
-			defer ticker.Stop()
-			if c.conf.ClientTimeout == time.Duration(0) {
-				// No timeout
-				for {
-					select {
-					case <-ticker.C:
-						n, success, err := c.clientRequest(data)
-						if success || err != nil {
-							return n, err
+			if c.conf.ClientPollRate > 0 {
+				// Loop while making requests
+				var ticker *time.Ticker = time.NewTicker(c.conf.ClientPollRate)
+				defer ticker.Stop()
+				if c.conf.ClientTimeout == time.Duration(0) {
+					// No timeout
+					for {
+						select {
+						case <-ticker.C:
+							n, success, err := c.clientRequest(data)
+							if success || err != nil {
+								return n, err
+							}
+						case <-c.cancel:
+							return 0, errors.New("Channel closed")
 						}
-					case <-c.cancel:
-						return 0, errors.New("Channel closed")
+					}
+				} else {
+					for {
+						select {
+						case <-ticker.C:
+							n, success, err := c.clientRequest(data)
+							if success || err != nil {
+								return n, err
+							}
+						case <-time.After(c.conf.ClientTimeout):
+							return 0, errors.New("Client Timeout")
+						case <-c.cancel:
+							return 0, errors.New("Channel closed")
+						}
 					}
 				}
 			} else {
-				for {
-					select {
-					case <-ticker.C:
-						n, success, err := c.clientRequest(data)
-						if success || err != nil {
-							return n, err
-						}
-					case <-time.After(c.conf.ClientTimeout):
-						return 0, errors.New("Client Timeout")
-					case <-c.cancel:
-						return 0, errors.New("Channel closed")
-					}
-				}
+				return n, err
 			}
 		}
 	}
@@ -259,7 +266,7 @@ func (c *Channel) clientRequest(data []byte) (uint64, bool, error) {
 	//as long as there is no error
 	//extract the information from the body of the reponse message
 	if err == nil {
-		if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
+		if resp.Header.Get("Valid") == "0" {
 			buf := bytes.Buffer{}
 			buf.ReadFrom(resp.Body)
 			copy(data, buf.Bytes())
