@@ -36,12 +36,15 @@ func ToChannel(cc ConfigClient) (*Channel, error) {
 	var c Config
 	var friendIP, originIP [4]byte
 	var err error
+
 	if friendIP, err = cc.FriendIP.GetValue(); err != nil {
 		return nil, errors.New("Invalid FriendIP value")
 	}
+	
 	if originIP, err = cc.OriginIP.GetValue(); err != nil {
 		return nil, errors.New("Invalid OriginIP value")
 	}
+	
 	c.FriendIP = friendIP
 	c.OriginIP = originIP
 
