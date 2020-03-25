@@ -4,6 +4,7 @@ $hidden_console_width: 54px;
 .cc-navbar {
   position: fixed !important;
   width: 100%;
+  z-index: 99;
 }
 
 .spinner-container {
