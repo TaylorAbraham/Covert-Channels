@@ -40,11 +40,11 @@ func ToChannel(cc ConfigClient) (*Channel, error) {
 	if friendIP, err = cc.FriendIP.GetValue(); err != nil {
 		return nil, errors.New("Invalid FriendIP value")
 	}
-	
+
 	if originIP, err = cc.OriginIP.GetValue(); err != nil {
 		return nil, errors.New("Invalid OriginIP value")
 	}
-	
+
 	c.FriendIP = friendIP
 	c.OriginIP = originIP
 
