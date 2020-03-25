@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"./channel/httpCovert"
+	"./channel/httpNormal"
 	"./channel/icmpIP"
 	"./channel/icmpNormal"
 	"./channel/tcpHandshake"
@@ -83,6 +85,8 @@ func defaultChannel() channelData {
 		TcpSyn:       tcpSyn.GetDefault(),
 		TcpHandshake: tcpHandshake.GetDefault(),
 		TcpNormal:    tcpNormal.GetDefault(),
+		HttpCovert:   httpCovert.GetDefault(),
+		HttpNormal:   httpNormal.GetDefault(),
 		UdpNormal:    udpNormal.GetDefault(),
 		UdpIP:        udpIP.GetDefault(),
 	}

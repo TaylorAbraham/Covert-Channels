@@ -1,4 +1,4 @@
-package icmpIP
+package httpNormal
 
 import (
 	"bytes"
@@ -7,34 +7,36 @@ import (
 	"time"
 )
 
-var sconfTimeout Config = Config{
-	FriendIP:     [4]byte{127, 0, 0, 1},
-	OriginIP:     [4]byte{127, 0, 0, 1},
-	Identifier:   1234,
-	ReadTimeout:  time.Second,
-	WriteTimeout: time.Second,
+var sconf Config = Config{
+	FriendIP:       [4]byte{127, 0, 0, 1},
+	OriginIP:       [4]byte{127, 0, 0, 1},
+	FriendPort:     2001,
+	OriginPort:     2000,
+	UserType:       Server,
+	ClientPollRate: time.Millisecond * 500,
+	ClientTimeout:  2 * time.Second,
 }
 
-var rconfTimeout Config = Config{
-	FriendIP:     [4]byte{127, 0, 0, 1},
-	OriginIP:     [4]byte{127, 0, 0, 1},
-	Identifier:   1234,
-	ReadTimeout:  time.Second,
-	WriteTimeout: time.Second,
+var rconf Config = Config{
+	FriendIP:       [4]byte{127, 0, 0, 1},
+	OriginIP:       [4]byte{127, 0, 0, 1},
+	FriendPort:     2000,
+	OriginPort:     2001,
+	UserType:       Client,
+	ClientPollRate: time.Millisecond * 500,
+	ClientTimeout:  2 * time.Second,
 }
 
-// testing sending and receiving feature of the covert channel
-func TestReceiveSend(t *testing.T) {
+func TestReceiveSendGet(t *testing.T) {
 
-	log.Println("Starting ICMP covert TestReceiveSend")
+	log.Println("Starting TestReceiveSend")
 
-	sch, err := MakeChannel(sconfTimeout)
+	sch, err := MakeChannel(sconf)
 	if err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
 
-	// create the ICMP covert channel
-	rch, err := MakeChannel(rconfTimeout)
+	rch, err := MakeChannel(rconf)
 	if err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
@@ -47,10 +49,9 @@ func TestReceiveSend(t *testing.T) {
 		inputs [][]byte = [][]byte{[]byte("Hello world!"), []byte("")}
 	)
 
-	// construct the packets
 	for _, input := range inputs {
 		go func() {
-			var data [50]byte
+			var data [15]byte
 			nr, rErr = rch.Receive(data[:])
 			select {
 			case c <- data[:nr]:
@@ -58,41 +59,42 @@ func TestReceiveSend(t *testing.T) {
 			}
 		}()
 
-		// send the packets
 		sendAndCheck(t, input, sch)
 
-		// receive the packet
 		receiveAndCheck(t, input, c)
 
 		if rErr != nil {
 			t.Errorf("err = '%s'; want nil", rErr.Error())
 		}
 	}
-
-	// close the channel
 	if err := sch.Close(); err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
-
 	if err := rch.Close(); err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
 }
 
-// test sending and receiving to the same IP
-func TestReceiveSendSelf(t *testing.T) {
+func TestReceiveSendPost(t *testing.T) {
 
-	log.Println("Starting ICMP covert TestReceiveSendSelf")
+	log.Println("Starting TestReceiveSend")
 
-	// configure the addresses
-	var conf Config = Config{
-		FriendIP:   [4]byte{127, 0, 0, 1},
-		OriginIP:   [4]byte{127, 0, 0, 1},
-		Identifier: 8080,
+	sconfcopy := sconf
+	sconfcopy.FriendPort = 3001
+	sconfcopy.OriginPort = 3002
+	sconfcopy.UserType = Server
+
+	sch, err := MakeChannel(sconfcopy)
+	if err != nil {
+		t.Errorf("err = '%s'; want nil", err.Error())
 	}
 
-	// create the ICMP covert channel
-	ch, err := MakeChannel(conf)
+	rconfcopy := rconf
+	rconfcopy.FriendPort = 3002
+	rconfcopy.OriginPort = 3001
+	rconfcopy.UserType = Client
+
+	rch, err := MakeChannel(rconfcopy)
 	if err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
@@ -105,35 +107,31 @@ func TestReceiveSendSelf(t *testing.T) {
 		inputs [][]byte = [][]byte{[]byte("Hello world!"), []byte("")}
 	)
 
-	// construct the packet
 	for _, input := range inputs {
 		go func() {
-			var data [50]byte
-			nr, rErr = ch.Receive(data[:])
+			var data [15]byte
+			nr, rErr = rch.Receive(data[:])
 			select {
 			case c <- data[:nr]:
 			case <-time.After(time.Second * 5):
 			}
 		}()
+		sendAndCheck(t, input, sch)
 
-		// send the packet
-		sendAndCheck(t, input, ch)
-
-		// receive the packet
 		receiveAndCheck(t, input, c)
 
 		if rErr != nil {
 			t.Errorf("err = '%s'; want nil", rErr.Error())
 		}
 	}
-
-	// close the channel
-	if err := ch.Close(); err != nil {
+	if err := sch.Close(); err != nil {
+		t.Errorf("err = '%s'; want nil", err.Error())
+	}
+	if err := rch.Close(); err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
 }
 
-// just send the ICMP packets
 func sendAndCheck(t *testing.T, input []byte, sch *Channel) {
 	n, err := sch.Send(input)
 	if err != nil {
@@ -144,14 +142,13 @@ func sendAndCheck(t *testing.T, input []byte, sch *Channel) {
 	}
 }
 
-// just receive the IMCP packets
 func receiveAndCheck(t *testing.T, input []byte, c chan []byte) {
 	select {
 	case received := <-c:
 		if bytes.Compare(received, input) != 0 {
 			t.Errorf("received = %s; want %s", string(received), string(input))
 		}
-	case <-time.After(time.Millisecond * 500):
+	case <-time.After(time.Second * 5):
 		t.Errorf("Read timeout")
 	}
 }
