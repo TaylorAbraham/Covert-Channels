@@ -2,16 +2,19 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import Dropdown from 'react-bootstrap/Dropdown';
 import InputGroup from 'react-bootstrap/InputGroup';
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
+import Tooltip from 'react-bootstrap/Tooltip';
 
 const Select = (props) => {
   const {
     label,
     items,
     value,
-    onChange,
+    parentOnChange,
+    tooltip,
   } = props;
   return (
-    <InputGroup className="d-flex m-1 w-25">
+    <InputGroup className="d-flex m-1 w-100">
       <InputGroup.Prepend>
         <InputGroup.Text className="input-text">{label}</InputGroup.Text>
       </InputGroup.Prepend>
@@ -28,7 +31,7 @@ const Select = (props) => {
               <Dropdown.Item
                 as="option"
                 active={value === item}
-                onClick={onChange}
+                onClick={parentOnChange}
                 value={item}
                 key={item}
               >
@@ -38,6 +41,13 @@ const Select = (props) => {
           }
         </Dropdown.Menu>
       </Dropdown>
+      {tooltip && (
+        <OverlayTrigger overlay={<Tooltip id="tooltip-disabled">{tooltip}</Tooltip>}>
+          <span className="cc-tooltip ml-1 mr-1">
+            <div className="cc-tooltip__icon">?</div>
+          </span>
+        </OverlayTrigger>
+      )}
     </InputGroup>
   );
 };
@@ -46,7 +56,12 @@ Select.propTypes = {
   label: PropTypes.string.isRequired,
   items: PropTypes.arrayOf(PropTypes.string).isRequired,
   value: PropTypes.string.isRequired,
-  onChange: PropTypes.func.isRequired,
+  parentOnChange: PropTypes.func.isRequired,
+  tooltip: PropTypes.string,
+};
+
+Select.defaultProps = {
+  tooltip: '',
 };
 
 export default Select;

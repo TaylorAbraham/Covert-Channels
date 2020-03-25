@@ -1,14 +1,29 @@
 import React, { useState, useEffect } from 'react';
+import Navbar from 'react-bootstrap/Navbar';
+import Nav from 'react-bootstrap/Nav';
 import Button from 'react-bootstrap/Button';
-import Dropdown from 'react-bootstrap/Dropdown';
-import FormControl from 'react-bootstrap/FormControl';
 import Spinner from 'react-bootstrap/Spinner';
 
-import IPInput from './ui-components/IPInput';
-import NumberInput from './ui-components/NumberInput';
-import './styles.css';
-import Checkbox from './ui-components/Checkbox';
-import Select from './ui-components/Select';
+import ConfigScreen from './screens/ConfigScreen';
+import Console from './screens/Console';
+import './styles.scss';
+import MessagingScreen from './screens/MessagingScreen';
+import HelpScreen from './screens/HelpScreen';
+
+const Screens = Object.freeze({
+  CONFIG: 'config',
+  MSG: 'msg',
+  HELP: 'help',
+});
+
+const getTimestamp = () => {
+  const d = new Date();
+  const hr = d.getHours().toString().padStart(2, '0');
+  const min = d.getMinutes().toString().padStart(2, '0');
+  const sec = d.getSeconds().toString().padStart(2, '0');
+  const ms = d.getMilliseconds().toString().padStart(3, '0');
+  return `${hr}:${min}:${sec}.${ms}`;
+};
 
 /**
  * IMPORTANT NOTE: For styling, refer to https://getbootstrap.com/docs/4.0/utilities/position/
@@ -19,10 +34,14 @@ const App = () => {
   const [processors, setProcessors] = useState([]);
   const [channelList, setChannelList] = useState([]);
   const [channel, setChannel] = useState({});
+  const [channelIsOpen, setChannelIsOpen] = useState(false);
+  const [consoleIsVisible, setConsoleIsVisible] = useState(true);
   const [config, setConfig] = useState({});
   const [isLoading, setLoading] = useState(true);
   const [ws, setWS] = useState(null);
   const [systemMessages, setSystemMessages] = useState([]);
+  const [covertMessages, setCovertMessages] = useState([]);
+  const [screen, setScreen] = useState(Screens.CONFIG);
 
   const sendInitialConfig = (localWS) => {
     const cmd = JSON.stringify({ OpCode: 'config' });
@@ -30,7 +49,11 @@ const App = () => {
   };
 
   const addSystemMessage = (newMsg) => {
-    setSystemMessages(sm => sm.concat(newMsg));
+    setSystemMessages(sm => sm.concat(`[${getTimestamp()}] ${newMsg}`));
+  };
+
+  const addCovertMessage = (newMsg) => {
+    setCovertMessages(cm => cm.concat(`[${getTimestamp()}] ${newMsg}`));
   };
 
   const openChannel = () => {
@@ -68,15 +91,18 @@ const App = () => {
         break;
       case 'open':
         addSystemMessage('Covert channel successfully opened.');
+        setChannelIsOpen(true);
         break;
       case 'close':
+        setChannelIsOpen(false);
         addSystemMessage('Covert channel closed.');
         break;
       case 'write':
         addSystemMessage('Covert message sent.');
         break;
       case 'read':
-        addSystemMessage(`Covert message received: ${msg.Message}`);
+        addSystemMessage('Covert message received.');
+        addCovertMessage(msg.Message);
         break;
       case 'error':
         addSystemMessage(`[ERROR]: ${msg.Message}`);
@@ -105,258 +131,60 @@ const App = () => {
       <Spinner animation="border" role="status" />
     </div>
   ) : (
-    <div className="m-2">
-      <h2 className="m-1">Messaging</h2>
-      <FormControl
-        as="textarea"
-        className="w-25 m-1"
-        value={textToSend}
-        onChange={e => setTextToSend(e.target.value)}
-      />
-      <Button variant="primary" onClick={sendMessage} className="m-1">Send Message</Button>
-      <br />
-      <div className="m-1">System Messages</div>
-      <FormControl
-        as="textarea"
-        className="w-50 m-1"
-        value={systemMessages.join('\n')}
-        readOnly
-      />
-      <h2 className="m-1 mt-5">Configuration</h2>
-      <h3 className="m-1">Processors</h3>
-      <Button
-        variant="success"
-        className="m-1 w-25"
-        onClick={() => setProcessors(processors.concat({
-          Type: null,
-          Data: null,
-        }))}
-      >
-        Add Processor
-      </Button>
-      {
-        processors.map((processor, i) => (
-          <div key={i.toString()}>
-            <Dropdown className="m-1">
-              <Dropdown.Toggle
-                className="w-25"
-                variant="outline-primary"
-              >
-                {processor.Type || 'Select a Processor'}
-              </Dropdown.Toggle>
-              <Dropdown.Menu className="w-25">
-                {
-                  Object.keys(processorList).map(p => (
-                    <Dropdown.Item
-                      as="option"
-                      active={p === processor.Type}
-                      onClick={(e) => {
-                        setProcessors([
-                          ...processors.slice(0, i),
-                          {
-                            Type: e.target.value,
-                            Data: processorList,
-                          },
-                          ...processors.slice(i + 1, processors.length + 1),
-                        ]);
-                      }}
-                      value={p}
-                      key={p}
-                    >
-                      {p}
-                    </Dropdown.Item>
-                  ))
-                }
-              </Dropdown.Menu>
-            </Dropdown>
-            {processor.Data && Object.keys(processor.Data[processor.Type]).map((key) => {
-              /**
-               * EXTREME DANGER WARNING
-               * The below code involves very convoluted spread operators to massage
-               * the data to the format that GoLang expects it to be in.
-               */
-              const opt = processor.Data[processor.Type][key];
-              const props = {
-                key,
-                label: opt.Display.Name,
-                value: opt.Value,
-                onChange: e => setProcessors([
-                  ...processors.slice(0, i),
-                  {
-                    ...processor,
-                    Data: {
-                      ...processor.Data,
-                      [processor.Type]: {
-                        ...processor.Data[processor.Type],
-                        [key]: {
-                          ...opt,
-                          Value: e.target.value,
-                        },
-                      },
-                    },
-                  },
-                  ...processors.slice(i + 1, processors.length + 1),
-                ]),
-              };
-              switch (opt.Type) {
-                case 'ipv4':
-                  return (
-                    <IPInput {...props} />
-                  );
-                case 'i8':
-                case 'u16':
-                case 'u64':
-                case 'exactu64':
-                  return (
-                    <NumberInput
-                      {...props}
-                      onChange={e => setProcessors([
-                        ...processors.slice(0, i),
-                        {
-                          ...processor,
-                          Data: {
-                            ...processor.Data,
-                            [processor.Type]: {
-                              ...processor.Data[processor.Type],
-                              [key]: {
-                                ...opt,
-                                Value: parseInt(e.target.value) || 0,
-                              },
-                            },
-                          },
-                        },
-                        ...processors.slice(i + 1, processors.length + 1),
-                      ])}
-                    />
-                  );
-                case 'bool':
-                  return (
-                    <Checkbox
-                      {...props}
-                      onChange={e => setProcessors([
-                        ...processors.slice(0, i),
-                        {
-                          ...processor,
-                          Data: {
-                            ...processor.Data,
-                            [processor.Type]: {
-                              ...processor.Data[processor.Type],
-                              [key]: {
-                                ...opt,
-                                Value: e.target.checked,
-                              },
-                            },
-                          },
-                        },
-                        ...processors.slice(i + 1, processors.length + 1),
-                      ])}
-                    />
-                  );
-                case 'select':
-                  return (
-                    <Select
-                      {...props}
-                      items={opt.Range}
-                    />
-                  );
-                default:
-                  return (<div key={key}>UNIMPLEMENTED</div>);
-              }
-            })}
-          </div>
-        ))
-      }
-      <h3 className="m-1">Channel</h3>
-      <Dropdown className="m-1">
-        <Dropdown.Toggle
-          className="w-25"
-          variant="outline-primary"
-        >
-          {channel.value || 'Select a Channel'}
-        </Dropdown.Toggle>
-        <Dropdown.Menu className="w-25">
-          {
-            Object.keys(channelList).map(chan => (
-              <Dropdown.Item
-                as="option"
-                active={chan === channel.value}
-                onClick={(e) => {
-                  setChannel({
-                    value: e.target.value,
-                    properties: channelList[chan],
-                  });
-                  setConfig(channelList[chan]);
-                }}
-                value={chan}
-                key={chan}
-              >
-                {chan}
-              </Dropdown.Item>
-            ))
-          }
-        </Dropdown.Menu>
-      </Dropdown>
-      {Object.keys(config).map((key) => {
-        const opt = config[key];
-        const props = {
-          key,
-          label: opt.Display.Name,
-          value: opt.Value,
-          onChange: e => setConfig({
-            ...config,
-            [key]: {
-              ...config[key],
-              Value: e.target.value,
-            },
-          }),
-        };
-        switch (opt.Type) {
-          case 'ipv4':
-            return (
-              <IPInput {...props} />
-            );
-          case 'i8':
-          case 'u16':
-          case 'u64':
-          case 'exactu64':
-            return (
-              <NumberInput
-                {...props}
-                onChange={e => setConfig({
-                  ...config,
-                  [key]: {
-                    ...config[key],
-                    Value: parseInt(e.target.value) || 0,
-                  },
-                })}
-              />
-            );
-          case 'bool':
-            return (
-              <Checkbox
-                {...props}
-                onChange={e => setConfig({
-                  ...config,
-                  [key]: {
-                    ...config[key],
-                    Value: e.target.checked,
-                  },
-                })}
-              />
-            );
-          case 'select':
-            return (
-              <Select
-                {...props}
-                items={opt.Range}
-              />
-            );
-          default:
-            return (<div key={key}>UNIMPLEMENTED</div>);
-        }
-      })}
-      <Button variant="success" onClick={openChannel} className="m-1 w-25">Open Covert Channel</Button>
-      <Button variant="danger" onClick={closeChannel} className="m-1 w-25">Close Covert Channel</Button>
+    <div>
+      <Navbar className="cc-navbar" bg="primary" variant="dark" expand="lg">
+        <Navbar.Brand href="#config">Covert Client</Navbar.Brand>
+        <Navbar.Toggle aria-controls="basic-navbar-nav" />
+        <Navbar.Collapse id="basic-navbar-nav">
+          <Nav activeKey={`#${screen}`} className="mr-auto">
+            <Nav.Link href="#config" onClick={() => setScreen(Screens.CONFIG)}>Configuration</Nav.Link>
+            <Nav.Link href="#msg" onClick={() => setScreen(Screens.MSG)}>Messaging</Nav.Link>
+            <Nav.Link href="#help" onClick={() => setScreen(Screens.HELP)}>Help</Nav.Link>
+          </Nav>
+          {channelIsOpen ? (
+            <Button variant="success" disabled style={{ opacity: '100%' }}>Channel Open</Button>
+          ) : (
+            <Button variant="danger" disabled style={{ opacity: '100%' }}>Channel Closed</Button>
+          )}
+        </Navbar.Collapse>
+      </Navbar>
+      <div className="cc-content">
+        <div className={`cc-content__screen ${!consoleIsVisible ? 'cc-content__screen--expand' : ''}`}>
+          {screen === Screens.CONFIG ? (
+            <ConfigScreen
+              openChannel={openChannel}
+              closeChannel={closeChannel}
+              config={config}
+              setConfig={setConfig}
+              processorList={processorList}
+              processors={processors}
+              setProcessors={setProcessors}
+              channelList={channelList}
+              channel={channel}
+              setChannel={setChannel}
+              channelIsOpen={channelIsOpen}
+            />
+          ) : (screen === Screens.MSG) ? (
+            <MessagingScreen
+              textToSend={textToSend}
+              setTextToSend={setTextToSend}
+              covertMessages={covertMessages}
+              sendMessage={sendMessage}
+            />
+          ) : (screen === Screens.HELP) ? (
+            <HelpScreen />
+          ) : (
+            <div>UNIMPLEMENTED</div>
+          )}
+        </div>
+        <div className={`cc-content__console ${!consoleIsVisible ? 'cc-content__console--hidden' : ''}`}>
+          <Console
+            messages={systemMessages}
+            consoleIsVisible={consoleIsVisible}
+            toggleConsoleIsVisible={() => setConsoleIsVisible(!consoleIsVisible)}
+          />
+        </div>
+      </div>
     </div>
   );
 };

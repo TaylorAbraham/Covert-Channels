@@ -1,41 +1,27 @@
-import React, { useState } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
 import FormControl from 'react-bootstrap/FormControl';
 import InputGroup from 'react-bootstrap/InputGroup';
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
 
-
-const IPInput = (props) => {
+const TextArea = (props) => {
   const {
     label,
     value,
     parentOnChange,
     tooltip,
   } = props;
-  const [inputValid, setInputValid] = useState(true);
-  const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
   return (
     <div>
-      <InputGroup className={`cc-ip-input m-1 w-100 ${inputValid ? '' : 'cc-ip-input--invalid'}`}>
+      <InputGroup className="cc-ip-input m-1 w-100">
         <InputGroup.Prepend>
           <InputGroup.Text className="input-text">{label}</InputGroup.Text>
         </InputGroup.Prepend>
         <FormControl
+          as="textarea"
           value={value}
-          onChange={(e) => {
-            // Only check for valid input on change
-            if (ipRegex.test(e.target.value)) {
-              setInputValid(true);
-            }
-            parentOnChange(e);
-          }}
-          onBlur={(e) => {
-            // Only check for invalid input on defocus
-            if (!ipRegex.test(e.target.value)) {
-              setInputValid(false);
-            }
-          }}
+          onChange={parentOnChange}
         />
         {tooltip && (
           <OverlayTrigger overlay={<Tooltip id="tooltip-disabled">{tooltip}</Tooltip>}>
@@ -45,25 +31,20 @@ const IPInput = (props) => {
           </OverlayTrigger>
         )}
       </InputGroup>
-      {!inputValid && (
-        <p className="cc-ip-input__err-text ml-1">
-          Please enter a valid IP address
-        </p>
-      )}
     </div>
   );
 };
 
-IPInput.propTypes = {
+TextArea.propTypes = {
   label: PropTypes.string.isRequired,
   value: PropTypes.string,
   parentOnChange: PropTypes.func.isRequired,
   tooltip: PropTypes.string,
 };
 
-IPInput.defaultProps = {
+TextArea.defaultProps = {
   value: '',
   tooltip: '',
 };
 
-export default IPInput;
+export default TextArea;

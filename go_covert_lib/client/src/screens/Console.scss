@@ -1,0 +1,46 @@
+$primary: #007bffa1;
+$background: #80808033;
+
+.cc-console {
+  height: inherit;
+
+  &__header {
+    width: inherit;
+    background-color: $primary;
+    color: white;
+    margin-bottom: 0;
+    -webkit-user-select: none; /* Safari */        
+    -moz-user-select: none; /* Firefox */
+    -ms-user-select: none; /* IE10+/Edge */
+    user-select: none; /* Standard */
+  }
+
+  &__header &__toggle-btn {
+    font-size: 24px;
+    padding: 0 10px;
+    font-weight: bold;
+    line-height: 36px;
+    margin-top: -5px;
+    p {
+      margin: -5px 0 0 0;
+      -webkit-transition: transform 0.75s;
+      -moz-transition: transform 0.75s;
+      -o-transition: transform 0.75s;
+      -ms-transition: transform 0.75s;
+      transition: transform 0.75s;
+    }
+    &--reverse p {
+      -moz-transform: scale(-1, 1);
+      -webkit-transform: scale(-1, 1);
+      -o-transform: scale(-1, 1);
+      -ms-transform: scale(-1, 1);
+      transform: scale(-1, 1);
+    }
+  }
+
+  &__messages {
+    background-color: $background;
+    height: 100%;
+    font-family: "Courier New", Courier, monospace;
+  }
+}
