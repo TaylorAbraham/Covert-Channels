@@ -1,6 +1,15 @@
 package controller
 
 import (
+
+	"encoding/json"
+	"errors"
+	"log"
+	"os"
+	"strconv"
+	"time"
+	"./channel/httpCovert"
+	"./channel/httpNormal"
 	"./channel/icmpIP"
 	"./channel/icmpNormal"
 	"./channel/tcpHandshake"
@@ -16,13 +25,7 @@ import (
 	"./processor/none"
 	"./processor/symmetricEncryption"
 	"./processor/zLibCompression"
-	"encoding/json"
-	"errors"
 	"github.com/gorilla/websocket"
-	"log"
-	"os"
-	"strconv"
-	"time"
 )
 
 // Constructor for the controller
@@ -83,6 +86,8 @@ func defaultChannel() channelData {
 		TcpSyn:       tcpSyn.GetDefault(),
 		TcpHandshake: tcpHandshake.GetDefault(),
 		TcpNormal:    tcpNormal.GetDefault(),
+		HttpCovert:   httpCovert.GetDefault(),
+		HttpNormal:   httpNormal.GetDefault(),
 		UdpNormal:    udpNormal.GetDefault(),
 		UdpIP:        udpIP.GetDefault(),
 	}
