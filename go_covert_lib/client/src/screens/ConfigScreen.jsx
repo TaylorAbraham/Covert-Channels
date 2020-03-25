@@ -175,7 +175,7 @@ const ConfigScreen = (props) => {
                     />
                   );
                 case 'hexkey':
-                  return (<HexKey {...propsForComponent} values={opt.Range} />);
+                  return (<HexKey {...propsForComponent} acceptedLengths={opt.Range} />);
                 case 'key':
                   return (<TextArea {...propsForComponent} />);
                 default:
