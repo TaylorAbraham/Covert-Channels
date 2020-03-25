@@ -9,8 +9,8 @@ import (
 	"golang.org/x/net/ipv4"
 	"math/rand"
 	"net"
-	"time"
 	"sync"
+	"time"
 )
 
 const (
@@ -65,7 +65,7 @@ type Channel struct {
 	conf        Config
 	rawConn     *ipv4.RawConn
 	writeCancel chan bool
-	closeMutex *sync.Mutex
+	closeMutex  *sync.Mutex
 }
 
 // Create the covert channel, filling in the SeqEncoder
@@ -130,7 +130,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		// This timer is used to timeout if packets are received, but they
 		// are not the correct type
 		prevPacketTime time.Time
-		maskIndex int = 0
+		maskIndex      int = 0
 	)
 
 	// Figure out the expected source and destination IP address
@@ -242,8 +242,8 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		wait         time.Duration
 		tcph         layers.TCP
 		// We make it clear that the error always starts as nil
-		err error = nil
-		maskIndex int = 0
+		err       error = nil
+		maskIndex int   = 0
 	)
 
 	data, err = embedders.EncodeFromMask(c.conf.Encoder.GetMask(), data)
@@ -423,7 +423,7 @@ func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, 
 		newipv4h ipv4.Header
 		newtcph  layers.TCP
 		newbuf   []byte
-		err 		 error
+		err      error
 	)
 
 	newipv4h, newtcph, newbuf, _, err = c.conf.Encoder.SetByte(ipv4h, tcph, buf, maskIndex)

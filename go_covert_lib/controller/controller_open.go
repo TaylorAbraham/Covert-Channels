@@ -7,6 +7,7 @@ import (
 	"./channel"
 	"./channel/httpCovert"
 	"./channel/httpNormal"
+	"./channel/icmpNormal"
 	"./channel/tcpHandshake"
 	"./channel/tcpNormal"
 	"./channel/tcpSyn"
@@ -124,6 +125,10 @@ func (ctr *Controller) retrieveChannel(cconf channelConfig) (channel.Channel, *c
 	}
 
 	switch newConf.Type {
+	case "icmpNormal":
+		if c, err = icmpNormal.ToChannel(newConf.Data.icmpNormal); err != nil {
+			return nil, nil, err
+		}
 	case "TcpSyn":
 		if c, err = tcpSyn.ToChannel(newConf.Data.TcpSyn); err != nil {
 			return nil, nil, err

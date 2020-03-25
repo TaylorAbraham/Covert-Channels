@@ -28,7 +28,7 @@ func (id *IDEncoder) SetByte(ipv4h ipv4.Header, b byte) (ipv4.Header, error) {
 type EcnEncoder struct{}
 
 func (id *EcnEncoder) GetByte(ipv4h ipv4.Header) (byte, error) {
-	if ipv4h.TOS & 0x02 != 0 {
+	if ipv4h.TOS&0x02 != 0 {
 		return 1, nil
 	} else {
 		return 0, nil

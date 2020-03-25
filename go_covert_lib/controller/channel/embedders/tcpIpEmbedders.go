@@ -114,7 +114,7 @@ func (e *TcpIpUrgFlgEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP, maskInd
 
 func (s *TcpIpUrgFlgEncoder) GetMask() [][]byte {
 	return [][]byte{[]byte{0x01}, []byte{0x01}, []byte{0x01}, []byte{0x01},
-									[]byte{0x01}, []byte{0x01}, []byte{0x01}, []byte{0x01}}
+		[]byte{0x01}, []byte{0x01}, []byte{0x01}, []byte{0x01}}
 }
 
 type TcpIpTimeEncoder struct {
@@ -144,7 +144,6 @@ func (s *TcpIpTimeEncoder) GetMask() [][]byte {
 	return [][]byte{[]byte{0xFF}}
 }
 
-
 type TcpIpEcnEncoder struct {
 	emb *EcnEncoder
 }
@@ -170,5 +169,5 @@ func (e *TcpIpEcnEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP, maskIndex 
 
 func (s *TcpIpEcnEncoder) GetMask() [][]byte {
 	return [][]byte{[]byte{0x01}, []byte{0x01}, []byte{0x01}, []byte{0x01},
-									[]byte{0x01}, []byte{0x01}, []byte{0x01}, []byte{0x01}}
+		[]byte{0x01}, []byte{0x01}, []byte{0x01}, []byte{0x01}}
 }

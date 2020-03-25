@@ -295,7 +295,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		handshake byte   = 0
 		n         uint64 // the number of bytes received
 		fin       bool   // if the FIN packet has arrived
-		maskIndex int = 0
+		maskIndex int    = 0
 	)
 
 	// Check if we should timeout
@@ -533,7 +533,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		n          uint64
 		originPort uint16
 		timestamp  *layers.TCPOption
-		maskIndex int = 0
+		maskIndex  int = 0
 	)
 
 	if tcpAddr, ok := conn.LocalAddr().(*net.TCPAddr); !ok {
@@ -600,17 +600,23 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	tcph.PSH = true
 
 	// Send each packet
+sendloop:
 	for len(rem) > 0 {
 		var payload []byte = make([]byte, 5)
 		if ipv4h, tcph, rem, tm, err = c.conf.Encoder.SetByte(ipv4h, tcph, rem, maskIndex); err != nil {
-			break
+			break sendloop
 		}
 		maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
 
-		time.Sleep(tm)
+		select {
+		case <-time.After(tm):
+		case <-c.cancel:
+			err = errors.New("Cancel")
+			break sendloop
+		}
 
 		if wbuf, tcph, err = createTCPHeader(tcph, seq, ack, c.conf.OriginIP, c.conf.FriendIP, originPort, c.conf.FriendReceivePort, payload); err != nil {
-			break
+			break sendloop
 		}
 
 		// Sending a packet seems to overwrite at least the current timestamp option value to zero
@@ -621,7 +627,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		}
 
 		if err = c.sendPacket(&ipv4h, wbuf, &cm); err != nil {
-			break
+			break sendloop
 		}
 		n = uint64(len(data) - len(rem))
 
