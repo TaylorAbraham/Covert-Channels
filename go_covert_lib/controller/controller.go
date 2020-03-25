@@ -1,9 +1,15 @@
 package controller
 
 import (
+	"./channel/httpCovert"
+	"./channel/httpNormal"
+	"./channel/icmpIP"
+	"./channel/icmpNormal"
 	"./channel/tcpHandshake"
 	"./channel/tcpNormal"
 	"./channel/tcpSyn"
+	"./channel/udpIP"
+	"./channel/udpNormal"
 	"./config"
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
@@ -74,9 +80,15 @@ func DefaultConfig() configData {
 
 func defaultChannel() channelData {
 	return channelData{
+		icmpIP:       icmpIP.GetDefault(),
+		icmpNormal:   icmpNormal.GetDefault(),
 		TcpSyn:       tcpSyn.GetDefault(),
 		TcpHandshake: tcpHandshake.GetDefault(),
 		TcpNormal:    tcpNormal.GetDefault(),
+		HttpCovert:   httpCovert.GetDefault(),
+		HttpNormal:   httpNormal.GetDefault(),
+		UdpNormal:    udpNormal.GetDefault(),
+		UdpIP:        udpIP.GetDefault(),
 	}
 }
 

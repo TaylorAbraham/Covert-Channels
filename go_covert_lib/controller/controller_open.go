@@ -5,9 +5,15 @@ import (
 	"errors"
 
 	"./channel"
+	"./channel/httpCovert"
+	"./channel/httpNormal"
+	"./channel/icmpIP"
+	"./channel/icmpNormal"
 	"./channel/tcpHandshake"
 	"./channel/tcpNormal"
 	"./channel/tcpSyn"
+	"./channel/udpIP"
+	"./channel/udpNormal"
 	"./config"
 	"./processor"
 	"./processor/asymmetricEncryption"
@@ -120,6 +126,14 @@ func (ctr *Controller) retrieveChannel(cconf channelConfig) (channel.Channel, *c
 	}
 
 	switch newConf.Type {
+	case "icmpIP":
+		if c, err = icmpIP.ToChannel(newConf.Data.icmpIP); err != nil {
+			return nil, nil, err
+		}
+	case "icmpNormal":
+		if c, err = icmpNormal.ToChannel(newConf.Data.icmpNormal); err != nil {
+			return nil, nil, err
+		}
 	case "TcpSyn":
 		if c, err = tcpSyn.ToChannel(newConf.Data.TcpSyn); err != nil {
 			return nil, nil, err
@@ -130,6 +144,22 @@ func (ctr *Controller) retrieveChannel(cconf channelConfig) (channel.Channel, *c
 		}
 	case "TcpNormal":
 		if c, err = tcpNormal.ToChannel(newConf.Data.TcpNormal); err != nil {
+			return nil, nil, err
+		}
+	case "HttpCovert":
+		if c, err = httpCovert.ToChannel(newConf.Data.HttpCovert); err != nil {
+			return nil, nil, err
+		}
+	case "HttpNormal":
+		if c, err = httpNormal.ToChannel(newConf.Data.HttpNormal); err != nil {
+			return nil, nil, err
+		}
+	case "UdpNormal":
+		if c, err = udpNormal.ToChannel(newConf.Data.UdpNormal); err != nil {
+			return nil, nil, err
+		}
+	case "UdpIP":
+		if c, err = udpIP.ToChannel(newConf.Data.UdpIP); err != nil {
 			return nil, nil, err
 		}
 	default:

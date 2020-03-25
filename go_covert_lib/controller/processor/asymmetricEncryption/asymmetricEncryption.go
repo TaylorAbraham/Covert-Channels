@@ -1,18 +1,18 @@
 package asymmetricEncryption
 
 import (
-	"crypto/sha512"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha512"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
 )
 
 type AsymmetricEncryption struct {
-	senderPublicKey []byte
-	senderPrivateKey []byte
-	receiverPublicKey []byte
+	senderPublicKey    []byte
+	senderPrivateKey   []byte
+	receiverPublicKey  []byte
 	receiverPrivateKey []byte
 }
 

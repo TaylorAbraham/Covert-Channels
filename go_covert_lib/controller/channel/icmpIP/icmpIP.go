@@ -1,9 +1,8 @@
-package udpIP
+package icmpIP
 
 import (
 	"../embedders"
 	"bytes"
-	"context"
 	"errors"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -13,47 +12,10 @@ import (
 	"time"
 )
 
-const maxAccept = 32
-
-// We make the fields public to facilitate logging
-type packet struct {
-	Ipv4h ipv4.Header
-	Udph  layers.UDP
-}
-
-type syncPktMap struct {
-	mutex  *sync.Mutex
-	pktMap map[uint16][]packet
-}
-
-func MakeSyncMap() *syncPktMap {
-	return &syncPktMap{pktMap: make(map[uint16][]packet), mutex: &sync.Mutex{}}
-}
-
-func (smap *syncPktMap) Add(k uint16, v packet) {
-	smap.mutex.Lock()
-	smap.pktMap[k] = append(smap.pktMap[k], v)
-	smap.mutex.Unlock()
-}
-
-type acceptedConn struct {
-	conn net.Conn
-	// The UDP port used by our Friend IP in this covert message
-	friendPort uint16
-}
-
 type Config struct {
-	FriendIP          [4]byte
-	OriginIP          [4]byte
-	FriendReceivePort uint16
-	OriginReceivePort uint16
-	DialTimeout       time.Duration
-	Encoder           UdpEncoder
-
-	// For debugging purposes, log all packets that are sent or received
-	logPackets bool
-
-	AcceptTimeout time.Duration
+	FriendIP [4]byte
+	OriginIP [4]byte
+	Encoder  IcmpEncoder
 
 	// The intra-packet read timeout. Set zero for no timeout.
 	// The receive method will block until a three way handshake
@@ -62,6 +24,7 @@ type Config struct {
 	ReadTimeout time.Duration
 	// The timeout for writing the packet to a raw socket. Set zero for no timeout.
 	WriteTimeout time.Duration
+	Identifier   uint16
 }
 
 type Channel struct {
@@ -69,15 +32,9 @@ type Channel struct {
 	rawConn *ipv4.RawConn
 	cancel  chan bool
 
-	// For debugging purposes, log all packets received and sent
-	sendPktLog    *syncPktMap
-	receivePktLog *syncPktMap
-
 	// We make the mutex a pointer to avoid the risk of copying
 	writeMutex *sync.Mutex
 	closeMutex *sync.Mutex
-
-	acceptChan chan acceptedConn
 }
 
 func (c *Channel) Close() error {
@@ -97,22 +54,18 @@ func (c *Channel) Close() error {
 func MakeChannel(conf Config) (*Channel, error) {
 
 	c := &Channel{
-		conf:          conf,
-		cancel:        make(chan bool),
-		sendPktLog:    MakeSyncMap(),
-		receivePktLog: MakeSyncMap(),
-		writeMutex:    &sync.Mutex{},
-		closeMutex:    &sync.Mutex{},
-		// Only 32 connections can be accepted before they begin to be dropped
-		acceptChan: make(chan acceptedConn, maxAccept),
+		conf:       conf,
+		cancel:     make(chan bool),
+		writeMutex: &sync.Mutex{},
+		closeMutex: &sync.Mutex{},
 	}
 
 	if c.conf.Encoder == nil {
 		c.conf.Encoder = &IDEncoder{}
 	}
 
-	//ip network with udp protocol
-	conn, err := net.ListenPacket("ip4:17", "0.0.0.0")
+	//ip network within the ICMP protocol
+	conn, err := net.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
 		return nil, err
 	}
@@ -127,46 +80,15 @@ func MakeChannel(conf Config) (*Channel, error) {
 }
 
 func (c *Channel) Send(data []byte) (uint64, error) {
-
 	data, err := embedders.EncodeFromMask(c.conf.Encoder.GetMask(), data)
 	if err != nil {
 		return 0, err
 	}
 
-	nd := net.Dialer{
-		Timeout: c.conf.DialTimeout,
-	}
-
-	ctx, cancelFn := context.WithCancel(context.Background())
-	// A channel to be closed after message sending is over
-	// to end the goroutine used for cancelling the dial
-	doneMsg := make(chan byte)
-	// If the cancel method is called for the covert channel, we want to
-	// exit the dial operation. This goroutine waits for the cancel channel
-	// to be closed and cancels the context if so
-	go func() {
-		select {
-		case <-c.cancel:
-			cancelFn()
-		// doneDial ensures that this go routine always exits
-		case <-doneMsg:
-		}
-	}()
-	// we close the doneMsg channel to ensure that the go routine always exits
-	defer close(doneMsg)
-
-	// DialContext
-	conn, err := nd.DialContext(ctx, "udp4", (&net.UDPAddr{IP: c.conf.FriendIP[:], Port: int(c.conf.FriendReceivePort)}).String())
-	if err != nil {
-		return 0, err
-	}
-
-	defer conn.Close()
-
 	var (
 		ipv4h     ipv4.Header         = createIPHeader(c.conf.OriginIP, c.conf.FriendIP)
 		cm        ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
-		udph      layers.UDP
+		icmph     layers.ICMPv4
 		wbuf      []byte
 		rem       []byte = data
 		n         uint64
@@ -175,18 +97,15 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 
 	// Send each packet
 	for len(rem) > 0 {
+
 		var payload []byte = make([]byte, 26) //set payload of length 26
-		if ipv4h, udph, rem, err = c.conf.Encoder.SetByte(ipv4h, udph, rem, maskIndex); err != nil {
+		if ipv4h, icmph, rem, err = c.conf.Encoder.SetByte(ipv4h, icmph, rem, maskIndex); err != nil {
 			break
 		}
 		maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
 
-		if wbuf, udph, err = createUDPHeader(udph, c.conf.OriginIP, c.conf.FriendIP, c.conf.OriginReceivePort, c.conf.FriendReceivePort, payload); err != nil {
+		if wbuf, icmph, err = createicmpheader(icmph, payload, c.conf.Identifier); err != nil {
 			break
-		}
-
-		if c.conf.logPackets {
-			c.sendPktLog.Add(c.conf.OriginReceivePort, packet{Ipv4h: ipv4h, Udph: udph})
 		}
 
 		if err = c.sendPacket(&ipv4h, wbuf, &cm); err != nil {
@@ -201,46 +120,20 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		return n, err
 	}
 
-	//last payload determining the end of the message
-	var payload []byte = make([]byte, 24) //length 24 signifies the end of the message
+	var payload []byte = make([]byte, 0) //length 0 signifies the end of the message
 
-	if wbuf, udph, err = createUDPHeader(udph, c.conf.OriginIP, c.conf.FriendIP, c.conf.OriginReceivePort, c.conf.FriendReceivePort, payload); err != nil {
+	if wbuf, icmph, err = createicmpheader(icmph, payload, c.conf.Identifier); err != nil {
 		return n, err
 	}
 
-	if c.conf.logPackets {
-		c.sendPktLog.Add(c.conf.OriginReceivePort, packet{Ipv4h: ipv4h, Udph: udph})
-	}
-
 	err = c.sendPacket(&ipv4h, wbuf, &cm)
-	return n, err
+	return n, nil
 }
 
-func (c *Channel) sendPacket(h *ipv4.Header, b []byte, cm *ipv4.ControlMessage) error {
-	c.writeMutex.Lock()
-	defer c.writeMutex.Unlock()
-	if c.conf.WriteTimeout != 0 {
-		c.rawConn.SetWriteDeadline(time.Now().Add(c.conf.WriteTimeout))
-	}
-	return c.rawConn.WriteTo(h, b, cm)
-}
-
-// We return the tcph header so that it can be logged if needed for debugging
-func createUDPHeader(udph layers.UDP, sip, dip [4]byte, sport, dport uint16, payload []byte) ([]byte, layers.UDP, error) {
-
-	iph := layers.IPv4{
-		SrcIP: sip[:],
-		DstIP: dip[:],
-	}
-
-	udph.SrcPort = layers.UDPPort(sport)
-	udph.DstPort = layers.UDPPort(dport)
-
-	//udph.Length = uint16(len(payload))
-
-	if err := udph.SetNetworkLayerForChecksum(&iph); err != nil {
-		return nil, udph, err
-	}
+func createicmpheader(icmph layers.ICMPv4, payload []byte, identifier uint16) ([]byte, layers.ICMPv4, error) {
+	// assigning type code to the ICMP layer
+	icmph.TypeCode = layers.CreateICMPv4TypeCode(1, 0)
+	icmph.Id = identifier
 
 	sb := gopacket.NewSerializeBuffer()
 	op := gopacket.SerializeOptions{
@@ -248,12 +141,11 @@ func createUDPHeader(udph layers.UDP, sip, dip [4]byte, sport, dport uint16, pay
 		FixLengths:       true,
 	}
 
-	// This will compute proper checksums
-	if err := gopacket.SerializeLayers(sb, op, &udph, gopacket.Payload(payload)); err != nil {
-		return nil, udph, err
+	if err := gopacket.SerializeLayers(sb, op, &icmph, gopacket.Payload(payload)); err != nil {
+		return nil, icmph, err
 	}
 
-	return sb.Bytes(), udph, nil
+	return sb.Bytes(), icmph, nil
 }
 
 func (c *Channel) Receive(data []byte) (uint64, error) {
@@ -265,14 +157,9 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		return 0, err
 	}
 
-	if len(dataBuf) == 0 {
-		return 0, nil
-	}
-
 	var (
-		buf          []byte = make([]byte, 1024)
-		saddr        [4]byte
-		sport, dport uint16
+		buf   []byte = make([]byte, 1024)
+		saddr [4]byte
 		// There is guaranteed to be at least one space for a byte in the
 		// data buffer at this point
 		pos uint64 = 0
@@ -288,26 +175,27 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		p              []byte
 	)
 
-	saddr, sport, dport = c.conf.FriendIP, c.conf.FriendReceivePort, c.conf.OriginReceivePort
+	saddr = c.conf.FriendIP
 
 	prevPacketTime = time.Now()
 
 	for {
-
 		h, p, _, err = c.readConn(buf)
+
 		if err != nil {
 			break
 		}
-		udph := layers.UDP{}
-		if err = udph.DecodeFromBytes(p, gopacket.NilDecodeFeedback); err == nil {
+		icmph := layers.ICMPv4{}
+		if err = icmph.DecodeFromBytes(p, gopacket.NilDecodeFeedback); err == nil {
 			// We check for the expected source IP, source port, and destination port
 			if bytes.Equal(h.Src.To4(), saddr[:]) {
-				if udph.SrcPort == layers.UDPPort(sport) && udph.DstPort == layers.UDPPort(dport) {
-					if udph.Length == uint16(32) { //end of message
+				if icmph.Id == c.conf.Identifier && icmph.TypeCode == layers.CreateICMPv4TypeCode(1, 0) {
+					if len(p) == 8 { //end of message
 						break
-					} else if udph.Length == uint16(34) { //the rest of the message
+					} else { //the rest of the message
+						prevPacketTime = time.Now()
 						var b []byte
-						b, err = c.conf.Encoder.GetByte(*h, udph, maskIndex)
+						b, err = c.conf.Encoder.GetByte(*h, icmph, maskIndex)
 						if err != nil {
 							break
 						}
@@ -320,9 +208,8 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 								dataBuf[pos] = b[i]
 								pos++
 							}
+							prevPacketTime = time.Now()
 						}
-					} else { //not packet from friend port
-						continue
 					}
 				}
 			}
@@ -333,6 +220,17 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		}
 	}
 	return embedders.CopyData(c.conf.Encoder.GetMask(), pos, dataBuf, data, err)
+}
+
+func (c *Channel) sendPacket(h *ipv4.Header, b []byte, cm *ipv4.ControlMessage) error {
+	if c.conf.WriteTimeout > 0 {
+		c.rawConn.SetWriteDeadline(time.Now().Add(c.conf.WriteTimeout))
+	} else {
+		// A deadline of zero means never timeout
+		// The initial Time struct is zero
+		c.rawConn.SetWriteDeadline(time.Time{})
+	}
+	return c.rawConn.WriteTo(h, b, cm)
 }
 
 // Read from a raw connection whil setting a timeout if necessary
@@ -355,7 +253,7 @@ func createIPHeader(sip, dip [4]byte) ipv4.Header {
 		TOS:      0,
 		FragOff:  0,
 		TTL:      64,
-		Protocol: 17,
+		Protocol: 1,
 		Src:      sip[:],
 		Dst:      dip[:],
 	}

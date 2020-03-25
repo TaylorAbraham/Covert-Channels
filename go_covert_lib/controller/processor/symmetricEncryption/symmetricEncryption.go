@@ -3,21 +3,21 @@ package symmetricEncryption
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"errors"
 	"encoding/binary"
+	"errors"
 )
 
-// padding is done by having 7 zero's at the start followed by the length of 
+// padding is done by having 7 zero's at the start followed by the length of
 // the original message, the contents of the message, followed by a series of
-// zero's to fill the block size requirements of the symmetric encryption 
-// algorithm 
+// zero's to fill the block size requirements of the symmetric encryption
+// algorithm
 const padAmount = 8
 
 type SymmetricEncryption struct {
 	algorithm string
 	mode      string
 	key       []byte
-	block	cipher.Block
+	block     cipher.Block
 	blockSize int
 }
 
@@ -82,10 +82,10 @@ func OFBEncrypter(block cipher.Block, data []byte, blockSize int) []byte {
 }
 
 func Pad(data []byte) []byte {
-	// padding is done by having 7 zero's at the start followed by the length 
-	// of the original message, the contents of the message, followed by a 
-	// series of zero's to fill the block size requirements of the symmetric  
-	// encryption algorithm 
+	// padding is done by having 7 zero's at the start followed by the length
+	// of the original message, the contents of the message, followed by a
+	// series of zero's to fill the block size requirements of the symmetric
+	// encryption algorithm
 
 	b := make([]byte, padAmount)
 	b = append(b, data...)
@@ -99,7 +99,7 @@ func Pad(data []byte) []byte {
 
 func UnPad(data []byte) ([]byte, error) {
 	lenOfData := binary.BigEndian.Uint64(data[:padAmount])
-	if lenOfData < uint64(len(data) - padAmount) {
+	if lenOfData < uint64(len(data)-padAmount) {
 		return nil, errors.New("Failed to unprocess data, as data was not processed correctly")
 	}
 	data = data[padAmount:]
@@ -110,7 +110,7 @@ func (c *SymmetricEncryption) Unprocess(data []byte) ([]byte, error) {
 	if len(data)%c.blockSize != 0 && len(data) >= c.blockSize {
 		return nil, errors.New("Unable to decrypt, wrong block size")
 	}
-	
+
 	// based on the users choice of the mode of operation encrypt in that mode
 	switch c.mode {
 	case "Cipher Block Chaining (CBC)":

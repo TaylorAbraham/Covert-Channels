@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-
 func TestAESEncodeDecode(t *testing.T) {
 	encodeDecode(t, make([]byte, 32), "Advanced Encryption Standard (AES)", "Cipher Block Chaining (CBC)", []byte{1, 2, 3, 4, 5})
 	encodeDecode(t, make([]byte, 32), "Advanced Encryption Standard (AES)", "Cipher Feedback (CFB)", []byte{1, 2, 3, 4, 5})
@@ -59,7 +58,7 @@ func encodeDecode(t *testing.T, key []byte, algo string, mode string, b []byte) 
 	if err != nil {
 		t.Errorf("err = '%s'; want nil", err.Error())
 	}
- 
+
 	if !bytes.Equal(bcopy, b) {
 		t.Errorf("Original array changed")
 	}

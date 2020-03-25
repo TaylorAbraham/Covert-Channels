@@ -4,9 +4,15 @@ import (
 	"sync"
 
 	"./channel"
+	"./channel/httpCovert"
+	"./channel/httpNormal"
+	"./channel/icmpIP"
+	"./channel/icmpNormal"
 	"./channel/tcpHandshake"
 	"./channel/tcpNormal"
 	"./channel/tcpSyn"
+	"./channel/udpIP"
+	"./channel/udpNormal"
 	"./processor"
 	"./processor/asymmetricEncryption"
 	"./processor/caesar"
@@ -59,9 +65,15 @@ type channelConfig struct {
 }
 
 type channelData struct {
+	icmpIP       icmpIP.ConfigClient
+	icmpNormal   icmpNormal.ConfigClient
 	TcpSyn       tcpSyn.ConfigClient
 	TcpHandshake tcpHandshake.ConfigClient
 	TcpNormal    tcpNormal.ConfigClient
+	HttpCovert   httpCovert.ConfigClient
+	HttpNormal   httpNormal.ConfigClient
+	UdpNormal    udpNormal.ConfigClient
+	UdpIP        udpIP.ConfigClient
 }
 
 type processorData struct {

@@ -88,8 +88,8 @@ type HexKeyParam struct {
 }
 
 type KeyParam struct {
-	Type string
-	Value string
+	Type    string
+	Value   string
 	Display Display
 }
 
