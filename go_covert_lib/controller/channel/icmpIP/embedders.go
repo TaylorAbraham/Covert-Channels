@@ -8,8 +8,8 @@ import (
 )
 
 type IcmpEncoder interface {
-	GetByte(ipv4h ipv4.Header, icmph layers.ICMP, maskIndex int) ([]byte, error)
-	SetByte(ipv4h ipv4.Header, icmph layers.ICMP, buf []byte, maskIndex int) (ipv4.Header, layers.ICMP, []byte, error)
+	GetByte(ipv4h ipv4.Header, icmph layers.ICMPv4, maskIndex int) ([]byte, error)
+	SetByte(ipv4h ipv4.Header, icmph layers.ICMPv4, buf []byte, maskIndex int) (ipv4.Header, layers.ICMPv4, []byte, error)
 	GetMask() [][]byte
 }
 
@@ -18,14 +18,14 @@ type IDEncoder struct {
 	emb *embedders.IDEncoder
 }
 
-func (e *IDEncoder) GetByte(ipv4h ipv4.Header, icmph layers.ICMP, maskIndex int) ([]byte, error) {
+func (e *IDEncoder) GetByte(ipv4h ipv4.Header, icmph layers.ICMPv4, maskIndex int) ([]byte, error) {
 	if b, err := e.emb.GetByte(ipv4h); err == nil {
 		return []byte{b}, nil
 	} else {
 		return nil, err
 	}
 }
-func (e *IDEncoder) SetByte(ipv4h ipv4.Header, icmph layers.ICMP, buf []byte, maskIndex int) (ipv4.Header, layers.ICMP, []byte, error) {
+func (e *IDEncoder) SetByte(ipv4h ipv4.Header, icmph layers.ICMPv4, buf []byte, maskIndex int) (ipv4.Header, layers.ICMPv4, []byte, error) {
 	if len(buf) == 0 {
 		return ipv4h, icmph, nil, errors.New("Cannot set byte if no data")
 	}

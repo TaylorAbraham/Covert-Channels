@@ -1,11 +1,11 @@
 package icmpIP
 
 import (
-	"../embedders"
-	"bytes"
-	"context"
-	"errors"
-	"github.com/google/gopacket"
+	//"../embedders"
+	//"bytes"
+	//"context"
+	//"errors"
+	//"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"golang.org/x/net/ipv4"
 	"net"
@@ -16,7 +16,7 @@ import (
 // We make the fields public for logging
 type packet struct {
 	Ipv4h ipv4.Header
-	icmph  layers.ICMP
+	icmph  layers.ICMPv4
 }
 
 type syncPktMap struct {
@@ -35,7 +35,7 @@ type Config struct {
 	FriendReceivePort uint16
 	OriginReceivePort uint16
 	DialTimeout       time.Duration
-	Encoder           icmpEncoder
+	Encoder           IcmpEncoder
 
 	AcceptTimeout time.Duration
 
@@ -83,12 +83,8 @@ func MakeChannel(conf Config) (*Channel, error) {
 	c := &Channel{
 		conf:          conf,
 		cancel:        make(chan bool),
-		sendPktLog:    MakeSyncMap(),
-		receivePktLog: MakeSyncMap(),
 		writeMutex:    &sync.Mutex{},
 		closeMutex:    &sync.Mutex{},
-		// Only 32 connections can be accepted before they begin to be dropped
-		acceptChan: make(chan acceptedConn, maxAccept),
 	}
 
 	if c.conf.Encoder == nil {
@@ -111,11 +107,15 @@ func MakeChannel(conf Config) (*Channel, error) {
 }
 
 func (c *Channel) Send(data []byte) (uint64, error) {
+	return 0, nil
+}
 
+func (c *Channel) Receive(data []byte) (uint64, error) {
+	return 0, nil
 }
 
 func (c *Channel) sendPacket(h *ipv4.Header, b []byte, cm *ipv4.ControlMessage) error {
-
+	return nil
 }
 
 // Read from a raw connection whil setting a timeout if necessary
