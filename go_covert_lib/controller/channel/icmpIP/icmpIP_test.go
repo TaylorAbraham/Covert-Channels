@@ -10,10 +10,7 @@ import (
 var sconfTimeout Config = Config{
 	FriendIP:          [4]byte{127, 0, 0, 1},
 	OriginIP:          [4]byte{127, 0, 0, 1},
-	FriendReceivePort: 8080,
-	OriginReceivePort: 8081,
-	DialTimeout:       time.Second,
-	AcceptTimeout:     time.Second,
+	Identifier : 1234,
 	ReadTimeout:       time.Second,
 	WriteTimeout:      time.Second,
 }
@@ -21,10 +18,7 @@ var sconfTimeout Config = Config{
 var rconfTimeout Config = Config{
 	FriendIP:          [4]byte{127, 0, 0, 1},
 	OriginIP:          [4]byte{127, 0, 0, 1},
-	FriendReceivePort: 8081,
-	OriginReceivePort: 8080,
-	DialTimeout:       time.Second,
-	AcceptTimeout:     time.Second,
+	Identifier : 1234,
 	ReadTimeout:       time.Second,
 	WriteTimeout:      time.Second,
 }
@@ -94,8 +88,7 @@ func TestReceiveSendSelf(t *testing.T) {
 	var conf Config = Config{
 		FriendIP:          [4]byte{127, 0, 0, 1},
 		OriginIP:          [4]byte{127, 0, 0, 1},
-		FriendReceivePort: 8080,
-		OriginReceivePort: 8080,
+		Identifier: 8080,
 	}
 
 	// create the ICMP covert channel

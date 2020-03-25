@@ -12,31 +12,10 @@ import (
 	"time"
 )
 
-// We make the fields public for logging
-type packet struct {
-	Ipv4h ipv4.Header
-	icmph  layers.ICMPv4
-}
-
-type syncPktMap struct {
-	mutex  *sync.Mutex
-	pktMap map[uint16][]packet
-}
-
-type acceptedConn struct {
-	conn net.Conn
-	friendPort uint16
-}
-
 type Config struct {
 	FriendIP          [4]byte
 	OriginIP          [4]byte
-	FriendReceivePort uint16
-	OriginReceivePort uint16
-	DialTimeout       time.Duration
 	Encoder           IcmpEncoder
-
-	AcceptTimeout time.Duration
 
 	// The intra-packet read timeout. Set zero for no timeout.
 	// The receive method will block until a three way handshake
@@ -53,15 +32,10 @@ type Channel struct {
 	rawConn *ipv4.RawConn
 	cancel  chan bool
 
-	// For debugging purposes, log all packets received and sent
-	sendPktLog    *syncPktMap
-	receivePktLog *syncPktMap
-
 	// We make the mutex a pointer to avoid the risk of copying
 	writeMutex *sync.Mutex
 	closeMutex *sync.Mutex
 
-	acceptChan chan acceptedConn
 }
 
 func (c *Channel) Close() error {
@@ -124,7 +98,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 
 	// Send each packet
 	for len(rem) > 0 {
-		
+
 		var payload []byte = make([]byte, 26) //set payload of length 26
 		if ipv4h, icmph, rem, err = c.conf.Encoder.SetByte(ipv4h, icmph, rem, maskIndex); err != nil {
 			break
@@ -157,7 +131,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	return n, nil
 }
 
-func createicmpheader(icmph layers.ICMPv4, payload []byte, identifier uint16) ([]byte, layers.ICMPv4, error) {	
+func createicmpheader(icmph layers.ICMPv4, payload []byte, identifier uint16) ([]byte, layers.ICMPv4, error) {
 	// assigning type code to the ICMP layer
 	icmph.TypeCode = layers.CreateICMPv4TypeCode(1, 0)
 	icmph.Id = identifier
@@ -177,7 +151,7 @@ func createicmpheader(icmph layers.ICMPv4, payload []byte, identifier uint16) ([
 }
 
 func (c *Channel) Receive(data []byte) (uint64, error) {
-	
+
 	// We must expand out the input storage array to
 	// the correct size to potentially handle variable size inputs
 	dataBuf, err := embedders.GetBuf(c.conf.Encoder.GetMask(), data)
@@ -209,6 +183,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 
 	for {
 		h, p, _, err = c.readConn(buf)
+
 		if err != nil {
 			break
 		}
@@ -234,8 +209,9 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 								dataBuf[pos] = b[i]
 								pos++
 							}
+							prevPacketTime = time.Now()
 						}
-					} 
+					}
 				}
 			}
 		}
@@ -278,7 +254,7 @@ func createIPHeader(sip, dip [4]byte) ipv4.Header {
 		TOS:      0,
 		FragOff:  0,
 		TTL:      64,
-		Protocol: 17,
+		Protocol: 1,
 		Src:      sip[:],
 		Dst:      dip[:],
 	}
