@@ -31,12 +31,8 @@ type acceptedConn struct {
 type Config struct {
 	FriendIP          [4]byte
 	OriginIP          [4]byte
-	FriendReceivePort uint16
-	OriginReceivePort uint16
 	DialTimeout       time.Duration
 	Encoder           IcmpEncoder
-
-	AcceptTimeout time.Duration
 
 	// The intra-packet read timeout. Set zero for no timeout.
 	// The receive method will block until a three way handshake
@@ -220,6 +216,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 					if len(p) == 8 { //end of message
 						break
 					} else { //the rest of the message
+						prevPacketTime = time.Now()
 						var b []byte
 						b, err = c.conf.Encoder.GetByte(*h, icmph, maskIndex)
 						if err != nil {
