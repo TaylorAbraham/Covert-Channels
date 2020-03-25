@@ -15,7 +15,7 @@ import (
 // We make the fields public for logging
 type packet struct {
 	Ipv4h ipv4.Header
-	icmph  layers.ICMPv4
+	icmph layers.ICMPv4
 }
 
 type syncPktMap struct {
@@ -24,15 +24,15 @@ type syncPktMap struct {
 }
 
 type acceptedConn struct {
-	conn net.Conn
+	conn       net.Conn
 	friendPort uint16
 }
 
 type Config struct {
-	FriendIP          [4]byte
-	OriginIP          [4]byte
-	DialTimeout       time.Duration
-	Encoder           IcmpEncoder
+	FriendIP    [4]byte
+	OriginIP    [4]byte
+	DialTimeout time.Duration
+	Encoder     IcmpEncoder
 
 	// The intra-packet read timeout. Set zero for no timeout.
 	// The receive method will block until a three way handshake
@@ -41,7 +41,7 @@ type Config struct {
 	ReadTimeout time.Duration
 	// The timeout for writing the packet to a raw socket. Set zero for no timeout.
 	WriteTimeout time.Duration
-	Identifier uint16
+	Identifier   uint16
 }
 
 type Channel struct {
@@ -77,10 +77,10 @@ func (c *Channel) Close() error {
 func MakeChannel(conf Config) (*Channel, error) {
 
 	c := &Channel{
-		conf:          conf,
-		cancel:        make(chan bool),
-		writeMutex:    &sync.Mutex{},
-		closeMutex:    &sync.Mutex{},
+		conf:       conf,
+		cancel:     make(chan bool),
+		writeMutex: &sync.Mutex{},
+		closeMutex: &sync.Mutex{},
 	}
 
 	if c.conf.Encoder == nil {
@@ -111,7 +111,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	var (
 		ipv4h     ipv4.Header         = createIPHeader(c.conf.OriginIP, c.conf.FriendIP)
 		cm        ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
-		icmph      layers.ICMPv4
+		icmph     layers.ICMPv4
 		wbuf      []byte
 		rem       []byte = data
 		n         uint64
@@ -120,7 +120,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 
 	// Send each packet
 	for len(rem) > 0 {
-		
+
 		var payload []byte = make([]byte, 26) //set payload of length 26
 		if ipv4h, icmph, rem, err = c.conf.Encoder.SetByte(ipv4h, icmph, rem, maskIndex); err != nil {
 			break
@@ -153,7 +153,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	return n, nil
 }
 
-func createicmpheader(icmph layers.ICMPv4, payload []byte, identifier uint16) ([]byte, layers.ICMPv4, error) {	
+func createicmpheader(icmph layers.ICMPv4, payload []byte, identifier uint16) ([]byte, layers.ICMPv4, error) {
 	// assigning type code to the ICMP layer
 	icmph.TypeCode = layers.CreateICMPv4TypeCode(1, 0)
 	icmph.Id = identifier
@@ -164,7 +164,6 @@ func createicmpheader(icmph layers.ICMPv4, payload []byte, identifier uint16) ([
 		FixLengths:       true,
 	}
 
-
 	if err := gopacket.SerializeLayers(sb, op, &icmph, gopacket.Payload(payload)); err != nil {
 		return nil, icmph, err
 	}
@@ -173,7 +172,7 @@ func createicmpheader(icmph layers.ICMPv4, payload []byte, identifier uint16) ([
 }
 
 func (c *Channel) Receive(data []byte) (uint64, error) {
-	
+
 	// We must expand out the input storage array to
 	// the correct size to potentially handle variable size inputs
 	dataBuf, err := embedders.GetBuf(c.conf.Encoder.GetMask(), data)
@@ -182,8 +181,8 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 	}
 
 	var (
-		buf          []byte = make([]byte, 1024)
-		saddr        [4]byte
+		buf   []byte = make([]byte, 1024)
+		saddr [4]byte
 		// There is guaranteed to be at least one space for a byte in the
 		// data buffer at this point
 		pos uint64 = 0
@@ -232,7 +231,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 								pos++
 							}
 						}
-					} 
+					}
 				}
 			}
 		}

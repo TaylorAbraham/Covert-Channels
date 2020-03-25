@@ -1,13 +1,6 @@
 package controller
 
 import (
-
-	"encoding/json"
-	"errors"
-	"log"
-	"os"
-	"strconv"
-	"time"
 	"./channel/httpCovert"
 	"./channel/httpNormal"
 	"./channel/icmpIP"
@@ -25,7 +18,13 @@ import (
 	"./processor/none"
 	"./processor/symmetricEncryption"
 	"./processor/zLibCompression"
+	"encoding/json"
+	"errors"
 	"github.com/gorilla/websocket"
+	"log"
+	"os"
+	"strconv"
+	"time"
 )
 
 // Constructor for the controller
