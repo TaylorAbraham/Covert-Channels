@@ -1,11 +1,10 @@
 package icmpIP
 
 import (
-	//"../embedders"
-	//"bytes"
-	//"context"
-	//"errors"
-	//"github.com/google/gopacket"
+	"../embedders"
+	"bytes"
+	"errors"
+	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"golang.org/x/net/ipv4"
 	"net"
@@ -46,6 +45,7 @@ type Config struct {
 	ReadTimeout time.Duration
 	// The timeout for writing the packet to a raw socket. Set zero for no timeout.
 	WriteTimeout time.Duration
+	Identifier uint16
 }
 
 type Channel struct {
@@ -107,15 +107,155 @@ func MakeChannel(conf Config) (*Channel, error) {
 }
 
 func (c *Channel) Send(data []byte) (uint64, error) {
-	return 0, nil
+	data, err := embedders.EncodeFromMask(c.conf.Encoder.GetMask(), data)
+	if err != nil {
+		return 0, err
+	}
+
+	var (
+		ipv4h     ipv4.Header         = createIPHeader(c.conf.OriginIP, c.conf.FriendIP)
+		cm        ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
+		icmph      layers.ICMPv4
+		wbuf      []byte
+		rem       []byte = data
+		n         uint64
+		maskIndex int = 0
+	)
+
+	// Send each packet
+	for len(rem) > 0 {
+		
+		var payload []byte = make([]byte, 26) //set payload of length 26
+		if ipv4h, icmph, rem, err = c.conf.Encoder.SetByte(ipv4h, icmph, rem, maskIndex); err != nil {
+			break
+		}
+		maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
+
+		if wbuf, icmph, err = createicmpheader(icmph, payload, c.conf.Identifier); err != nil {
+			break
+		}
+
+		if err = c.sendPacket(&ipv4h, wbuf, &cm); err != nil {
+			break
+		}
+		n = uint64(len(data) - len(rem))
+	}
+
+	// Readjust size to represent number of bytes sent
+	n, err = embedders.GetSentSize(c.conf.Encoder.GetMask(), n, err)
+	if err != nil {
+		return n, err
+	}
+
+	var payload []byte = make([]byte, 0) //length 0 signifies the end of the message
+
+	if wbuf, icmph, err = createicmpheader(icmph, payload, c.conf.Identifier); err != nil {
+		return n, err
+	}
+
+	err = c.sendPacket(&ipv4h, wbuf, &cm)
+	return n, nil
+}
+
+func createicmpheader(icmph layers.ICMPv4, payload []byte, identifier uint16) ([]byte, layers.ICMPv4, error) {	
+	// assigning type code to the ICMP layer
+	icmph.TypeCode = layers.CreateICMPv4TypeCode(1, 0)
+	icmph.Id = identifier
+
+	sb := gopacket.NewSerializeBuffer()
+	op := gopacket.SerializeOptions{
+		ComputeChecksums: true,
+		FixLengths:       true,
+	}
+
+
+	if err := gopacket.SerializeLayers(sb, op, &icmph, gopacket.Payload(payload)); err != nil {
+		return nil, icmph, err
+	}
+
+	return sb.Bytes(), icmph, nil
 }
 
 func (c *Channel) Receive(data []byte) (uint64, error) {
-	return 0, nil
+	
+	// We must expand out the input storage array to
+	// the correct size to potentially handle variable size inputs
+	dataBuf, err := embedders.GetBuf(c.conf.Encoder.GetMask(), data)
+	if err != nil {
+		return 0, err
+	}
+
+	var (
+		buf          []byte = make([]byte, 1024)
+		saddr        [4]byte
+		// There is guaranteed to be at least one space for a byte in the
+		// data buffer at this point
+		pos uint64 = 0
+		// The time since the last packet arrived
+		// Timeouts can occur due to the raw socket itself timing out,
+		// however this will typically not happen on a normal system
+		// since the raw socket will read any incoming tcp packet.
+		// This timer is used to timeout if packets are received, but they
+		// are not the correct type
+		prevPacketTime time.Time
+		maskIndex      int = 0
+		h              *ipv4.Header
+		p              []byte
+	)
+
+	saddr = c.conf.FriendIP
+
+	prevPacketTime = time.Now()
+
+	for {
+		h, p, _, err = c.readConn(buf)
+		if err != nil {
+			break
+		}
+		icmph := layers.ICMPv4{}
+		if err = icmph.DecodeFromBytes(p, gopacket.NilDecodeFeedback); err == nil {
+			// We check for the expected source IP, source port, and destination port
+			if bytes.Equal(h.Src.To4(), saddr[:]) {
+				if icmph.Id == c.conf.Identifier && icmph.TypeCode == layers.CreateICMPv4TypeCode(1, 0) {
+					if len(p) == 8 { //end of message
+						break
+					} else { //the rest of the message
+						var b []byte
+						b, err = c.conf.Encoder.GetByte(*h, icmph, maskIndex)
+						if err != nil {
+							break
+						}
+						maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
+						if (pos + uint64(len(b))) >= uint64(len(dataBuf)) { //overflow
+							err = errors.New("Overflow. End of message never received.")
+							break
+						} else { //add data to array, increment pos
+							for i := 0; i < len(b); i++ {
+								dataBuf[pos] = b[i]
+								pos++
+							}
+						}
+					} 
+				}
+			}
+		}
+		if c.conf.ReadTimeout > 0 && time.Now().Sub(prevPacketTime) > c.conf.ReadTimeout {
+			err = errors.New("Covert Packet Timeout")
+			break
+		}
+	}
+	return embedders.CopyData(c.conf.Encoder.GetMask(), pos, dataBuf, data, err)
 }
 
 func (c *Channel) sendPacket(h *ipv4.Header, b []byte, cm *ipv4.ControlMessage) error {
-	return nil
+	if c.conf.WriteTimeout > 0 {
+		c.rawConn.SetWriteDeadline(time.Now().Add(c.conf.WriteTimeout))
+	} else {
+		// A deadline of zero means never timeout
+		// The initial Time struct is zero
+		c.rawConn.SetWriteDeadline(time.Time{})
+	}
+	return c.rawConn.WriteTo(h, b, cm)
 }
 
 // Read from a raw connection whil setting a timeout if necessary
