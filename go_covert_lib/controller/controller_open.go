@@ -7,6 +7,7 @@ import (
 	"./channel"
 	"./channel/httpCovert"
 	"./channel/httpNormal"
+	"./channel/icmpIP"
 	"./channel/icmpNormal"
 	"./channel/tcpHandshake"
 	"./channel/tcpNormal"
@@ -125,6 +126,10 @@ func (ctr *Controller) retrieveChannel(cconf channelConfig) (channel.Channel, *c
 	}
 
 	switch newConf.Type {
+	case "icmpIP":
+		if c, err = icmpIP.ToChannel(newConf.Data.icmpIP); err != nil {
+			return nil, nil, err
+		}
 	case "icmpNormal":
 		if c, err = icmpNormal.ToChannel(newConf.Data.icmpNormal); err != nil {
 			return nil, nil, err
@@ -147,7 +152,7 @@ func (ctr *Controller) retrieveChannel(cconf channelConfig) (channel.Channel, *c
 		}
 	case "HttpNormal":
 		if c, err = httpNormal.ToChannel(newConf.Data.HttpNormal); err != nil {
-      return nil, nil, err
+			return nil, nil, err
 		}
 	case "UdpNormal":
 		if c, err = udpNormal.ToChannel(newConf.Data.UdpNormal); err != nil {

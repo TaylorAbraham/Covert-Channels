@@ -6,6 +6,7 @@ import (
 	"./channel"
 	"./channel/httpCovert"
 	"./channel/httpNormal"
+	"./channel/icmpIP"
 	"./channel/icmpNormal"
 	"./channel/tcpHandshake"
 	"./channel/tcpNormal"
@@ -64,7 +65,8 @@ type channelConfig struct {
 }
 
 type channelData struct {
-	icmpNormal	icmpNormal.ConfigClient
+	icmpIP       icmpIP.ConfigClient
+	icmpNormal   icmpNormal.ConfigClient
 	TcpSyn       tcpSyn.ConfigClient
 	TcpHandshake tcpHandshake.ConfigClient
 	TcpNormal    tcpNormal.ConfigClient
