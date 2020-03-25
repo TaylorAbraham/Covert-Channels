@@ -44,6 +44,13 @@ $hidden_console_width: 54px;
   }
 }
 
+.cc-processor {
+  &__delete {
+    border-radius: 100% !important;
+    align-self: center;
+  }
+}
+
 .input-text {
   width: 180px;
   text-align: right !important;

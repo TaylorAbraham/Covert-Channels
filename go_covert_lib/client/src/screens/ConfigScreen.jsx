@@ -2,6 +2,8 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import Button from 'react-bootstrap/Button';
 import Dropdown from 'react-bootstrap/Dropdown';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faTrash } from '@fortawesome/free-solid-svg-icons';
 
 import Checkbox from '../ui-components/Checkbox';
 import HexKey from '../ui-components/HexKey';
@@ -26,6 +28,12 @@ const ConfigScreen = (props) => {
     channelIsOpen,
   } = props;
 
+  const deleteProcessor = (targetIndex) => {
+    setProcessors(processors.filter((proc, i) => {
+      return i !== targetIndex;
+    }));
+  };
+
   return (
     <div className="m-2">
       <h2 className="m-1">Configuration</h2>
@@ -42,39 +50,48 @@ const ConfigScreen = (props) => {
       </Button>
       {
         processors.map((processor, i) => (
-          <div key={i.toString()}>
-            <Dropdown className="m-1">
-              <Dropdown.Toggle
-                className="w-100"
-                variant="outline-primary"
+          <div className="cc-processor" key={i.toString()}>
+            <div className="d-flex">
+              <Dropdown className="w-100 m-1">
+                <Dropdown.Toggle
+                  className="w-100"
+                  variant="outline-primary"
+                >
+                  {processor.Type || 'Select a Processor'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu className="w-100">
+                  {
+                    Object.keys(processorList).map(p => (
+                      <Dropdown.Item
+                        as="option"
+                        active={p === processor.Type}
+                        onClick={(e) => {
+                          setProcessors([
+                            ...processors.slice(0, i),
+                            {
+                              Type: e.target.value,
+                              Data: processorList,
+                            },
+                            ...processors.slice(i + 1, processors.length + 1),
+                          ]);
+                        }}
+                        value={p}
+                        key={p}
+                      >
+                        {p}
+                      </Dropdown.Item>
+                    ))
+                  }
+                </Dropdown.Menu>
+              </Dropdown>
+              <Button
+                onClick={() => deleteProcessor(i)}
+                variant="danger"
+                className="cc-processor cc-processor__delete"
               >
-                {processor.Type || 'Select a Processor'}
-              </Dropdown.Toggle>
-              <Dropdown.Menu className="w-100">
-                {
-                  Object.keys(processorList).map(p => (
-                    <Dropdown.Item
-                      as="option"
-                      active={p === processor.Type}
-                      onClick={(e) => {
-                        setProcessors([
-                          ...processors.slice(0, i),
-                          {
-                            Type: e.target.value,
-                            Data: processorList,
-                          },
-                          ...processors.slice(i + 1, processors.length + 1),
-                        ]);
-                      }}
-                      value={p}
-                      key={p}
-                    >
-                      {p}
-                    </Dropdown.Item>
-                  ))
-                }
-              </Dropdown.Menu>
-            </Dropdown>
+                <FontAwesomeIcon icon={faTrash} />
+              </Button>
+            </div>
             {processor.Data && Object.keys(processor.Data[processor.Type]).map((key) => {
               /**
                * EXTREME DANGER WARNING
