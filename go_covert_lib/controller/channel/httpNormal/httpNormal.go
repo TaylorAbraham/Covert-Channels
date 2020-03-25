@@ -84,13 +84,13 @@ func (c *Channel) handleFunc(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		select {
 		case data := <-c.serverSendBuf:
-			w.Header().Add("Valid", "0")
+			w.Header().Add("Valid", "1")
 			io.WriteString(w, string(data))
 		case <-time.After(time.Millisecond * 50):
 			//log.Println("GET Request timeout")
-			w.Header().Add("Valid", "1")
+			w.Header().Add("Valid", "0")
 		case <-c.cancel:
-			w.Header().Add("Valid", "1")
+			w.Header().Add("Valid", "0")
 		}
 
 		// if the request message is a post request
@@ -156,8 +156,8 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 				} else {
 					return uint64(len(httpdata)), nil
 				}
-			case <-time.After(c.conf.WriteTimeout):
-				return 0, errors.New("Write Timeout")
+			case <-time.After(c.conf.ReadTimeout):
+				return 0, errors.New("Read Timeout")
 			case <-c.cancel:
 				return 0, errors.New("Channel closed")
 			}
@@ -202,7 +202,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 					}
 				}
 			} else {
-				return n, err
+				return n, errors.New("No message on server")
 			}
 		}
 	}
@@ -266,7 +266,7 @@ func (c *Channel) clientRequest(data []byte) (uint64, bool, error) {
 	//as long as there is no error
 	//extract the information from the body of the reponse message
 	if err == nil {
-		if resp.Header.Get("Valid") == "0" {
+		if resp.Header.Get("Valid") == "1" {
 			buf := bytes.Buffer{}
 			buf.ReadFrom(resp.Body)
 			copy(data, buf.Bytes())
