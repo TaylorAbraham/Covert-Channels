@@ -126,12 +126,12 @@ func (ctr *Controller) retrieveChannel(cconf channelConfig) (channel.Channel, *c
 	}
 
 	switch newConf.Type {
-	case "icmpIP":
-		if c, err = icmpIP.ToChannel(newConf.Data.icmpIP); err != nil {
+	case "IcmpIP":
+		if c, err = icmpIP.ToChannel(newConf.Data.IcmpIP); err != nil {
 			return nil, nil, err
 		}
-	case "icmpNormal":
-		if c, err = icmpNormal.ToChannel(newConf.Data.icmpNormal); err != nil {
+	case "IcmpNormal":
+		if c, err = icmpNormal.ToChannel(newConf.Data.IcmpNormal); err != nil {
 			return nil, nil, err
 		}
 	case "TcpSyn":

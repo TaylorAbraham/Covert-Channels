@@ -65,8 +65,8 @@ type channelConfig struct {
 }
 
 type channelData struct {
-	icmpIP       icmpIP.ConfigClient
-	icmpNormal   icmpNormal.ConfigClient
+	IcmpIP       icmpIP.ConfigClient
+	IcmpNormal   icmpNormal.ConfigClient
 	TcpSyn       tcpSyn.ConfigClient
 	TcpHandshake tcpHandshake.ConfigClient
 	TcpNormal    tcpNormal.ConfigClient
