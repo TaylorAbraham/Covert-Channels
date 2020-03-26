@@ -121,9 +121,13 @@ const App = () => {
     // const newWS = new WebSocket('ws://localhost:8080/api/ws');
     newWS.binaryType = 'arraybuffer';
     newWS.onopen = _e => sendInitialConfig(newWS);
-    newWS.onerror = _e => console.log('UNIMPLEMENTED'); // TODO:
+    newWS.onerror = e => addSystemMessage(e);
     newWS.onmessage = e => handleMessage(JSON.parse(e.data));
     setWS(newWS);
+
+    if (!window.File || !window.FileReader || !window.FileList || !window.Blob) {
+      addSystemMessage('[WARNING] Your browser does not support file operations. Saving/loading configurations will not work.');
+    }
   }, []);
 
   return isLoading ? (
@@ -163,6 +167,7 @@ const App = () => {
               channel={channel}
               setChannel={setChannel}
               channelIsOpen={channelIsOpen}
+              addSystemMessage={addSystemMessage}
             />
           ) : (screen === Screens.MSG) ? (
             <MessagingScreen
