@@ -31,7 +31,7 @@ var confList []Config = []Config{
 		FriendPort: 8080,
 		OriginPort: 8081,
 		Delimiter:  Protocol,
-		Encoder:    &embedders.TcpIpSeqEncoder{},
+		Embedder:   &embedders.TcpIpSeqEncoder{},
 	},
 	Config{
 		FriendIP:   [4]byte{127, 0, 0, 1},
@@ -39,7 +39,7 @@ var confList []Config = []Config{
 		FriendPort: 8080,
 		OriginPort: 8081,
 		Delimiter:  Protocol,
-		Encoder:    &embedders.TcpIpIDEncoder{},
+		Embedder:   &embedders.TcpIpIDEncoder{},
 	},
 	Config{
 		FriendIP:   [4]byte{127, 0, 0, 1},
@@ -47,7 +47,7 @@ var confList []Config = []Config{
 		FriendPort: 8080,
 		OriginPort: 8081,
 		Delimiter:  Protocol,
-		Encoder:    &embedders.TcpIpUrgPtrEncoder{},
+		Embedder:   &embedders.TcpIpUrgPtrEncoder{},
 	},
 	Config{
 		FriendIP:   [4]byte{127, 0, 0, 1},
@@ -55,7 +55,7 @@ var confList []Config = []Config{
 		FriendPort: 8080,
 		OriginPort: 8081,
 		Delimiter:  Protocol,
-		Encoder:    &embedders.TcpIpUrgFlgEncoder{},
+		Embedder:   &embedders.TcpIpUrgFlgEncoder{},
 	},
 	Config{
 		FriendIP:   [4]byte{127, 0, 0, 1},
@@ -63,7 +63,7 @@ var confList []Config = []Config{
 		FriendPort: 8080,
 		OriginPort: 8081,
 		Delimiter:  Protocol,
-		Encoder:    &embedders.TcpIpTimeEncoder{},
+		Embedder:   &embedders.TcpIpTimeEncoder{},
 	},
 	Config{
 		FriendIP:   [4]byte{127, 0, 0, 1},
@@ -71,7 +71,7 @@ var confList []Config = []Config{
 		FriendPort: 8080,
 		OriginPort: 8081,
 		Delimiter:  Protocol,
-		Encoder:    &embedders.TcpIpEcnEncoder{},
+		Embedder:   &embedders.TcpIpEcnEncoder{},
 	},
 }
 

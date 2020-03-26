@@ -12,7 +12,7 @@ type ConfigClient struct {
 	OriginIP          config.IPV4Param
 	FriendReceivePort config.U16Param
 	OriginReceivePort config.U16Param
-	Encoder           config.SelectParam
+	Embedder          config.SelectParam
 	DialTimeout       config.U64Param
 	AcceptTimeout     config.U64Param
 	ReadTimeout       config.U64Param
@@ -29,7 +29,7 @@ func GetDefault() ConfigClient {
 		AcceptTimeout:     config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The accept timeout for the receive method in milliseconds. Zero for no timeout.", Name: "Accept Timeout", Group: "Timing"}),
 		ReadTimeout:       config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The intra-packet read timeout for the receive method in milliseconds. Zero for no timeout.", Name: "Read Timeout", Group: "Timing"}),
 		WriteTimeout:      config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The a timeout for writing packets to the raw socket, in milliseconds. Zero for no timeout.", Name: "Write Timeout", Group: "Timing"}),
-		Encoder:           config.MakeSelect("id", []string{"id", "urgflg", "urgptr", "time", "ecn"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
+		Embedder:          config.MakeSelect("id", []string{"id", "urgflg", "urgptr", "time", "ecn"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
 	}
 }
 
@@ -54,19 +54,19 @@ func ToChannel(cc ConfigClient) (*Channel, error) {
 	c.ReadTimeout = time.Duration(cc.ReadTimeout.Value) * time.Millisecond
 	c.WriteTimeout = time.Duration(cc.WriteTimeout.Value) * time.Millisecond
 
-	switch cc.Encoder.Value {
+	switch cc.Embedder.Value {
 	case "id":
-		c.Encoder = &embedders.TcpIpIDEncoder{}
+		c.Embedder = &embedders.TcpIpIDEncoder{}
 	case "urgflg":
-		c.Encoder = &embedders.TcpIpUrgFlgEncoder{}
+		c.Embedder = &embedders.TcpIpUrgFlgEncoder{}
 	case "urgptr":
-		c.Encoder = &embedders.TcpIpUrgPtrEncoder{}
+		c.Embedder = &embedders.TcpIpUrgPtrEncoder{}
 	case "time":
-		c.Encoder = &embedders.TcpIpTimeEncoder{}
+		c.Embedder = &embedders.TcpIpTimeEncoder{}
 	case "ecn":
-		c.Encoder = &embedders.TcpIpEcnEncoder{}
+		c.Embedder = &embedders.TcpIpEcnEncoder{}
 	default:
-		return nil, errors.New("Invalid encoder value")
+		return nil, errors.New("Invalid embedder value")
 	}
 
 	if ch, err := MakeChannel(c); err != nil {

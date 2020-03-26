@@ -47,7 +47,7 @@ type Config struct {
 	// or delinieating by a TCP packet with a specific flag (Delim::Protocol).
 	// Default is Delim::Protocol.
 	Delimiter uint8
-	Encoder   TcpEncoder
+	Embedder  TcpEncoder
 	// A function to retrieve a delay to implement between sent packets. By default this
 	// function returns a delay of 0 ms, but users can set it to a longer time or even to
 	// their favourite distribution.
@@ -75,8 +75,8 @@ type Channel struct {
 // the data structure
 func MakeChannel(conf Config) (*Channel, error) {
 	c := &Channel{conf: conf, writeCancel: make(chan bool), closeMutex: &sync.Mutex{}}
-	if c.conf.Encoder == nil {
-		c.conf.Encoder = &embedders.TcpIpSeqEncoder{}
+	if c.conf.Embedder == nil {
+		c.conf.Embedder = &embedders.TcpIpSeqEncoder{}
 	}
 
 	conn, err := net.ListenPacket("ip4:6", "0.0.0.0")
@@ -104,7 +104,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 
 	// We must expand out the input storage array to
 	// the correct size to potentially handle variable size inputs
-	dataBuf, err := embedders.GetBuf(c.conf.Encoder.GetMask(), data)
+	dataBuf, err := embedders.GetBuf(c.conf.Embedder.GetMask(), data)
 	if err != nil {
 		return 0, err
 	}
@@ -177,11 +177,11 @@ readloop:
 							first = false
 
 							var newBytes []byte
-							newBytes, err = c.conf.Encoder.GetByte(*h, tcph, maskIndex)
+							newBytes, err = c.conf.Embedder.GetByte(*h, tcph, maskIndex)
 							if err != nil {
 								break readloop
 							}
-							maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
+							maskIndex = embedders.UpdateMaskIndex(c.conf.Embedder.GetMask(), maskIndex)
 
 							for _, b := range newBytes {
 								// Make sure we don't overflow the buffer
@@ -219,7 +219,7 @@ readloop:
 		}
 	}
 
-	return embedders.CopyData(c.conf.Encoder.GetMask(), pos, dataBuf, data, err)
+	return embedders.CopyData(c.conf.Embedder.GetMask(), pos, dataBuf, data, err)
 }
 
 // Send a covert message
@@ -246,7 +246,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		maskIndex int   = 0
 	)
 
-	data, err = embedders.EncodeFromMask(c.conf.Encoder.GetMask(), data)
+	data, err = embedders.EncodeFromMask(c.conf.Embedder.GetMask(), data)
 	if err != nil {
 		return 0, err
 	}
@@ -266,7 +266,7 @@ readloop:
 		if err != nil {
 			break readloop
 		}
-		maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
+		maskIndex = embedders.UpdateMaskIndex(c.conf.Embedder.GetMask(), maskIndex)
 		prevSequence = tcph.Seq
 
 		p, err = createTcpHeadBuf(tcph, saddr, daddr, sport, dport)
@@ -300,7 +300,7 @@ readloop:
 	}
 
 	// Readjust size to represent number of bytes sent
-	num, err = embedders.GetSentSize(c.conf.Encoder.GetMask(), num, err)
+	num, err = embedders.GetSentSize(c.conf.Embedder.GetMask(), num, err)
 	if err != nil {
 		return num, err
 	}
@@ -316,7 +316,7 @@ readloop:
 		// to fit the mask at this maskIndex
 		// We create a buffer with the appropriate size and fill it with
 		// random numbers
-		var fakeBuf []byte = make([]byte, len(c.conf.Encoder.GetMask()[maskIndex]))
+		var fakeBuf []byte = make([]byte, len(c.conf.Embedder.GetMask()[maskIndex]))
 		for i := range fakeBuf {
 			fakeBuf[i] = byte(r.Uint32())
 		}
@@ -426,10 +426,10 @@ func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, 
 		err      error
 	)
 
-	newipv4h, newtcph, newbuf, _, err = c.conf.Encoder.SetByte(ipv4h, tcph, buf, maskIndex)
+	newipv4h, newtcph, newbuf, _, err = c.conf.Embedder.SetByte(ipv4h, tcph, buf, maskIndex)
 	if tcph.Seq == prevSequence {
 		tcph.Seq = r.Uint32() & 0xFFFFFFFF
-		newipv4h, newtcph, newbuf, _, err = c.conf.Encoder.SetByte(ipv4h, tcph, buf, maskIndex)
+		newipv4h, newtcph, newbuf, _, err = c.conf.Embedder.SetByte(ipv4h, tcph, buf, maskIndex)
 	}
 	return newipv4h, newtcph, newbuf, err
 }

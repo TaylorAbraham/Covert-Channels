@@ -17,7 +17,7 @@ type ConfigClient struct {
 	BouncePort   config.U16Param
 	Bounce       config.BoolParam
 	Delimiter    config.SelectParam
-	Encoder      config.SelectParam
+	Embedder     config.SelectParam
 	GetDelay     config.SelectParam
 	WriteTimeout config.U64Param
 	ReadTimeout  config.U64Param
@@ -36,7 +36,7 @@ func GetDefault() ConfigClient {
 		WriteTimeout: config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The write timeout in milliseconds.", Name: "Write Timeout", Group: "Timing"}),
 		ReadTimeout:  config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The read timeout in milliseconds.", Name: "Read Timeout", Group: "Timing"}),
 		Delimiter:    config.MakeSelect("protocol", []string{"buffer", "protocol"}, config.Display{Description: "The delimiter to use for deciding when to return after having received a message.", Name: "Delimeter", Group: "Settings"}),
-		Encoder:      config.MakeSelect("sequence", []string{"sequence", "id", "urgptr", "urgflg", "time", "ecn"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
+		Embedder:     config.MakeSelect("sequence", []string{"sequence", "id", "urgptr", "urgflg", "time", "ecn"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
 	}
 }
 
@@ -73,21 +73,21 @@ func ToChannel(cc ConfigClient) (*Channel, error) {
 		return nil, errors.New("Invalid delimiter value")
 	}
 
-	switch cc.Encoder.Value {
+	switch cc.Embedder.Value {
 	case "sequence":
-		c.Encoder = &embedders.TcpIpSeqEncoder{}
+		c.Embedder = &embedders.TcpIpSeqEncoder{}
 	case "id":
-		c.Encoder = &embedders.TcpIpIDEncoder{}
+		c.Embedder = &embedders.TcpIpIDEncoder{}
 	case "urgflg":
-		c.Encoder = &embedders.TcpIpUrgFlgEncoder{}
+		c.Embedder = &embedders.TcpIpUrgFlgEncoder{}
 	case "urgptr":
-		c.Encoder = &embedders.TcpIpUrgPtrEncoder{}
+		c.Embedder = &embedders.TcpIpUrgPtrEncoder{}
 	case "time":
-		c.Encoder = &embedders.TcpIpTimeEncoder{}
+		c.Embedder = &embedders.TcpIpTimeEncoder{}
 	case "ecn":
-		c.Encoder = &embedders.TcpIpEcnEncoder{}
+		c.Embedder = &embedders.TcpIpEcnEncoder{}
 	default:
-		return nil, errors.New("Invalid encoder value")
+		return nil, errors.New("Invalid embedder value")
 	}
 
 	switch cc.GetDelay.Value {
