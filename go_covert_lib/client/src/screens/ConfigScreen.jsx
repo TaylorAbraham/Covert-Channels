@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import FileSaver from 'file-saver';
 import Button from 'react-bootstrap/Button';
 import Dropdown from 'react-bootstrap/Dropdown';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -26,13 +27,56 @@ const ConfigScreen = (props) => {
     channel,
     setChannel,
     channelIsOpen,
+    addSystemMessage,
   } = props;
+
+  const [channelIsSelected, setChannelIsSelected] = useState(false);
 
   const deleteProcessor = (targetIndex) => {
     setProcessors(processors.filter((proc, i) => {
       return i !== targetIndex;
     }));
   };
+
+  const saveConfig = () => {
+    const serializedConfig = JSON.stringify({
+      config,
+      processors,
+    });
+    const blob = new Blob([serializedConfig], { type: 'text/plain;charset=utf-8' });
+    FileSaver.saveAs(blob, 'covert-config.txt');
+    addSystemMessage('Saved current configuration');
+  };
+
+  const handleFileChange = (e) => {
+    if (e && e.target && e.target.files && e.target.files.length === 1) {
+      const file = e.target.files[0];
+      addSystemMessage(`Loading configuration from ${file.name}...`);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = reader.result;
+        let parsedConfig;
+        try {
+          parsedConfig = JSON.parse(text);
+          setConfig(parsedConfig.config);
+          setProcessors(parsedConfig.processors);
+        } catch (err) {
+          addSystemMessage(`Could not parse file ${file.name}`);
+          return;
+        }
+        addSystemMessage(`Succesfully loaded configuration from ${file.name}`);
+      };
+      reader.readAsText(file);
+      // Hack to clear the uploaded file. This is used because otherwise uploading
+      // the same file will NOT re-load the config. We do want a reload here.
+      document.getElementById('invisible-file-input').type = 'text';
+      document.getElementById('invisible-file-input').type = 'file';
+    }
+  };
+
+  useEffect(() => {
+    setChannelIsSelected(Object.entries(channel).length > 0 && channel.constructor === Object);
+  }, [channel]);
 
   return (
     <div className="m-2">
@@ -311,11 +355,27 @@ const ConfigScreen = (props) => {
           variant="success"
           onClick={openChannel}
           className="cc-config__submit m-1 w-100"
-          hidden={Object.entries(channel).length === 0 && channel.constructor === Object}
+          hidden={!channelIsSelected}
         >
           Open Covert Channel
         </Button>
       )}
+      <div className="m-1 w-100 d-flex">
+        <Button
+          className="mr-1 w-100"
+          onClick={saveConfig}
+        >
+          Save Config
+        </Button>
+        <Button
+          className="w-100"
+          onClick={() => document.getElementById('invisible-file-input').click()}
+          disabled={channelIsOpen}
+        >
+          Load Config
+        </Button>
+        <input onChange={handleFileChange} id="invisible-file-input" type="file" style={{ display: 'none' }} />
+      </div>
     </div>
   );
 };
@@ -332,6 +392,7 @@ ConfigScreen.propTypes = {
   channel: PropTypes.object.isRequired,
   setChannel: PropTypes.func.isRequired,
   channelIsOpen: PropTypes.bool.isRequired,
+  addSystemMessage: PropTypes.func.isRequired,
 };
 
 export default ConfigScreen;
