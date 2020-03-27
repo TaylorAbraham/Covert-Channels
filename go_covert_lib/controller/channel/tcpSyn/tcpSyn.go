@@ -177,7 +177,7 @@ readloop:
 							first = false
 
 							var newBytes []byte
-							newBytes, err = c.conf.Embedder.GetByte(*h, tcph, maskIndex)
+							newBytes, err = c.conf.Embedder.GetByte(*h, tcph, 0, maskIndex)
 							if err != nil {
 								break readloop
 							}

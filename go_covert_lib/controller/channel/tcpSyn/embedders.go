@@ -11,11 +11,7 @@ import (
 // A method is used to hide the byte during sending, and a second is used
 // extract it during reception
 type TcpEncoder interface {
-	// We use the prevSequence to indicate duplicate packets arriving
-	// on from the bouncer socket. It is this function's responsibility
-	// to ensure that any modifications to the tcp header ensure that the
-	// new sequence number is different than the previous sequence number
+	GetByte(ipv4h ipv4.Header, tcph layers.TCP, t time.Duration, maskIndex int) ([]byte, error)
 	SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, maskIndex int) (ipv4.Header, layers.TCP, []byte, time.Duration, error)
-	GetByte(ipv4h ipv4.Header, tcph layers.TCP, maskIndex int) ([]byte, error)
 	GetMask() [][]byte
 }

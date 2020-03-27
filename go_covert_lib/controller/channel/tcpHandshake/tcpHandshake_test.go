@@ -131,7 +131,7 @@ var confList []Config = []Config{
 		OriginIP:          [4]byte{127, 0, 0, 1},
 		FriendReceivePort: 8080,
 		OriginReceivePort: 8081,
-		Embedder:          &embedders.TcpIpTimeEncoder{},
+		Embedder:          &embedders.TcpIpTimestampEncoder{},
 	},
 	Config{
 		FriendIP:          [4]byte{127, 0, 0, 1},
@@ -139,6 +139,13 @@ var confList []Config = []Config{
 		FriendReceivePort: 8080,
 		OriginReceivePort: 8081,
 		Embedder:          &embedders.TcpIpEcnEncoder{},
+	},
+	Config{
+		FriendIP:          [4]byte{127, 0, 0, 1},
+		OriginIP:          [4]byte{127, 0, 0, 1},
+		FriendReceivePort: 8080,
+		OriginReceivePort: 8081,
+		Embedder:          &embedders.TcpIpTemporalEncoder{Emb: embedders.TemporalEncoder{time.Duration(50 * time.Millisecond)}},
 	},
 }
 

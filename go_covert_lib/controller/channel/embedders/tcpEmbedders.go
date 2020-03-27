@@ -31,9 +31,9 @@ func (id *UrgFlgEncoder) SetByte(tcph layers.TCP, b byte) (layers.TCP, error) {
 	return tcph, nil
 }
 
-type TimeEncoder struct{}
+type TimestampEncoder struct{}
 
-func (id *TimeEncoder) GetByte(tcph layers.TCP) (byte, error) {
+func (id *TimestampEncoder) GetByte(tcph layers.TCP) (byte, error) {
 	for i := range tcph.Options {
 		if layers.TCPOptionKindTimestamps == tcph.Options[i].OptionType {
 			if 4 <= len(tcph.Options[i].OptionData) {
@@ -46,7 +46,7 @@ func (id *TimeEncoder) GetByte(tcph layers.TCP) (byte, error) {
 	return 0, errors.New("Missing timestamp option")
 }
 
-func (id *TimeEncoder) SetByte(tcph layers.TCP, b byte) (layers.TCP, time.Duration, error) {
+func (id *TimestampEncoder) SetByte(tcph layers.TCP, b byte) (layers.TCP, time.Duration, error) {
 	var opt layers.TCPOption
 	opt.OptionType = layers.TCPOptionKindTimestamps
 	opt.OptionLength = 10

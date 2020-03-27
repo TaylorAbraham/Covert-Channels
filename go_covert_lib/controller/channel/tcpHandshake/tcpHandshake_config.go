@@ -29,7 +29,7 @@ func GetDefault() ConfigClient {
 		AcceptTimeout:     config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The accept timeout for the receive method in milliseconds. Zero for no timeout.", Name: "Accept Timeout", Group: "Timing"}),
 		ReadTimeout:       config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The intra-packet read timeout for the receive method in milliseconds. Zero for no timeout.", Name: "Read Timeout", Group: "Timing"}),
 		WriteTimeout:      config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The a timeout for writing packets to the raw socket, in milliseconds. Zero for no timeout.", Name: "Write Timeout", Group: "Timing"}),
-		Embedder:          config.MakeSelect("id", []string{"id", "urgflg", "urgptr", "time", "ecn"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
+		Embedder:          config.MakeSelect("id", []string{"id", "urgflg", "urgptr", "timestamp", "ecn", "temporal"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
 	}
 }
 
@@ -61,10 +61,12 @@ func ToChannel(cc ConfigClient) (*Channel, error) {
 		c.Embedder = &embedders.TcpIpUrgFlgEncoder{}
 	case "urgptr":
 		c.Embedder = &embedders.TcpIpUrgPtrEncoder{}
-	case "time":
-		c.Embedder = &embedders.TcpIpTimeEncoder{}
+	case "timestamp":
+		c.Embedder = &embedders.TcpIpTimestampEncoder{}
 	case "ecn":
 		c.Embedder = &embedders.TcpIpEcnEncoder{}
+	case "temporal":
+		c.Embedder = &embedders.TcpIpTemporalEncoder{Emb: embedders.TemporalEncoder{time.Duration(50 * time.Millisecond)}}
 	default:
 		return nil, errors.New("Invalid embedder value")
 	}

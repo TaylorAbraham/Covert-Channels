@@ -30,6 +30,7 @@ const maxStorePacket = 512
 type packet struct {
 	Ipv4h ipv4.Header
 	Tcph  layers.TCP
+	Time  time.Time
 }
 
 type acceptedConn struct {
@@ -341,6 +342,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 	var (
 		nPayload   int    = 0
 		payloadBuf []byte = make([]byte, 256)
+		prevTime   time.Time
 	)
 
 	// Exit when the fin packet is received
@@ -357,7 +359,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 				valid bool
 				err   error
 			)
-			n, handshake, valid, fin, err = c.handleReceivedPacket(p, dataBuf, n, ac.friendPort, handshake, maskIndex)
+			n, handshake, valid, fin, prevTime, err = c.handleReceivedPacket(p, dataBuf, n, ac.friendPort, handshake, prevTime, maskIndex)
 			maskIndex = embedders.UpdateMaskIndex(c.conf.Embedder.GetMask(), maskIndex)
 
 			// If packets are sent with payload then it will fill up the internal
@@ -427,7 +429,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 // TCP connection). RST or second SYN packets are interpreted as an error in the connection and
 // cause the Receive method to abort.
 // We return a valid flag to indicate if the packet forms part of the TCP covert communication (three way handshake, message, or FIN packet )
-func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPort uint16, handshake byte, maskIndex int) (uint64, byte, bool, bool, error) {
+func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPort uint16, handshake byte, prevTime time.Time, maskIndex int) (uint64, byte, bool, bool, time.Time, error) {
 
 	var (
 		valid         bool // Was this packet a valid part of the message
@@ -448,6 +450,7 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 		//          seq = d.tcph.Seq
 		handshake = 2
 		valid = true
+		prevTime = p.Time
 	} else if p.Tcph.RST {
 		// If rst packet is sent we quit
 		err = errors.New("RST packet")
@@ -470,7 +473,7 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 		fin = true
 	} else {
 		// Normal transmission packet
-		if receivedBytes, err = c.conf.Embedder.GetByte(p.Ipv4h, p.Tcph, maskIndex); err == nil {
+		if receivedBytes, err = c.conf.Embedder.GetByte(p.Ipv4h, p.Tcph, p.Time.Sub(prevTime), maskIndex); err == nil {
 			valid = true
 			for _, b := range receivedBytes {
 				if n < uint64(len(data)) {
@@ -482,8 +485,9 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 				}
 			}
 		}
+		prevTime = p.Time
 	}
-	return n, handshake, valid, fin, err
+	return n, handshake, valid, fin, prevTime, err
 }
 
 func (c *Channel) Send(data []byte) (uint64, error) {
@@ -557,7 +561,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 			seq = p.Tcph.Ack
 			ack = p.Tcph.Seq + 1
 
-			if _, ok := c.conf.Embedder.(*embedders.TcpIpTimeEncoder); ok {
+			if _, ok := c.conf.Embedder.(*embedders.TcpIpTimestampEncoder); ok {
 				for i := range p.Tcph.Options {
 					if p.Tcph.Options[i].OptionType == layers.TCPOptionKindTimestamps {
 						if len(p.Tcph.Options[i].OptionData) == 8 {
@@ -800,7 +804,7 @@ func (c *Channel) readLoop(recieverChan chan packet, senderChan chan packet) {
 				}
 
 				select {
-				case pckChan <- packet{Ipv4h: *h, Tcph: tcph}:
+				case pckChan <- packet{Ipv4h: *h, Tcph: tcph, Time: time.Now()}:
 				default:
 					l.Println("Too many packets: Dropped Packet")
 				}

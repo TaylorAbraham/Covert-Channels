@@ -63,7 +63,7 @@ var confList []Config = []Config{
 		FriendPort: 8080,
 		OriginPort: 8081,
 		Delimiter:  Protocol,
-		Embedder:   &embedders.TcpIpTimeEncoder{},
+		Embedder:   &embedders.TcpIpTimestampEncoder{},
 	},
 	Config{
 		FriendIP:   [4]byte{127, 0, 0, 1},

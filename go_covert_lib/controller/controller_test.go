@@ -333,12 +333,27 @@ func TestMessageExchange(t *testing.T) {
 			f1: func(conf *configData) {
 				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 9090
 				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 9091
-				conf.Channel.Data.TcpHandshake.Embedder.Value = "time"
+				conf.Channel.Data.TcpHandshake.Embedder.Value = "timestamp"
 			},
 			f2: func(conf *configData) {
 				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 9091
 				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 9090
-				conf.Channel.Data.TcpHandshake.Embedder.Value = "time"
+				conf.Channel.Data.TcpHandshake.Embedder.Value = "timestamp"
+			},
+			isTiming: true,
+		},
+
+		channelTest{
+			name: "TcpHandshake",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 9090
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 9091
+				conf.Channel.Data.TcpHandshake.Embedder.Value = "temporal"
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 9091
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 9090
+				conf.Channel.Data.TcpHandshake.Embedder.Value = "temporal"
 			},
 			isTiming: true,
 		},
@@ -453,12 +468,12 @@ func TestMessageExchange(t *testing.T) {
 			f1: func(conf *configData) {
 				conf.Channel.Data.TcpSyn.FriendPort.Value = 8090
 				conf.Channel.Data.TcpSyn.OriginPort.Value = 8091
-				conf.Channel.Data.TcpSyn.Embedder.Value = "time"
+				conf.Channel.Data.TcpSyn.Embedder.Value = "timestamp"
 			},
 			f2: func(conf *configData) {
 				conf.Channel.Data.TcpSyn.FriendPort.Value = 8091
 				conf.Channel.Data.TcpSyn.OriginPort.Value = 8090
-				conf.Channel.Data.TcpSyn.Embedder.Value = "time"
+				conf.Channel.Data.TcpSyn.Embedder.Value = "timestamp"
 			},
 		},
 		channelTest{
