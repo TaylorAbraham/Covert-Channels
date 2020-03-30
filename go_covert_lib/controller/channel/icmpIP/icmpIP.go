@@ -15,7 +15,7 @@ import (
 type Config struct {
 	FriendIP [4]byte
 	OriginIP [4]byte
-	Embedder  IcmpEncoder
+	Embedder IcmpEncoder
 
 	// The intra-packet read timeout. Set zero for no timeout.
 	// The receive method will block until a three way handshake
@@ -86,13 +86,13 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	}
 
 	var (
-		ipv4h     ipv4.Header         = createIPHeader(c.conf.OriginIP, c.conf.FriendIP)
-		cm        ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
-		icmph     layers.ICMPv4
-		wbuf      []byte
-		rem       []byte = data
-		n         uint64
-		state     embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
+		ipv4h ipv4.Header         = createIPHeader(c.conf.OriginIP, c.conf.FriendIP)
+		cm    ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
+		icmph layers.ICMPv4
+		wbuf  []byte
+		rem   []byte = data
+		n     uint64
+		state embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 	)
 
 	// Send each packet
@@ -172,7 +172,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		prevPacketTime time.Time
 		h              *ipv4.Header
 		p              []byte
-		state     embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
+		state          embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 	)
 
 	saddr = c.conf.FriendIP

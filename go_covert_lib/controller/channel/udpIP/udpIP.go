@@ -48,7 +48,7 @@ type Config struct {
 	FriendReceivePort uint16
 	OriginReceivePort uint16
 	DialTimeout       time.Duration
-	Embedder           UdpEncoder
+	Embedder          UdpEncoder
 
 	// For debugging purposes, log all packets that are sent or received
 	logPackets bool
@@ -164,13 +164,13 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	defer conn.Close()
 
 	var (
-		ipv4h     ipv4.Header         = createIPHeader(c.conf.OriginIP, c.conf.FriendIP)
-		cm        ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
-		udph      layers.UDP
-		wbuf      []byte
-		rem       []byte = data
-		n         uint64
-		state     embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
+		ipv4h ipv4.Header         = createIPHeader(c.conf.OriginIP, c.conf.FriendIP)
+		cm    ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
+		udph  layers.UDP
+		wbuf  []byte
+		rem   []byte = data
+		n     uint64
+		state embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 	)
 
 	// Send each packet
@@ -283,7 +283,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		// This timer is used to timeout if packets are received, but they
 		// are not the correct type
 		prevPacketTime time.Time
-		state     embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
+		state          embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 		h              *ipv4.Header
 		p              []byte
 	)
