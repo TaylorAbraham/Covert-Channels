@@ -1,6 +1,7 @@
 package tcpSyn
 
 import (
+	"../embedders"
 	"github.com/google/gopacket/layers"
 	"golang.org/x/net/ipv4"
 	"time"
@@ -11,7 +12,7 @@ import (
 // A method is used to hide the byte during sending, and a second is used
 // extract it during reception
 type TcpEncoder interface {
-	GetByte(ipv4h ipv4.Header, tcph layers.TCP, t time.Duration, maskIndex int) ([]byte, error)
-	SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, maskIndex int) (ipv4.Header, layers.TCP, []byte, time.Duration, error)
+	GetByte(ipv4h ipv4.Header, tcph layers.TCP, t time.Duration, maskIndex int, state embedders.State) ([]byte, embedders.State, error)
+	SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, maskIndex int, state embedders.State) (ipv4.Header, layers.TCP, []byte, time.Duration, embedders.State, error)
 	GetMask() [][]byte
 }

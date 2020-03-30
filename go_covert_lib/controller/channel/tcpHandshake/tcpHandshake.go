@@ -343,6 +343,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		nPayload   int    = 0
 		payloadBuf []byte = make([]byte, 256)
 		prevTime   time.Time
+		state      embedders.State
 	)
 
 	// Exit when the fin packet is received
@@ -359,7 +360,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 				valid bool
 				err   error
 			)
-			n, handshake, valid, fin, prevTime, err = c.handleReceivedPacket(p, dataBuf, n, ac.friendPort, handshake, prevTime, maskIndex)
+			n, handshake, valid, fin, prevTime, state, err = c.handleReceivedPacket(p, dataBuf, n, ac.friendPort, handshake, prevTime, maskIndex, state)
 			maskIndex = embedders.UpdateMaskIndex(c.conf.Embedder.GetMask(), maskIndex)
 
 			// If packets are sent with payload then it will fill up the internal
@@ -429,7 +430,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 // TCP connection). RST or second SYN packets are interpreted as an error in the connection and
 // cause the Receive method to abort.
 // We return a valid flag to indicate if the packet forms part of the TCP covert communication (three way handshake, message, or FIN packet )
-func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPort uint16, handshake byte, prevTime time.Time, maskIndex int) (uint64, byte, bool, bool, time.Time, error) {
+func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPort uint16, handshake byte, prevTime time.Time, maskIndex int, state embedders.State) (uint64, byte, bool, bool, time.Time, embedders.State, error) {
 
 	var (
 		valid         bool // Was this packet a valid part of the message
@@ -473,7 +474,7 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 		fin = true
 	} else {
 		// Normal transmission packet
-		if receivedBytes, err = c.conf.Embedder.GetByte(p.Ipv4h, p.Tcph, p.Time.Sub(prevTime), maskIndex); err == nil {
+		if receivedBytes, state, err = c.conf.Embedder.GetByte(p.Ipv4h, p.Tcph, p.Time.Sub(prevTime), maskIndex, state); err == nil {
 			valid = true
 			for _, b := range receivedBytes {
 				if n < uint64(len(data)) {
@@ -484,10 +485,11 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 					break
 				}
 			}
+			state.PacketNumber += 1
+			prevTime = p.Time
 		}
-		prevTime = p.Time
 	}
-	return n, handshake, valid, fin, prevTime, err
+	return n, handshake, valid, fin, prevTime, state, err
 }
 
 func (c *Channel) Send(data []byte) (uint64, error) {
@@ -591,6 +593,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		tcph  layers.TCP
 		wbuf  []byte
 		tm    time.Duration
+		state embedders.State
 	)
 
 	if timestamp != nil {
@@ -607,7 +610,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 sendloop:
 	for len(rem) > 0 {
 		var payload []byte = make([]byte, 5)
-		if ipv4h, tcph, rem, tm, err = c.conf.Embedder.SetByte(ipv4h, tcph, rem, maskIndex); err != nil {
+		if ipv4h, tcph, rem, tm, state, err = c.conf.Embedder.SetByte(ipv4h, tcph, rem, maskIndex, state); err != nil {
 			break sendloop
 		}
 		maskIndex = embedders.UpdateMaskIndex(c.conf.Embedder.GetMask(), maskIndex)
@@ -633,6 +636,7 @@ sendloop:
 		if err = c.sendPacket(&ipv4h, wbuf, &cm); err != nil {
 			break sendloop
 		}
+		state.PacketNumber += 1
 		n = uint64(len(data) - len(rem))
 
 		seq = seq + uint32(len(payload))

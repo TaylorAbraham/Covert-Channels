@@ -6,6 +6,12 @@ import (
 	"strconv"
 )
 
+type State struct {
+	PacketNumber uint64
+	ByteLog      []byte
+	StoredData   interface{}
+}
+
 func CalcSize(mask [][]byte, n int) (int, []byte, int, error) {
 	maskArr, bitSum := toMaskArr(mask)
 	if bitSum%8 != 0 {
