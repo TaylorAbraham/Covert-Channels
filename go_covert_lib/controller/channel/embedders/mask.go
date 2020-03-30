@@ -9,7 +9,23 @@ import (
 type State struct {
 	PacketNumber uint64
 	ByteLog      []byte
+	MaskSize     int
+	MaskIndex    int
 	StoredData   interface{}
+}
+
+func MakeState(mask [][]byte) State {
+	return State{ ByteLog : []byte{}, MaskSize : len(mask) }
+}
+
+// Increments both the packet number and the MaskIndex
+func (s State) IncrementState() State {
+	s.MaskIndex += 1
+	s.PacketNumber += 1
+	if s.MaskIndex >= s.MaskSize {
+		s.MaskIndex = 0
+	}
+	return s
 }
 
 func CalcSize(mask [][]byte, n int) (int, []byte, int, error) {
@@ -171,14 +187,5 @@ func GetSentSize(mask [][]byte, n uint64, err error) (uint64, error) {
 		return n, sizeErr
 	} else {
 		return n, nil
-	}
-}
-
-func UpdateMaskIndex(mask [][]byte, maskIndex int) int {
-	maskIndex += 1
-	if maskIndex < len(mask) {
-		return maskIndex
-	} else {
-		return 0
 	}
 }

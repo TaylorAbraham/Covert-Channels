@@ -8,7 +8,7 @@ import (
 )
 
 type TcpEncoder interface {
-	GetByte(ipv4h ipv4.Header, tcph layers.TCP, t time.Duration, maskIndex int, state embedders.State) ([]byte, embedders.State, error)
-	SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, maskIndex int, state embedders.State) (ipv4.Header, layers.TCP, []byte, time.Duration, embedders.State, error)
+	GetByte(ipv4h ipv4.Header, tcph layers.TCP, t time.Duration, state embedders.State) ([]byte, embedders.State, error)
+	SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, state embedders.State) (ipv4.Header, layers.TCP, []byte, time.Duration, embedders.State, error)
 	GetMask() [][]byte
 }

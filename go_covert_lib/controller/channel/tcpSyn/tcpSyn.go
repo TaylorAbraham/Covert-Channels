@@ -130,7 +130,6 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		// This timer is used to timeout if packets are received, but they
 		// are not the correct type
 		prevPacketTime time.Time
-		maskIndex      int = 0
 	)
 
 	// Figure out the expected source and destination IP address
@@ -146,7 +145,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 	var (
 		h     *ipv4.Header
 		p     []byte
-		state embedders.State
+		state      embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 	)
 readloop:
 	for {
@@ -178,13 +177,12 @@ readloop:
 							first = false
 
 							var newBytes []byte
-							newBytes, state, err = c.conf.Embedder.GetByte(*h, tcph, 0, maskIndex, state)
+							newBytes, state, err = c.conf.Embedder.GetByte(*h, tcph, 0, state)
 							if err != nil {
 								break readloop
 							}
 
-							state.PacketNumber += 1
-							maskIndex = embedders.UpdateMaskIndex(c.conf.Embedder.GetMask(), maskIndex)
+							state = state.IncrementState()
 							prevPacketTime = time.Now()
 
 							for _, b := range newBytes {
@@ -246,8 +244,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		tcph         layers.TCP
 		// We make it clear that the error always starts as nil
 		err       error = nil
-		maskIndex int   = 0
-		state     embedders.State
+		state     embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 	)
 
 	data, err = embedders.EncodeFromMask(c.conf.Embedder.GetMask(), data)
@@ -268,11 +265,10 @@ readloop:
 
 		tcph.SYN = true
 
-		h, tcph, data, wait, state, err = c.createTcpHead(h, tcph, data, prevSequence, maskIndex, state)
+		h, tcph, data, wait, state, err = c.createTcpHead(h, tcph, data, prevSequence, state)
 		if err != nil {
 			break readloop
 		}
-		maskIndex = embedders.UpdateMaskIndex(c.conf.Embedder.GetMask(), maskIndex)
 		prevSequence = tcph.Seq
 
 		p, err = createTcpHeadBuf(tcph, saddr, daddr, sport, dport)
@@ -283,7 +279,7 @@ readloop:
 		if err = c.writeConn(&h, p, &cm); err != nil {
 			break readloop
 		}
-		state.PacketNumber += 1
+		state = state.IncrementState()
 		num += 1
 		// We wait for the time specified by the user's GetDelay function
 		// or until the user signals to cancel
@@ -312,12 +308,12 @@ readloop:
 		// to fit the mask at this maskIndex
 		// We create a buffer with the appropriate size and fill it with
 		// random numbers
-		var fakeBuf []byte = make([]byte, len(c.conf.Embedder.GetMask()[maskIndex]))
+		var fakeBuf []byte = make([]byte, len(c.conf.Embedder.GetMask()[state.MaskIndex]))
 		for i := range fakeBuf {
 			fakeBuf[i] = byte(r.Uint32())
 		}
 
-		h, tcph, _, _, state, err = c.createTcpHead(h, layers.TCP{ACK: true}, fakeBuf, prevSequence, maskIndex, state)
+		h, tcph, _, _, state, err = c.createTcpHead(h, layers.TCP{ACK: true}, fakeBuf, prevSequence, state)
 		if err != nil {
 			return num, err
 		}
@@ -404,7 +400,7 @@ func createCM(sip, dip [4]byte) ipv4.ControlMessage {
 	}
 }
 
-func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, prevSequence uint32, maskIndex int, state embedders.State) (ipv4.Header, layers.TCP, []byte, time.Duration, embedders.State, error) {
+func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, prevSequence uint32, state embedders.State) (ipv4.Header, layers.TCP, []byte, time.Duration, embedders.State, error) {
 	// Based on a preliminary investigation of my machine (running Ubuntu 18.04),
 	// SYN packets always seem to have a window of 65495
 	tcph.Window = 65495
@@ -426,7 +422,7 @@ func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, 
 	for tcph.Seq == prevSequence {
 		tcph.Seq = r.Uint32() & 0xFFFFFFFF
 	}
-	newipv4h, newtcph, newbuf, wait, state, err = c.conf.Embedder.SetByte(ipv4h, tcph, buf, maskIndex, state)
+	newipv4h, newtcph, newbuf, wait, state, err = c.conf.Embedder.SetByte(ipv4h, tcph, buf, state)
 	if newtcph.Seq == prevSequence {
 		return newipv4h, newtcph, newbuf, time.Duration(0), state, errors.New("Could not send packet; " +
 			"Embedder set current sequence number to preceeding sequence number. " +
