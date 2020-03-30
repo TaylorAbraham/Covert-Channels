@@ -13,7 +13,7 @@ type ConfigClient struct {
 	OriginIP          config.IPV4Param
 	FriendReceivePort config.U16Param
 	OriginReceivePort config.U16Param
-	Encoder           config.SelectParam
+	Embedder           config.SelectParam
 	WriteTimeout      config.U64Param
 	ReadTimeout       config.U64Param
 	DialTimeout       config.U64Param
@@ -29,7 +29,7 @@ func GetDefault() ConfigClient {
 		WriteTimeout:      config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The write timeout in milliseconds.", Name: "Write Timeout", Group: "Timing"}),
 		ReadTimeout:       config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The read timeout in milliseconds.", Name: "Read Timeout", Group: "Timing"}),
 		DialTimeout:       config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The dial timeout for the send method in milliseconds. Zero for no timeout.", Name: "Dial Timeout", Group: "Timing"}),
-		Encoder:           config.MakeSelect("id", []string{"id"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
+		Embedder:           config.MakeSelect("id", []string{"id"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
 		AcceptTimeout:     config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The accept timeout for the receive method in milliseconds. Zero for no timeout.", Name: "Accept Timeout", Group: "Timing"}),
 	}
 }
@@ -55,11 +55,11 @@ func ToChannel(cc ConfigClient) (*Channel, error) {
 	c.ReadTimeout = time.Duration(cc.ReadTimeout.Value) * time.Millisecond
 	c.WriteTimeout = time.Duration(cc.WriteTimeout.Value) * time.Millisecond
 
-	switch cc.Encoder.Value {
+	switch cc.Embedder.Value {
 	case "id":
-		c.Encoder = &IDEncoder{}
+		c.Embedder = &IDEncoder{}
 	default:
-		return nil, errors.New("Invalid encoder value")
+		return nil, errors.New("Invalid embedder value")
 	}
 
 	if ch, err := MakeChannel(c); err != nil {
