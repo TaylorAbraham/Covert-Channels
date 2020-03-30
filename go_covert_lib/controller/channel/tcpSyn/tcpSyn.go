@@ -262,7 +262,9 @@ readloop:
 		h = createIPHeader(saddr, daddr)
 		cm = createCM(saddr, daddr)
 
-		h, tcph, data, err = c.createTcpHead(h, layers.TCP{SYN: true}, data, prevSequence, maskIndex)
+		tcph.SYN = true
+
+		h, tcph, data, wait, err = c.createTcpHead(h, tcph, data, prevSequence, maskIndex)
 		if err != nil {
 			break readloop
 		}
@@ -276,16 +278,6 @@ readloop:
 
 		if err = c.writeConn(&h, p, &cm); err != nil {
 			break readloop
-		}
-
-		// If the user did not supply a GetDelay function,
-		// we wait for 0 duration
-		// Otherwise we wait for the specified amount of time
-		// (recalculated in each loop in case it must follow a distribution)
-		if c.conf.GetDelay == nil {
-			wait = 0
-		} else {
-			wait = c.conf.GetDelay()
 		}
 
 		num += 1
@@ -321,7 +313,7 @@ readloop:
 			fakeBuf[i] = byte(r.Uint32())
 		}
 
-		h, tcph, _, err = c.createTcpHead(h, layers.TCP{ACK: true}, fakeBuf, prevSequence, maskIndex)
+		h, tcph, _, _, err = c.createTcpHead(h, layers.TCP{ACK: true}, fakeBuf, prevSequence, maskIndex)
 		if err != nil {
 			return num, err
 		}
@@ -408,7 +400,7 @@ func createCM(sip, dip [4]byte) ipv4.ControlMessage {
 	}
 }
 
-func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, prevSequence uint32, maskIndex int) (ipv4.Header, layers.TCP, []byte, error) {
+func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, prevSequence uint32, maskIndex int) (ipv4.Header, layers.TCP, []byte, time.Duration, error) {
 	// Based on a preliminary investigation of my machine (running Ubuntu 18.04),
 	// SYN packets always seem to have a window of 65495
 	tcph.Window = 65495
@@ -424,14 +416,23 @@ func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, 
 		newtcph  layers.TCP
 		newbuf   []byte
 		err      error
+		wait 		 time.Duration
 	)
 
-	newipv4h, newtcph, newbuf, _, err = c.conf.Embedder.SetByte(ipv4h, tcph, buf, maskIndex)
-	if tcph.Seq == prevSequence {
+	for tcph.Seq == prevSequence {
 		tcph.Seq = r.Uint32() & 0xFFFFFFFF
-		newipv4h, newtcph, newbuf, _, err = c.conf.Embedder.SetByte(ipv4h, tcph, buf, maskIndex)
 	}
-	return newipv4h, newtcph, newbuf, err
+	newipv4h, newtcph, newbuf, wait, err = c.conf.Embedder.SetByte(ipv4h, tcph, buf, maskIndex)
+	for n := 0; n < 10 && newtcph.Seq == prevSequence; n++ {
+		tcph.Seq = r.Uint32() & 0xFFFFFFFF
+		newipv4h, newtcph, newbuf, wait, err = c.conf.Embedder.SetByte(ipv4h, tcph, buf, maskIndex)
+	}
+	if newtcph.Seq == prevSequence {
+		return newipv4h, newtcph, newbuf, time.Duration(0), errors.New("Could not send packet; " +
+			"After 10 tries embedder always sets current sequence number to preceeding sequence number. " +
+			"Would prevent receiver from differentiating packets")
+	}
+	return newipv4h, newtcph, newbuf, wait, err
 }
 
 // Create the TCP header IP payload
