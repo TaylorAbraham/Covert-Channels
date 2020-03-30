@@ -15,7 +15,7 @@ import (
 type Config struct {
 	FriendIP [4]byte
 	OriginIP [4]byte
-	Encoder  IcmpEncoder
+	Embedder  IcmpEncoder
 
 	// The intra-packet read timeout. Set zero for no timeout.
 	// The receive method will block until a three way handshake
@@ -60,8 +60,8 @@ func MakeChannel(conf Config) (*Channel, error) {
 		closeMutex: &sync.Mutex{},
 	}
 
-	if c.conf.Encoder == nil {
-		c.conf.Encoder = &IDEncoder{}
+	if c.conf.Embedder == nil {
+		c.conf.Embedder = &IDEncoder{}
 	}
 
 	//ip network within the ICMP protocol
@@ -80,7 +80,7 @@ func MakeChannel(conf Config) (*Channel, error) {
 }
 
 func (c *Channel) Send(data []byte) (uint64, error) {
-	data, err := embedders.EncodeFromMask(c.conf.Encoder.GetMask(), data)
+	data, err := embedders.EncodeFromMask(c.conf.Embedder.GetMask(), data)
 	if err != nil {
 		return 0, err
 	}
@@ -92,17 +92,16 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		wbuf      []byte
 		rem       []byte = data
 		n         uint64
-		maskIndex int = 0
+		state     embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 	)
 
 	// Send each packet
 	for len(rem) > 0 {
 
 		var payload []byte = make([]byte, 26) //set payload of length 26
-		if ipv4h, icmph, rem, err = c.conf.Encoder.SetByte(ipv4h, icmph, rem, maskIndex); err != nil {
+		if ipv4h, icmph, rem, state, err = c.conf.Embedder.SetByte(ipv4h, icmph, rem, state); err != nil {
 			break
 		}
-		maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
 
 		if wbuf, icmph, err = createicmpheader(icmph, payload, c.conf.Identifier); err != nil {
 			break
@@ -111,11 +110,12 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		if err = c.sendPacket(&ipv4h, wbuf, &cm); err != nil {
 			break
 		}
+		state = state.IncrementState()
 		n = uint64(len(data) - len(rem))
 	}
 
 	// Readjust size to represent number of bytes sent
-	n, err = embedders.GetSentSize(c.conf.Encoder.GetMask(), n, err)
+	n, err = embedders.GetSentSize(c.conf.Embedder.GetMask(), n, err)
 	if err != nil {
 		return n, err
 	}
@@ -152,7 +152,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 
 	// We must expand out the input storage array to
 	// the correct size to potentially handle variable size inputs
-	dataBuf, err := embedders.GetBuf(c.conf.Encoder.GetMask(), data)
+	dataBuf, err := embedders.GetBuf(c.conf.Embedder.GetMask(), data)
 	if err != nil {
 		return 0, err
 	}
@@ -170,9 +170,9 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		// This timer is used to timeout if packets are received, but they
 		// are not the correct type
 		prevPacketTime time.Time
-		maskIndex      int = 0
 		h              *ipv4.Header
 		p              []byte
+		state     embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 	)
 
 	saddr = c.conf.FriendIP
@@ -195,11 +195,11 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 					} else { //the rest of the message
 						prevPacketTime = time.Now()
 						var b []byte
-						b, err = c.conf.Encoder.GetByte(*h, icmph, maskIndex)
+						b, state, err = c.conf.Embedder.GetByte(*h, icmph, state)
 						if err != nil {
 							break
 						}
-						maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
+						state = state.IncrementState()
 						if (pos + uint64(len(b))) >= uint64(len(dataBuf)) { //overflow
 							err = errors.New("Overflow. End of message never received.")
 							break
@@ -219,7 +219,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 			break
 		}
 	}
-	return embedders.CopyData(c.conf.Encoder.GetMask(), pos, dataBuf, data, err)
+	return embedders.CopyData(c.conf.Embedder.GetMask(), pos, dataBuf, data, err)
 }
 
 func (c *Channel) sendPacket(h *ipv4.Header, b []byte, cm *ipv4.ControlMessage) error {

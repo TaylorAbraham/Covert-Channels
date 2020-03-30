@@ -475,6 +475,7 @@ func TestMessageExchange(t *testing.T) {
 				conf.Channel.Data.TcpSyn.OriginPort.Value = 8090
 				conf.Channel.Data.TcpSyn.Embedder.Value = "timestamp"
 			},
+			isTiming : true,
 		},
 		channelTest{
 			name: "TcpSyn",
