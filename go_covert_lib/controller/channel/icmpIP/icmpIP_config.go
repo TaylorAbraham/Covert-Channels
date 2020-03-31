@@ -21,7 +21,7 @@ func GetDefault() ConfigClient {
 		OriginIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "Your IP address.", Name: "Your IP", Group: "IP Addresses"}),
 		WriteTimeout: config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The write timeout in milliseconds.", Name: "Write Timeout", Group: "Timing"}),
 		ReadTimeout:  config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The read timeout in milliseconds.", Name: "Read Timeout", Group: "Timing"}),
-		Embedder:     config.MakeSelect("id", []string{"id"}, config.Display{Description: "The embedding mechanism to use for this protocol.", Name: "Embedding", Group: "Settings"}),
+		Embedder:     config.MakeSelect("id", []string{"id"}, config.Display{Description: "The embedding mechanism to use for this protocol.", Name: "Embeddingcbc", Group: "Settings"}),
 		Identifier:   config.MakeU16(1234, [2]uint16{0, 65535}, config.Display{Description: "A unique key to distingish covert ICMP packets from other ICMP packets", Name: "Identifier", Group: "Timing"}),
 	}
 }

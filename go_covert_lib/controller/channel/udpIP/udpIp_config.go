@@ -29,7 +29,7 @@ func GetDefault() ConfigClient {
 		WriteTimeout:      config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The write timeout in milliseconds.", Name: "Write Timeout", Group: "Timing"}),
 		ReadTimeout:       config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The read timeout in milliseconds.", Name: "Read Timeout", Group: "Timing"}),
 		DialTimeout:       config.MakeU64(500, [2]uint64{0, 65535}, config.Display{Description: "The dial timeout for the send method in milliseconds. Zero for no timeout.", Name: "Dial Timeout", Group: "Timing"}),
-		Embedder:          config.MakeSelect("id", []string{"id"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
+		Embedder:          config.MakeSelect("id", []string{"id"}, config.Display{Description: "The embedding mechanism to use for this protocol.", Name: "Embedding", Group: "Settings"}),
 		AcceptTimeout:     config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The accept timeout for the receive method in milliseconds. Zero for no timeout.", Name: "Accept Timeout", Group: "Timing"}),
 	}
 }
