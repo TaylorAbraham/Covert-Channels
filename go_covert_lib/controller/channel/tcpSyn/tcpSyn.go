@@ -174,6 +174,8 @@ readloop:
 			first = false
 
 			var newBytes []byte
+
+
 			newBytes, state, err = c.conf.Embedder.GetByte(p.Ipv4h, p.Tcph, p.Time.Sub(prevTime), state)
 			if err != nil {
 				break readloop
@@ -225,7 +227,8 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		prevSequence uint32 = r.Uint32()
 		saddr, daddr [4]byte
 		sport, dport uint16
-		num          uint64 = 0
+		rem          []byte
+		n            uint64 = 0
 		h            ipv4.Header
 		p            []byte
 		cm           ipv4.ControlMessage
@@ -247,14 +250,17 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	} else {
 		saddr, daddr, sport, dport = c.conf.OriginIP, c.conf.FriendIP, c.conf.OriginPort, c.conf.FriendPort
 	}
+
+	rem = data
+
 readloop:
-	for len(data) > 0 {
+	for len(rem) > 0 {
 		h = createIPHeader(saddr, daddr)
 		cm = createCM(saddr, daddr)
 
 		tcph.SYN = true
 
-		h, tcph, data, wait, state, err = c.createTcpHead(h, tcph, data, prevSequence, state)
+		h, tcph, rem, wait, state, err = c.createTcpHead(h, tcph, rem, prevSequence, state)
 		if err != nil {
 			break readloop
 		}
@@ -265,11 +271,6 @@ readloop:
 			break readloop
 		}
 
-		if err = c.writeConn(&h, p, &cm); err != nil {
-			break readloop
-		}
-		state = state.IncrementState()
-		num += 1
 		// We wait for the time specified by the user's GetDelay function
 		// or until the user signals to cancel
 		select {
@@ -278,12 +279,18 @@ readloop:
 			err = &WriteWaitCancel{}
 			break readloop
 		}
+
+		if err = c.writeConn(&h, p, &cm); err != nil {
+			break readloop
+		}
+		state = state.IncrementState()
+		n = uint64(len(data) - len(rem))
 	}
 
 	// Readjust size to represent number of bytes sent
-	num, err = embedders.GetSentSize(c.conf.Embedder.GetMask(), num, err)
+	n, err = embedders.GetSentSize(c.conf.Embedder.GetMask(), n, err)
 	if err != nil {
-		return num, err
+		return n, err
 	}
 
 	// If we are using Protocol delimiting, we must send a final
@@ -304,21 +311,21 @@ readloop:
 
 		h, tcph, _, _, state, err = c.createTcpHead(h, layers.TCP{ACK: true}, fakeBuf, prevSequence, state)
 		if err != nil {
-			return num, err
+			return n, err
 		}
 		prevSequence = tcph.Seq
 
 		p, err = createTcpHeadBuf(tcph, saddr, daddr, sport, dport)
 		if err != nil {
-			return num, err
+			return n, err
 		}
 
 		if err = c.writeConn(&h, p, &cm); err != nil {
-			return num, err
+			return n, err
 		}
 	}
 
-	return num, nil
+	return n, nil
 }
 
 // Closes the covert channel.
@@ -344,7 +351,6 @@ func (c *Channel) readPacket(f func (p packet) (packet, bool, bool, error)) (pac
 		fin   bool
 		startTime time.Time = time.Now()
 	)
-
 	for {
 		if c.conf.ReadTimeout > 0 {
 			select {

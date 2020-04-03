@@ -193,7 +193,12 @@ func (e *TcpIpTemporalEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf [
 	if len(buf) == 0 {
 		return ipv4h, tcph, nil, time.Duration(0), state, errors.New("Cannot set byte if no data")
 	}
-	if t, err := e.Emb.SetByte(buf[0]); err == nil {
+
+	// The first packet we send is empty, it is used to generate the initial time on the receiver
+	if state.StoredData == nil {
+		state.StoredData = true
+		return ipv4h, tcph, buf, time.Duration(0), state, nil
+	} else if t, err := e.Emb.SetByte(buf[0]); err == nil {
 		return ipv4h, tcph, buf[1:], t, state, nil
 	} else {
 		return ipv4h, tcph, buf, time.Duration(0), state, err
@@ -201,7 +206,11 @@ func (e *TcpIpTemporalEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf [
 }
 
 func (e *TcpIpTemporalEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP, t time.Duration, state State) ([]byte, State, error) {
-	if b, err := e.Emb.GetByte(t); err == nil {
+	// We ignore the first packet, since it is used for setting the initial time
+	if state.StoredData == nil {
+		state.StoredData = true
+		return []byte{}, state, nil
+	} else if b, err := e.Emb.GetByte(t); err == nil {
 		return []byte{b}, state, nil
 	} else {
 		return nil, state, err
