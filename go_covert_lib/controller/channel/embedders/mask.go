@@ -15,7 +15,7 @@ type State struct {
 }
 
 func MakeState(mask [][]byte) State {
-	return State{ ByteLog : []byte{}, MaskSize : len(mask) }
+	return State{ByteLog: []byte{}, MaskSize: len(mask)}
 }
 
 // Increments both the packet number and the MaskIndex

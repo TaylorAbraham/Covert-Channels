@@ -7,12 +7,12 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"golang.org/x/net/ipv4"
+	"log"
 	"math/rand"
 	"net"
+	"os"
 	"sync"
 	"time"
-	"log"
-	"os"
 )
 
 const (
@@ -67,11 +67,11 @@ type Config struct {
 
 // A TCP covert channel
 type Channel struct {
-	conf        Config
-	rawConn     *ipv4.RawConn
-	cancel      chan bool
-	recvChan    chan packet
-	closeMutex  *sync.Mutex
+	conf       Config
+	rawConn    *ipv4.RawConn
+	cancel     chan bool
+	recvChan   chan packet
+	closeMutex *sync.Mutex
 }
 
 // Create the covert channel, filling in the SeqEncoder
@@ -80,7 +80,7 @@ type Channel struct {
 // that this function may one day be used for validating
 // the data structure
 func MakeChannel(conf Config) (*Channel, error) {
-	c := &Channel{conf: conf, cancel: make(chan bool), recvChan : make(chan packet, 1024), closeMutex: &sync.Mutex{}}
+	c := &Channel{conf: conf, cancel: make(chan bool), recvChan: make(chan packet, 1024), closeMutex: &sync.Mutex{}}
 	if c.conf.Embedder == nil {
 		c.conf.Embedder = &embedders.TcpIpSeqEncoder{}
 	}
@@ -135,19 +135,19 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 	}
 
 	var (
-		prev_val     uint32 = 0
-		first        bool   = true
+		prev_val uint32 = 0
+		first    bool   = true
 		// There is guaranteed to be at least one space for a byte in the
 		// data buffer at this point
-		pos uint64 = 0
-		prevTime   time.Time
-		fin   bool
-		p     packet
-		state embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
+		pos      uint64 = 0
+		prevTime time.Time
+		fin      bool
+		p        packet
+		state    embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 	)
 readloop:
 	for {
-		p, fin, err = c.readPacket(func (p packet) (packet, bool, bool, error) {
+		p, fin, err = c.readPacket(func(p packet) (packet, bool, bool, error) {
 			// Check if done
 			if c.conf.Delimiter == Protocol {
 				if (!c.conf.Bounce && p.Tcph.ACK && !p.Tcph.RST) || (c.conf.Bounce && p.Tcph.RST) {
@@ -174,7 +174,6 @@ readloop:
 			first = false
 
 			var newBytes []byte
-
 
 			newBytes, state, err = c.conf.Embedder.GetByte(p.Ipv4h, p.Tcph, p.Time.Sub(prevTime), state)
 			if err != nil {
@@ -235,8 +234,8 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		wait         time.Duration
 		tcph         layers.TCP
 		// We make it clear that the error always starts as nil
-		err       error = nil
-		state     embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
+		err   error           = nil
+		state embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 	)
 
 	data, err = embedders.EncodeFromMask(c.conf.Embedder.GetMask(), data)
@@ -343,12 +342,12 @@ func (c *Channel) Close() error {
 }
 
 // Read from a raw connection whil setting a timeout if necessary
-func (c *Channel) readPacket(f func (p packet) (packet, bool, bool, error)) (packet, bool, error) {
+func (c *Channel) readPacket(f func(p packet) (packet, bool, bool, error)) (packet, bool, error) {
 	var (
-		p packet
-		err error
-		valid bool
-		fin   bool
+		p         packet
+		err       error
+		valid     bool
+		fin       bool
 		startTime time.Time = time.Now()
 	)
 	for {
@@ -367,12 +366,12 @@ func (c *Channel) readPacket(f func (p packet) (packet, bool, bool, error)) (pac
 				return p, fin, errors.New("Cancel")
 			}
 		} else {
-			select{
+			select {
 			case p = <-c.recvChan:
-					p, valid, fin, err = f(p)
-					if valid || err != nil {
-						return p, fin, err
-					}
+				p, valid, fin, err = f(p)
+				if valid || err != nil {
+					return p, fin, err
+				}
 			case <-c.cancel:
 				return p, fin, errors.New("Cancel")
 			}
