@@ -34,7 +34,7 @@ func GetDefault() ConfigClient {
 		WriteTimeout: config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The write timeout in milliseconds.", Name: "Write Timeout", Group: "Timing"}),
 		ReadTimeout:  config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The read timeout in milliseconds.", Name: "Read Timeout", Group: "Timing"}),
 		Delimiter:    config.MakeSelect("protocol", []string{"buffer", "protocol"}, config.Display{Description: "The delimiter to use for deciding when to return after having received a message.", Name: "Delimeter", Group: "Settings"}),
-		Embedder:     config.MakeSelect("sequence", []string{"sequence", "id", "urgptr", "urgflg", "timestamp", "ecn"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
+		Embedder:     config.MakeSelect("sequence", []string{"sequence", "id", "urgptr", "urgflg", "timestamp", "ecn", "temporal"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
 	}
 }
 
@@ -88,6 +88,8 @@ func ToChannel(cc ConfigClient) (*Channel, error) {
 		c.Embedder = &embedders.TcpIpTimestampEncoder{}
 	case "ecn":
 		c.Embedder = &embedders.TcpIpEcnEncoder{}
+	case "temporal":
+		c.Embedder = &embedders.TcpIpTemporalEncoder{Emb: embedders.TemporalEncoder{time.Duration(50 * time.Millisecond)}}
 	default:
 		return nil, errors.New("Invalid embedder value")
 	}

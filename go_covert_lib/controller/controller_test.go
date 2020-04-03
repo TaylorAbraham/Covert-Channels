@@ -504,6 +504,20 @@ func TestMessageExchange(t *testing.T) {
 			},
 		},
 		channelTest{
+			name: "TcpSyn",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8090
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8091
+				conf.Channel.Data.TcpSyn.Embedder.Value = "temporal"
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8091
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8090
+				conf.Channel.Data.TcpSyn.Embedder.Value = "temporal"
+			},
+			isTiming: true,
+		},
+		channelTest{
 			name: "UdpNormal",
 			f1: func(conf *configData) {
 				conf.Channel.Data.UdpNormal.DestinationPort.Value = 8090
