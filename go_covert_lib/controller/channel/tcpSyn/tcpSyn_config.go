@@ -18,7 +18,6 @@ type ConfigClient struct {
 	Bounce       config.BoolParam
 	Delimiter    config.SelectParam
 	Embedder     config.SelectParam
-	GetDelay     config.SelectParam
 	WriteTimeout config.U64Param
 	ReadTimeout  config.U64Param
 }
@@ -32,7 +31,6 @@ func GetDefault() ConfigClient {
 		Bounce:       config.MakeBool(false, config.Display{Description: "Toggle bounce mode, which spoofs your IP address.", Name: "Bounce", Group: "Bouncing", GroupToggle: true}),
 		BounceIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "The bouncer's IP address.", Name: "Bouncer's IP", Group: "Bouncing"}),
 		BouncePort:   config.MakeU16(0, [2]uint16{0, 65535}, config.Display{Description: "The bouncer's port.", Name: "Bouncer's Port", Group: "Bouncing"}),
-		GetDelay:     config.MakeSelect("none", []string{"none"}, config.Display{Description: "The function to use for inter-byte delay.", Name: "Get Delay", Group: "Timing"}),
 		WriteTimeout: config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The write timeout in milliseconds.", Name: "Write Timeout", Group: "Timing"}),
 		ReadTimeout:  config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The read timeout in milliseconds.", Name: "Read Timeout", Group: "Timing"}),
 		Delimiter:    config.MakeSelect("protocol", []string{"buffer", "protocol"}, config.Display{Description: "The delimiter to use for deciding when to return after having received a message.", Name: "Delimeter", Group: "Settings"}),
@@ -92,12 +90,6 @@ func ToChannel(cc ConfigClient) (*Channel, error) {
 		c.Embedder = &embedders.TcpIpEcnEncoder{}
 	default:
 		return nil, errors.New("Invalid embedder value")
-	}
-
-	switch cc.GetDelay.Value {
-	case "none":
-	default:
-		return nil, errors.New("Invalid delay function")
 	}
 
 	if ch, err := MakeChannel(c); err != nil {

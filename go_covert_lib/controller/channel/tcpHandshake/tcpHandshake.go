@@ -90,7 +90,6 @@ func (smap *syncPktMap) Add(k uint16, v packet) {
 // alleviates this risk.
 type Config struct {
 	// For debugging purposes, log all packets that are sent or received
-	logPackets        bool
 	FriendIP          [4]byte
 	OriginIP          [4]byte
 	FriendReceivePort uint16
@@ -133,10 +132,6 @@ type Channel struct {
 
 	acceptChan chan acceptedConn
 
-	// For debugging purposes, log all packets received and sent
-	sendPktLog    *syncPktMap
-	receivePktLog *syncPktMap
-
 	// We make the mutex a pointer to avoid the risk of copying
 	writeMutex *sync.Mutex
 	closeMutex *sync.Mutex
@@ -164,9 +159,6 @@ func MakeChannel(conf Config) (*Channel, error) {
 			requestPortChan: make(chan portRequest),
 			dropPortChan:    make(chan dropRequest),
 		},
-
-		sendPktLog:    MakeSyncMap(),
-		receivePktLog: MakeSyncMap(),
 
 		writeMutex: &sync.Mutex{},
 		closeMutex: &sync.Mutex{},
@@ -352,9 +344,6 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		// If no valid packet is received within timeout of the previous valid packet
 		// we exit with an error
 		err = waitPacket(recvPktChan, c.conf.ReadTimeout, func(p packet) (bool, error) {
-			if c.conf.logPackets {
-				c.receivePktLog.Add(ac.friendPort, p)
-			}
 			var (
 				valid bool
 				err   error
@@ -781,17 +770,17 @@ func (c *Channel) readLoop(recieverChan chan packet, senderChan chan packet) {
 		if err = tcph.DecodeFromBytes(p, gopacket.NilDecodeFeedback); err == nil {
 			if bytes.Equal(h.Src.To4(), c.conf.FriendIP[:]) {
 				var pckChan chan packet
+
+				// When reading options DecodeFromBytes does not copy option data,
+				// it merely slices into the array. We copy here to make sure that the data
+				// does not get overwritten when the underlying array is used for later reads
+				for i := range tcph.Options {
+					tcph.Options[i].OptionData = append([]byte{}, tcph.Options[i].OptionData...)
+				}
+
 				// Packets may be received as ACKs to our sent messages or as packets sent to this channel
 				// We must route accordingly
 				if tcph.DstPort == layers.TCPPort(c.conf.OriginReceivePort) {
-
-					// When reading options DecodeFromBytes does not copy option data,
-					// it merely slices into the array. We copy here to make sure that the data
-					// does not get overwritten when the underlying array is used for later reads
-					for i := range tcph.Options {
-						tcph.Options[i].OptionData = append([]byte{}, tcph.Options[i].OptionData...)
-					}
-
 					// If the port number is to our receive port, then it is potentially
 					// an incomming message, so we route it to the Receive methods
 					pckChan = recieverChan
