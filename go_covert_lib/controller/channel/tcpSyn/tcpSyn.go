@@ -20,13 +20,6 @@ const (
 	Protocol = 1
 )
 
-// We make the fields public to facilitate logging
-type packet struct {
-	Ipv4h ipv4.Header
-	Tcph  layers.TCP
-	Time  time.Time
-}
-
 type WriteWaitCancel struct{}
 
 func (o *WriteWaitCancel) Error() string {
@@ -56,7 +49,7 @@ type Config struct {
 	// or delinieating by a TCP packet with a specific flag (Delim::Protocol).
 	// Default is Delim::Protocol.
 	Delimiter uint8
-	Embedder  TcpEncoder
+	Embedder  embedders.TcpIpEmbedder
 
 	// Timeouts for reads and writes
 	// These are the inter packet timeout, which will always translate to the inter byte Timeout
@@ -70,7 +63,7 @@ type Channel struct {
 	conf       Config
 	rawConn    *ipv4.RawConn
 	cancel     chan bool
-	recvChan   chan packet
+	recvChan   chan embedders.TcpIpPacket
 	closeMutex *sync.Mutex
 }
 
@@ -80,7 +73,7 @@ type Channel struct {
 // that this function may one day be used for validating
 // the data structure
 func MakeChannel(conf Config) (*Channel, error) {
-	c := &Channel{conf: conf, cancel: make(chan bool), recvChan: make(chan packet, 1024), closeMutex: &sync.Mutex{}}
+	c := &Channel{conf: conf, cancel: make(chan bool), recvChan: make(chan embedders.TcpIpPacket, 1024), closeMutex: &sync.Mutex{}}
 	if c.conf.Embedder == nil {
 		c.conf.Embedder = &embedders.TcpIpSeqEncoder{}
 	}
@@ -140,14 +133,13 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		// There is guaranteed to be at least one space for a byte in the
 		// data buffer at this point
 		pos      uint64 = 0
-		prevTime time.Time
 		fin      bool
-		p        packet
+		p        embedders.TcpIpPacket
 		state    embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 	)
 readloop:
 	for {
-		p, fin, err = c.readPacket(func(p packet) (packet, bool, bool, error) {
+		p, fin, err = c.readPacket(func(p embedders.TcpIpPacket) (embedders.TcpIpPacket, bool, bool, error) {
 			// Check if done
 			if c.conf.Delimiter == Protocol {
 				if (!c.conf.Bounce && p.Tcph.ACK && !p.Tcph.RST) || (c.conf.Bounce && p.Tcph.RST) {
@@ -175,13 +167,12 @@ readloop:
 
 			var newBytes []byte
 
-			newBytes, state, err = c.conf.Embedder.GetByte(p.Ipv4h, p.Tcph, p.Time.Sub(prevTime), state)
+			newBytes, state, err = c.conf.Embedder.GetByte(p, state)
 			if err != nil {
 				break readloop
 			}
 
 			state = state.IncrementState()
-			prevTime = p.Time
 
 			for _, b := range newBytes {
 				// Make sure we don't overflow the buffer
@@ -228,11 +219,10 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		sport, dport uint16
 		rem          []byte
 		n            uint64 = 0
-		h            ipv4.Header
-		p            []byte
+		payload      []byte
 		cm           ipv4.ControlMessage
 		wait         time.Duration
-		tcph         layers.TCP
+		p						 embedders.TcpIpPacket
 		// We make it clear that the error always starts as nil
 		err   error           = nil
 		state embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
@@ -254,18 +244,18 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 
 readloop:
 	for len(rem) > 0 {
-		h = createIPHeader(saddr, daddr)
+		p.Ipv4h = createIPHeader(saddr, daddr)
 		cm = createCM(saddr, daddr)
 
-		tcph.SYN = true
+		p.Tcph.SYN = true
 
-		h, tcph, rem, wait, state, err = c.createTcpHead(h, tcph, rem, prevSequence, state)
+		p, rem, wait, state, err = c.createTcpHead(p, rem, prevSequence, state)
 		if err != nil {
 			break readloop
 		}
-		prevSequence = tcph.Seq
+		prevSequence = p.Tcph.Seq
 
-		p, err = createTcpHeadBuf(tcph, saddr, daddr, sport, dport)
+		payload, err = createTcpHeadBuf(p.Tcph, saddr, daddr, sport, dport)
 		if err != nil {
 			break readloop
 		}
@@ -279,7 +269,7 @@ readloop:
 			break readloop
 		}
 
-		if err = c.writeConn(&h, p, &cm); err != nil {
+		if err = c.writeConn(&p.Ipv4h, payload, &cm); err != nil {
 			break readloop
 		}
 		state = state.IncrementState()
@@ -295,7 +285,7 @@ readloop:
 	// If we are using Protocol delimiting, we must send a final
 	// ACK packet to alert the receiver that the message is done sending
 	if c.conf.Delimiter == Protocol {
-		h = createIPHeader(saddr, daddr)
+		p.Ipv4h = createIPHeader(saddr, daddr)
 		cm = createCM(saddr, daddr)
 
 		// We want to still encode data so that this final packet looks
@@ -308,18 +298,19 @@ readloop:
 			fakeBuf[i] = byte(r.Uint32())
 		}
 
-		h, tcph, _, _, state, err = c.createTcpHead(h, layers.TCP{ACK: true}, fakeBuf, prevSequence, state)
+		p.Tcph = layers.TCP{ACK: true}
+		p, _, _, state, err = c.createTcpHead(p, fakeBuf, prevSequence, state)
 		if err != nil {
 			return n, err
 		}
-		prevSequence = tcph.Seq
+		prevSequence = p.Tcph.Seq
 
-		p, err = createTcpHeadBuf(tcph, saddr, daddr, sport, dport)
+		payload, err = createTcpHeadBuf(p.Tcph, saddr, daddr, sport, dport)
 		if err != nil {
 			return n, err
 		}
 
-		if err = c.writeConn(&h, p, &cm); err != nil {
+		if err = c.writeConn(&p.Ipv4h, payload, &cm); err != nil {
 			return n, err
 		}
 	}
@@ -342,9 +333,9 @@ func (c *Channel) Close() error {
 }
 
 // Read from a raw connection whil setting a timeout if necessary
-func (c *Channel) readPacket(f func(p packet) (packet, bool, bool, error)) (packet, bool, error) {
+func (c *Channel) readPacket(f func(p embedders.TcpIpPacket) (embedders.TcpIpPacket, bool, bool, error)) (embedders.TcpIpPacket, bool, error) {
 	var (
-		p         packet
+		p         embedders.TcpIpPacket
 		err       error
 		valid     bool
 		fin       bool
@@ -416,10 +407,10 @@ func createCM(sip, dip [4]byte) ipv4.ControlMessage {
 	}
 }
 
-func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, prevSequence uint32, state embedders.State) (ipv4.Header, layers.TCP, []byte, time.Duration, embedders.State, error) {
+func (c *Channel) createTcpHead(p embedders.TcpIpPacket, buf []byte, prevSequence uint32, state embedders.State) (embedders.TcpIpPacket, []byte, time.Duration, embedders.State, error) {
 	// Based on a preliminary investigation of my machine (running Ubuntu 18.04),
 	// SYN packets always seem to have a window of 65495
-	tcph.Window = 65495
+	p.Tcph.Window = 65495
 
 	// We must generate a random TCP sequence number.
 	// Changes in sequence number are used in bounce mode to detect duplicate
@@ -427,24 +418,23 @@ func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	var (
-		newipv4h ipv4.Header
-		newtcph  layers.TCP
+		newpkt   embedders.TcpIpPacket
 		newbuf   []byte
 		err      error
 		wait     time.Duration
 	)
 
-	tcph.Seq = r.Uint32() & 0xFFFFFFFF
-	for tcph.Seq == prevSequence {
-		tcph.Seq = r.Uint32() & 0xFFFFFFFF
+	p.Tcph.Seq = r.Uint32() & 0xFFFFFFFF
+	for p.Tcph.Seq == prevSequence {
+		p.Tcph.Seq = r.Uint32() & 0xFFFFFFFF
 	}
-	newipv4h, newtcph, newbuf, wait, state, err = c.conf.Embedder.SetByte(ipv4h, tcph, buf, state)
-	if newtcph.Seq == prevSequence {
-		return newipv4h, newtcph, newbuf, time.Duration(0), state, errors.New("Could not send packet; " +
+	newpkt, newbuf, wait, state, err = c.conf.Embedder.SetByte(p, buf, state)
+	if newpkt.Tcph.Seq == prevSequence {
+		return newpkt, newbuf, time.Duration(0), state, errors.New("Could not send packet; " +
 			"Embedder set current sequence number to preceeding sequence number. " +
 			"Would prevent receiver from differentiating packets")
 	}
-	return newipv4h, newtcph, newbuf, wait, state, err
+	return newpkt, newbuf, wait, state, err
 }
 
 // Create the TCP header IP payload
@@ -523,7 +513,7 @@ func (c *Channel) readLoop(saddr [4]byte, sport, dport uint16) {
 
 				if tcph.SrcPort == layers.TCPPort(sport) && tcph.DstPort == layers.TCPPort(dport) {
 					select {
-					case c.recvChan <- packet{Ipv4h: *h, Tcph: tcph, Time: time.Now()}:
+					case c.recvChan <- embedders.TcpIpPacket{Ipv4h: *h, Tcph: tcph, Time: time.Now()}:
 					default:
 						l.Println("Too many packets: Dropped Packet")
 					}

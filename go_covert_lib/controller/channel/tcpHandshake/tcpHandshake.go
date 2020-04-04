@@ -26,13 +26,6 @@ const maxAccept = 32
 // many packets should be stored
 const maxStorePacket = 512
 
-// We make the fields public to facilitate logging
-type packet struct {
-	Ipv4h ipv4.Header
-	Tcph  layers.TCP
-	Time  time.Time
-}
-
 type acceptedConn struct {
 	conn net.Conn
 	// The TCP port used by our Friend IP in this covert message
@@ -45,7 +38,7 @@ type portRequest struct {
 	port uint16
 	// A go channel to allow the portRouter
 	// to provide the desired packet go channel to the Receive method
-	reply chan chan packet
+	reply chan chan embedders.TcpIpPacket
 }
 
 type dropRequest struct {
@@ -55,14 +48,14 @@ type dropRequest struct {
 
 type syncPktMap struct {
 	mutex  *sync.Mutex
-	pktMap map[uint16][]packet
+	pktMap map[uint16][]embedders.TcpIpPacket
 }
 
 func MakeSyncMap() *syncPktMap {
-	return &syncPktMap{pktMap: make(map[uint16][]packet), mutex: &sync.Mutex{}}
+	return &syncPktMap{pktMap: make(map[uint16][]embedders.TcpIpPacket), mutex: &sync.Mutex{}}
 }
 
-func (smap *syncPktMap) Add(k uint16, v packet) {
+func (smap *syncPktMap) Add(k uint16, v embedders.TcpIpPacket) {
 	smap.mutex.Lock()
 	smap.pktMap[k] = append(smap.pktMap[k], v)
 	smap.mutex.Unlock()
@@ -94,7 +87,7 @@ type Config struct {
 	OriginIP          [4]byte
 	FriendReceivePort uint16
 	OriginReceivePort uint16
-	Embedder          TcpEncoder
+	Embedder          embedders.TcpIpEmbedder
 	// The TCP dial timeout for the three way handshake in the the Send method
 	DialTimeout time.Duration
 	// The TCP accept timeout for the three way handshake in the the Receive method
@@ -126,7 +119,7 @@ type Channel struct {
 
 	// A go channel for receiving TCP acks from the socket we are sending messages to
 	// This allows us to find the Ack and Seq numbers
-	replyChan     chan packet
+	replyChan     chan embedders.TcpIpPacket
 	receiveRouter portRouter
 	sendRouter    portRouter
 
@@ -150,12 +143,12 @@ func MakeChannel(conf Config) (*Channel, error) {
 		acceptChan: make(chan acceptedConn, maxAccept),
 
 		receiveRouter: portRouter{
-			pktRecvChan:     make(chan packet, 1024),
+			pktRecvChan:     make(chan embedders.TcpIpPacket, 1024),
 			requestPortChan: make(chan portRequest),
 			dropPortChan:    make(chan dropRequest),
 		},
 		sendRouter: portRouter{
-			pktRecvChan:     make(chan packet, 1024),
+			pktRecvChan:     make(chan embedders.TcpIpPacket, 1024),
 			requestPortChan: make(chan portRequest),
 			dropPortChan:    make(chan dropRequest),
 		},
@@ -201,7 +194,7 @@ type portRouter struct {
 	// pktRecvChan must be a buffered channel to
 	// allow the readLoop to keep reading even while the router processes
 	// sorting the packets by port
-	pktRecvChan chan packet
+	pktRecvChan chan embedders.TcpIpPacket
 	// Allows a caller to request a go channel for receiving from the
 	// desired friend port
 	requestPortChan chan portRequest
@@ -235,7 +228,7 @@ func (c *Channel) Close() error {
 // go channel in enough time or if there are packets coming along the go channel
 // but they are not valid packets. We check for both cases here.
 // Set timeout to zero for no timeout
-func waitPacket(pktChan chan packet, timeout time.Duration, f func(p packet) (bool, error), cancel chan bool) error {
+func waitPacket(pktChan chan embedders.TcpIpPacket, timeout time.Duration, f func(p embedders.TcpIpPacket) (bool, error), cancel chan bool) error {
 	var startTime time.Time = time.Now()
 	if timeout == 0 {
 		for {
@@ -333,7 +326,6 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 	var (
 		nPayload   int    = 0
 		payloadBuf []byte = make([]byte, 256)
-		prevTime   time.Time
 		state      embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 	)
 
@@ -343,12 +335,12 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		// This way we measure the time between valid packets.
 		// If no valid packet is received within timeout of the previous valid packet
 		// we exit with an error
-		err = waitPacket(recvPktChan, c.conf.ReadTimeout, func(p packet) (bool, error) {
+		err = waitPacket(recvPktChan, c.conf.ReadTimeout, func(p embedders.TcpIpPacket) (bool, error) {
 			var (
 				valid bool
 				err   error
 			)
-			n, handshake, valid, fin, prevTime, state, err = c.handleReceivedPacket(p, dataBuf, n, ac.friendPort, handshake, prevTime, state)
+			n, handshake, valid, fin, state, err = c.handleReceivedPacket(p, dataBuf, n, ac.friendPort, handshake, state)
 
 			// If packets are sent with payload then it will fill up the internal
 			// tcp buffer.
@@ -417,7 +409,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 // TCP connection). RST or second SYN packets are interpreted as an error in the connection and
 // cause the Receive method to abort.
 // We return a valid flag to indicate if the packet forms part of the TCP covert communication (three way handshake, message, or FIN packet )
-func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPort uint16, handshake byte, prevTime time.Time, state embedders.State) (uint64, byte, bool, bool, time.Time, embedders.State, error) {
+func (c *Channel) handleReceivedPacket(p embedders.TcpIpPacket, data []byte, n uint64, friendPort uint16, handshake byte, state embedders.State) (uint64, byte, bool, bool, embedders.State, error) {
 
 	var (
 		valid         bool // Was this packet a valid part of the message
@@ -438,7 +430,6 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 		//          seq = d.tcph.Seq
 		handshake = 2
 		valid = true
-		prevTime = p.Time
 	} else if p.Tcph.RST {
 		// If rst packet is sent we quit
 		err = errors.New("RST packet")
@@ -461,7 +452,7 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 		fin = true
 	} else {
 		// Normal transmission packet
-		if receivedBytes, state, err = c.conf.Embedder.GetByte(p.Ipv4h, p.Tcph, p.Time.Sub(prevTime), state); err == nil {
+		if receivedBytes, state, err = c.conf.Embedder.GetByte(p, state); err == nil {
 			valid = true
 			for _, b := range receivedBytes {
 				if n < uint64(len(data)) {
@@ -473,10 +464,9 @@ func (c *Channel) handleReceivedPacket(p packet, data []byte, n uint64, friendPo
 				}
 			}
 			state = state.IncrementState()
-			prevTime = p.Time
 		}
 	}
-	return n, handshake, valid, fin, prevTime, state, err
+	return n, handshake, valid, fin, state, err
 }
 
 func (c *Channel) Send(data []byte) (uint64, error) {
@@ -541,7 +531,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	defer c.sendRouter.donePktChan(originPort, false, c.cancel)
 
 	// Wait for the SYN/ACK packet
-	err = waitPacket(recvPktChan, time.Second*3, func(p packet) (bool, error) {
+	err = waitPacket(recvPktChan, time.Second*3, func(p embedders.TcpIpPacket) (bool, error) {
 		// We empty packets from the channel until we get the SYN/ACK packet
 		// from the 3-way handshake. This packet can be used to retrieve
 		// the seq and ack numbers
@@ -574,29 +564,28 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	}
 
 	var (
-		ipv4h ipv4.Header         = createIPHeader(c.conf.OriginIP, c.conf.FriendIP)
 		cm    ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
-		tcph  layers.TCP
 		wbuf  []byte
 		tm    time.Duration
 		state embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
+		p     embedders.TcpIpPacket = embedders.TcpIpPacket{ Ipv4h : createIPHeader(c.conf.OriginIP, c.conf.FriendIP) }
 	)
 
 	if timestamp != nil {
 		binary.BigEndian.PutUint32(timestamp.OptionData[:4], binary.BigEndian.Uint32(timestamp.OptionData[:4])+uint32(time.Now().Sub(systemTime)/time.Millisecond))
-		tcph.Options = append(tcph.Options, layers.TCPOption{OptionType: layers.TCPOptionKindNop, OptionLength: 2})
-		tcph.Options = append(tcph.Options, layers.TCPOption{OptionType: layers.TCPOptionKindNop, OptionLength: 2})
-		tcph.Options = append(tcph.Options, *timestamp)
+		p.Tcph.Options = append(p.Tcph.Options, layers.TCPOption{OptionType: layers.TCPOptionKindNop, OptionLength: 2})
+		p.Tcph.Options = append(p.Tcph.Options, layers.TCPOption{OptionType: layers.TCPOptionKindNop, OptionLength: 2})
+		p.Tcph.Options = append(p.Tcph.Options, *timestamp)
 	}
 
-	tcph.ACK = true
-	tcph.PSH = true
+	p.Tcph.ACK = true
+	p.Tcph.PSH = true
 
 	// Send each packet
 sendloop:
 	for len(rem) > 0 {
 		var payload []byte = make([]byte, 5)
-		if ipv4h, tcph, rem, tm, state, err = c.conf.Embedder.SetByte(ipv4h, tcph, rem, state); err != nil {
+		if p, rem, tm, state, err = c.conf.Embedder.SetByte(p, rem, state); err != nil {
 			break sendloop
 		}
 
@@ -607,18 +596,18 @@ sendloop:
 			break sendloop
 		}
 
-		if wbuf, tcph, err = createTCPHeader(tcph, seq, ack, c.conf.OriginIP, c.conf.FriendIP, originPort, c.conf.FriendReceivePort, payload); err != nil {
+		if wbuf, p.Tcph, err = createTCPHeader(p.Tcph, seq, ack, c.conf.OriginIP, c.conf.FriendIP, originPort, c.conf.FriendReceivePort, payload); err != nil {
 			break sendloop
 		}
 
 		// Sending a packet seems to overwrite at least the current timestamp option value to zero
 		// in the backing array (probably cause it is incorrect)
 		// Therefore, before sending, we copy all option data to new arrays
-		for i := range tcph.Options {
-			tcph.Options[i].OptionData = append([]byte{}, tcph.Options[i].OptionData...)
+		for i := range p.Tcph.Options {
+			p.Tcph.Options[i].OptionData = append([]byte{}, p.Tcph.Options[i].OptionData...)
 		}
 
-		if err = c.sendPacket(&ipv4h, wbuf, &cm); err != nil {
+		if err = c.sendPacket(&p.Ipv4h, wbuf, &cm); err != nil {
 			break sendloop
 		}
 		state = state.IncrementState()
@@ -633,21 +622,21 @@ sendloop:
 		return n, err
 	}
 
-	tcph.ACK = true
-	tcph.FIN = true
-	tcph.PSH = false
-	if wbuf, tcph, err = createTCPHeader(tcph, seq, ack, c.conf.OriginIP, c.conf.FriendIP, originPort, c.conf.FriendReceivePort, []byte{}); err != nil {
+	p.Tcph.ACK = true
+	p.Tcph.FIN = true
+	p.Tcph.PSH = false
+	if wbuf, p.Tcph, err = createTCPHeader(p.Tcph, seq, ack, c.conf.OriginIP, c.conf.FriendIP, originPort, c.conf.FriendReceivePort, []byte{}); err != nil {
 		return n, err
 	}
 
-	if err = c.sendPacket(&ipv4h, wbuf, &cm); err != nil {
+	if err = c.sendPacket(&p.Ipv4h, wbuf, &cm); err != nil {
 		return n, err
 	}
 
 	// We craft a packet for the fin packet
 	// Otherwise the close method for the socket conn mediates the close and
 	// it ends up with the wrong sequence number, causing the close to look weird.
-	err = waitPacket(recvPktChan, time.Second*1, func(p packet) (bool, error) {
+	err = waitPacket(recvPktChan, time.Second*1, func(p embedders.TcpIpPacket) (bool, error) {
 		if p.Tcph.ACK && (p.Tcph.FIN || p.Tcph.RST) {
 			return true, nil
 		}
@@ -747,7 +736,7 @@ func createCM(sip, dip [4]byte) ipv4.ControlMessage {
 // Based on the port numbers, we
 // The receiver chan is for packets destined to calls to the Receive method
 // The sender chan is for packets destined to calls to the Send method
-func (c *Channel) readLoop(recieverChan chan packet, senderChan chan packet) {
+func (c *Channel) readLoop(recieverChan chan embedders.TcpIpPacket, senderChan chan embedders.TcpIpPacket) {
 	var (
 		buf [1024]byte
 		l   *log.Logger = log.New(os.Stderr, "", log.Flags())
@@ -769,7 +758,7 @@ func (c *Channel) readLoop(recieverChan chan packet, senderChan chan packet) {
 		tcph := layers.TCP{}
 		if err = tcph.DecodeFromBytes(p, gopacket.NilDecodeFeedback); err == nil {
 			if bytes.Equal(h.Src.To4(), c.conf.FriendIP[:]) {
-				var pckChan chan packet
+				var pckChan chan embedders.TcpIpPacket
 
 				// When reading options DecodeFromBytes does not copy option data,
 				// it merely slices into the array. We copy here to make sure that the data
@@ -793,7 +782,7 @@ func (c *Channel) readLoop(recieverChan chan packet, senderChan chan packet) {
 				}
 
 				select {
-				case pckChan <- packet{Ipv4h: *h, Tcph: tcph, Time: time.Now()}:
+				case pckChan <- embedders.TcpIpPacket{Ipv4h: *h, Tcph: tcph, Time: time.Now()}:
 				default:
 					l.Println("Too many packets: Dropped Packet")
 				}
@@ -854,7 +843,7 @@ func (c *Channel) acceptLoop() {
 
 type pktStore struct {
 	hasRead bool
-	pktChan chan packet
+	pktChan chan embedders.TcpIpPacket
 }
 
 // Messages could be received from multiple friend ports in quick succession
@@ -880,14 +869,14 @@ loop:
 		// The Receive method requests a channel to report
 		// packets coming from the desired friend port
 		case request := <-r.requestPortChan:
-			var pktChan chan packet = nil // I am making it explicit that this should start as nil
+			var pktChan chan embedders.TcpIpPacket = nil // I am making it explicit that this should start as nil
 			if _, ok := pktMap[request.port]; ok {
 				pktMap[request.port].hasRead = true
 				pktChan = pktMap[request.port].pktChan
 			} else if len(pktMap) < maxAccept || dropUnused(pktMap) {
 				pktMap[request.port] = &pktStore{
 					hasRead: true,
-					pktChan: make(chan packet, maxStorePacket),
+					pktChan: make(chan embedders.TcpIpPacket, maxStorePacket),
 				}
 				pktChan = pktMap[request.port].pktChan
 			}
@@ -920,7 +909,7 @@ loop:
 				if len(pktMap) < maxAccept || dropUnused(pktMap) {
 					pktMap[friendPort] = &pktStore{
 						hasRead: false,
-						pktChan: make(chan packet, maxStorePacket),
+						pktChan: make(chan embedders.TcpIpPacket, maxStorePacket),
 					}
 				} else {
 					// There is not room to store the packet,
@@ -988,7 +977,7 @@ loop:
 				hasSYN   bool
 				newStore pktStore = pktStore{
 					hasRead: false,
-					pktChan: make(chan packet, maxStorePacket),
+					pktChan: make(chan embedders.TcpIpPacket, maxStorePacket),
 				}
 			)
 		dropLoop:
@@ -1066,11 +1055,11 @@ func dropUnused(pktMap map[uint16]*pktStore) bool {
 	}
 }
 
-func (r *portRouter) getPktChan(port uint16, cancel chan bool) (chan packet, error) {
+func (r *portRouter) getPktChan(port uint16, cancel chan bool) (chan embedders.TcpIpPacket, error) {
 	// This code requests the specific friendPort
 	// by providing a go channel to allow portRouter to
 	// reply with the go packet channel
-	var reply chan chan packet = make(chan chan packet)
+	var reply chan chan embedders.TcpIpPacket = make(chan chan embedders.TcpIpPacket)
 	select {
 	case r.requestPortChan <- portRequest{
 		port:  port,
@@ -1080,7 +1069,7 @@ func (r *portRouter) getPktChan(port uint16, cancel chan bool) (chan packet, err
 		return nil, errors.New("Receive Cancelled")
 	}
 
-	var recvPktChan chan packet
+	var recvPktChan chan embedders.TcpIpPacket
 	// If the above select successfully sent a request on requestPortChan, then we will
 	// then we will always get a reply on the reply go chan
 	// There is thus no need to select on the cancel go channel
