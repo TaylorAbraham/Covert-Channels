@@ -324,8 +324,8 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 	defer c.receiveRouter.donePktChan(ac.friendPort, true, c.cancel)
 
 	var (
-		nPayload   int    = 0
-		payloadBuf []byte = make([]byte, 256)
+		nPayload   int             = 0
+		payloadBuf []byte          = make([]byte, 256)
 		state      embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 	)
 
@@ -567,8 +567,8 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		cm    ipv4.ControlMessage = createCM(c.conf.OriginIP, c.conf.FriendIP)
 		wbuf  []byte
 		tm    time.Duration
-		state embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
-		p     embedders.TcpIpPacket = embedders.TcpIpPacket{ Ipv4h : createIPHeader(c.conf.OriginIP, c.conf.FriendIP) }
+		state embedders.State       = embedders.MakeState(c.conf.Embedder.GetMask())
+		p     embedders.TcpIpPacket = embedders.TcpIpPacket{Ipv4h: createIPHeader(c.conf.OriginIP, c.conf.FriendIP)}
 	)
 
 	if timestamp != nil {

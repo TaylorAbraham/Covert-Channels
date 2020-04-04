@@ -5,8 +5,8 @@ import (
 	"github.com/google/gopacket/layers"
 	"golang.org/x/net/ipv4"
 	"math/rand"
-	"time"
 	"sort"
+	"time"
 )
 
 // We make the fields public to facilitate logging
@@ -301,7 +301,7 @@ func (s *TcpIpEcnTempEncoder) GetMask() [][]byte {
 	return [][]byte{[]byte{0x03}, []byte{0x03}, []byte{0x03}, []byte{0x03}}
 }
 
-type TcpIpFreqEncoder struct {}
+type TcpIpFreqEncoder struct{}
 
 type freqData struct {
 	numToSend uint
@@ -320,16 +320,16 @@ func (e *TcpIpFreqEncoder) SetByte(p TcpIpPacket, buf []byte, state State) (TcpI
 
 	var (
 		deltaMillis time.Duration
-		fd freqData
-		ok bool
+		fd          freqData
+		ok          bool
 	)
 
 	if state.StoredData == nil {
-		var r  *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+		var r *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 		if buf[0] == 1 {
-		 	fd = freqData{ numToSend : 8, sendMS : make([]int, 8) }
+			fd = freqData{numToSend: 8, sendMS: make([]int, 8)}
 		} else {
-			fd = freqData{ numToSend : 2, sendMS : make([]int, 2) }
+			fd = freqData{numToSend: 2, sendMS: make([]int, 2)}
 		}
 		// We send the packets at random times within the 50 ms interval
 		for i := 0; i < int(fd.numToSend); i++ {
@@ -366,10 +366,10 @@ func (e *TcpIpFreqEncoder) SetByte(p TcpIpPacket, buf []byte, state State) (TcpI
 func (e *TcpIpFreqEncoder) GetByte(p TcpIpPacket, state State) ([]byte, State, error) {
 	// We ignore the first packet, since it is used for setting the initial time
 	if state.StoredData == nil {
-		state.StoredData = freqData{ numRecv : 1, startTime : p.Time }
+		state.StoredData = freqData{numRecv: 1, startTime: p.Time}
 		return []byte{}, state, nil
 	} else if fd, ok := state.StoredData.(freqData); ok {
-		if p.Time.Sub(fd.startTime) >= time.Millisecond * 50 {
+		if p.Time.Sub(fd.startTime) >= time.Millisecond*50 {
 			state.StoredData = nil
 			if fd.numRecv < 4 {
 				return []byte{0}, state, nil

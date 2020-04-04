@@ -132,10 +132,10 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 		first    bool   = true
 		// There is guaranteed to be at least one space for a byte in the
 		// data buffer at this point
-		pos      uint64 = 0
-		fin      bool
-		p        embedders.TcpIpPacket
-		state    embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
+		pos   uint64 = 0
+		fin   bool
+		p     embedders.TcpIpPacket
+		state embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 	)
 readloop:
 	for {
@@ -222,7 +222,7 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		payload      []byte
 		cm           ipv4.ControlMessage
 		wait         time.Duration
-		p						 embedders.TcpIpPacket
+		p            embedders.TcpIpPacket
 		// We make it clear that the error always starts as nil
 		err   error           = nil
 		state embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
@@ -418,10 +418,10 @@ func (c *Channel) createTcpHead(p embedders.TcpIpPacket, buf []byte, prevSequenc
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	var (
-		newpkt   embedders.TcpIpPacket
-		newbuf   []byte
-		err      error
-		wait     time.Duration
+		newpkt embedders.TcpIpPacket
+		newbuf []byte
+		err    error
+		wait   time.Duration
 	)
 
 	p.Tcph.Seq = r.Uint32() & 0xFFFFFFFF
