@@ -272,3 +272,77 @@ func (e *TcpIpEcnTempEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP, t time
 func (s *TcpIpEcnTempEncoder) GetMask() [][]byte {
 	return [][]byte{[]byte{0x03}, []byte{0x03}, []byte{0x03}, []byte{0x03}}
 }
+
+
+
+
+
+
+type TcpIpFreqEncoder struct {}
+
+type freqData struct {
+	numToSend uint
+	numSent   uint
+	numRecv   uint
+	startTime time.Time
+}
+
+// Encode even number bits using time delays
+// Encode odd number bits using ecn flags
+func (e *TcpIpFreqEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, state State) (ipv4.Header, layers.TCP, []byte, time.Duration, State, error) {
+	if len(buf) == 0 {
+		return ipv4h, tcph, nil, time.Duration(0), state, errors.New("Cannot set byte if no data")
+	}
+
+	if state.StoredData == nil {
+		if buf[0] == 1 {
+			state.StoredData = freqData{ numToSend : 8, startTime : time.Now() }
+		} else {
+			state.StoredData = freqData{ numToSend : 2, startTime : time.Now() }
+		}
+		return ipv4h, tcph, buf, time.Duration(time.Millisecond), state, nil
+	} else if fd, ok := state.StoredData.(freqData); ok {
+		fd.numSent += 1
+		if fd.numSent < fd.numToSend {
+			state.StoredData = fd
+			return ipv4h, tcph, buf, time.Duration(0), state, nil
+		} else {
+			tdiff := fd.startTime.Add(time.Millisecond * 55).Sub(time.Now())
+			if tdiff < 0 {
+				tdiff = time.Duration(0)
+			}
+			state.StoredData = nil
+			return ipv4h, tcph, buf[1:], tdiff, state, nil
+		}
+	} else {
+		return ipv4h, tcph, nil, time.Duration(0), state, errors.New("Incorrect state StoredData type")
+	}
+}
+
+func (e *TcpIpFreqEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP, t time.Duration, state State) ([]byte, State, error) {
+	// We ignore the first packet, since it is used for setting the initial time
+	if state.StoredData == nil {
+		state.StoredData = freqData{ numRecv : 1, startTime : time.Now() }
+		return []byte{}, state, nil
+	} else if fd, ok := state.StoredData.(freqData); ok {
+		if time.Now().Sub(fd.startTime) >= time.Millisecond * 50 {
+			state.StoredData = nil
+			if fd.numRecv < 4 {
+				return []byte{0}, state, nil
+			} else {
+				return []byte{1}, state, nil
+			}
+		} else {
+			fd.numRecv += 1
+			state.StoredData = fd
+			return []byte{}, state, nil
+		}
+	} else {
+		return nil, state, errors.New("Incorrect state StoredData type")
+	}
+}
+
+func (s *TcpIpFreqEncoder) GetMask() [][]byte {
+	return [][]byte{[]byte{0x01}, []byte{0x01}, []byte{0x01}, []byte{0x01},
+		[]byte{0x01}, []byte{0x01}, []byte{0x01}, []byte{0x01}}
+}

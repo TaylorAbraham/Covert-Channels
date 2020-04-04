@@ -104,7 +104,6 @@ func messageExcange(t *testing.T, ch1, ch2 *Channel, inputs [][]byte) {
 }
 
 var confList []Config = []Config{
-
 	Config{
 		FriendIP:          [4]byte{127, 0, 0, 1},
 		OriginIP:          [4]byte{127, 0, 0, 1},
@@ -153,6 +152,13 @@ var confList []Config = []Config{
 		FriendReceivePort: 8080,
 		OriginReceivePort: 8081,
 		Embedder:          &embedders.TcpIpEcnTempEncoder{TmpEmb: embedders.TemporalEncoder{time.Duration(50 * time.Millisecond)}},
+	},
+	Config{
+		FriendIP:          [4]byte{127, 0, 0, 1},
+		OriginIP:          [4]byte{127, 0, 0, 1},
+		FriendReceivePort: 8080,
+		OriginReceivePort: 8081,
+		Embedder:          &embedders.TcpIpFreqEncoder{},
 	},
 }
 
