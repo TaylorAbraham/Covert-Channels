@@ -333,6 +333,19 @@ func TestMessageExchange(t *testing.T) {
 			f1: func(conf *configData) {
 				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 9090
 				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 9091
+				conf.Channel.Data.TcpHandshake.Embedder.Value = "ecn"
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 9091
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 9090
+				conf.Channel.Data.TcpHandshake.Embedder.Value = "ecn"
+			},
+		},
+		channelTest{
+			name: "TcpHandshake",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 9090
+				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 9091
 				conf.Channel.Data.TcpHandshake.Embedder.Value = "timestamp"
 			},
 			f2: func(conf *configData) {
@@ -342,7 +355,6 @@ func TestMessageExchange(t *testing.T) {
 			},
 			isTiming: true,
 		},
-
 		channelTest{
 			name: "TcpHandshake",
 			f1: func(conf *configData) {
@@ -362,13 +374,14 @@ func TestMessageExchange(t *testing.T) {
 			f1: func(conf *configData) {
 				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 9090
 				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 9091
-				conf.Channel.Data.TcpHandshake.Embedder.Value = "ecn"
+				conf.Channel.Data.TcpHandshake.Embedder.Value = "ecntemporal"
 			},
 			f2: func(conf *configData) {
 				conf.Channel.Data.TcpHandshake.FriendReceivePort.Value = 9091
 				conf.Channel.Data.TcpHandshake.OriginReceivePort.Value = 9090
-				conf.Channel.Data.TcpHandshake.Embedder.Value = "ecn"
+				conf.Channel.Data.TcpHandshake.Embedder.Value = "ecntemporal"
 			},
+			isTiming: true,
 		},
 		channelTest{
 			name: "TcpHandshake",
@@ -514,6 +527,20 @@ func TestMessageExchange(t *testing.T) {
 				conf.Channel.Data.TcpSyn.FriendPort.Value = 8091
 				conf.Channel.Data.TcpSyn.OriginPort.Value = 8090
 				conf.Channel.Data.TcpSyn.Embedder.Value = "temporal"
+			},
+			isTiming: true,
+		},
+		channelTest{
+			name: "TcpSyn",
+			f1: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8090
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8091
+				conf.Channel.Data.TcpSyn.Embedder.Value = "ecntemporal"
+			},
+			f2: func(conf *configData) {
+				conf.Channel.Data.TcpSyn.FriendPort.Value = 8091
+				conf.Channel.Data.TcpSyn.OriginPort.Value = 8090
+				conf.Channel.Data.TcpSyn.Embedder.Value = "ecntemporal"
 			},
 			isTiming: true,
 		},

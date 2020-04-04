@@ -221,3 +221,54 @@ func (s *TcpIpTemporalEncoder) GetMask() [][]byte {
 	return [][]byte{[]byte{0x01}, []byte{0x01}, []byte{0x01}, []byte{0x01},
 		[]byte{0x01}, []byte{0x01}, []byte{0x01}, []byte{0x01}}
 }
+
+type TcpIpEcnTempEncoder struct {
+	TmpEmb TemporalEncoder
+	ecnEmb *EcnEncoder
+}
+
+// Encode even number bits using time delays
+// Encode odd number bits using ecn flags
+func (e *TcpIpEcnTempEncoder) SetByte(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, state State) (ipv4.Header, layers.TCP, []byte, time.Duration, State, error) {
+	if len(buf) == 0 {
+		return ipv4h, tcph, nil, time.Duration(0), state, errors.New("Cannot set byte if no data")
+	}
+
+	// The first packet we send is empty, it is used to generate the initial time on the receiver
+	if state.StoredData == nil {
+		state.StoredData = true
+		return ipv4h, tcph, buf, time.Duration(0), state, nil
+	} else {
+		if t, err := e.TmpEmb.SetByte(buf[0] & 0x01); err == nil {
+			if newipv4h, err := e.ecnEmb.SetByte(ipv4h, (buf[0]&0x02)>>1); err == nil {
+				return newipv4h, tcph, buf[1:], t, state, nil
+			} else {
+				return ipv4h, tcph, buf, time.Duration(0), state, err
+			}
+		} else {
+			return ipv4h, tcph, buf, time.Duration(0), state, err
+		}
+	}
+}
+
+func (e *TcpIpEcnTempEncoder) GetByte(ipv4h ipv4.Header, tcph layers.TCP, t time.Duration, state State) ([]byte, State, error) {
+	// We ignore the first packet, since it is used for setting the initial time
+	if state.StoredData == nil {
+		state.StoredData = true
+		return []byte{}, state, nil
+	} else {
+		if b1, err := e.TmpEmb.GetByte(t); err == nil {
+			if b2, err := e.ecnEmb.GetByte(ipv4h); err == nil {
+				return []byte{b1 | (b2 << 1)}, state, nil
+			} else {
+				return nil, state, err
+			}
+		} else {
+			return nil, state, err
+		}
+	}
+}
+
+func (s *TcpIpEcnTempEncoder) GetMask() [][]byte {
+	return [][]byte{[]byte{0x03}, []byte{0x03}, []byte{0x03}, []byte{0x03}}
+}
