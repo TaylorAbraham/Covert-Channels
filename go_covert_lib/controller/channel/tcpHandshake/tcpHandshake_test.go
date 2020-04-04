@@ -104,41 +104,61 @@ func messageExcange(t *testing.T, ch1, ch2 *Channel, inputs [][]byte) {
 }
 
 var confList []Config = []Config{
-
 	Config{
 		FriendIP:          [4]byte{127, 0, 0, 1},
 		OriginIP:          [4]byte{127, 0, 0, 1},
 		FriendReceivePort: 8080,
 		OriginReceivePort: 8081,
-		Encoder:           &embedders.TcpIpIDEncoder{},
+		Embedder:          &embedders.TcpIpIDEncoder{},
 	},
 	Config{
 		FriendIP:          [4]byte{127, 0, 0, 1},
 		OriginIP:          [4]byte{127, 0, 0, 1},
 		FriendReceivePort: 8080,
 		OriginReceivePort: 8081,
-		Encoder:           &embedders.TcpIpUrgFlgEncoder{},
+		Embedder:          &embedders.TcpIpUrgFlgEncoder{},
 	},
 	Config{
 		FriendIP:          [4]byte{127, 0, 0, 1},
 		OriginIP:          [4]byte{127, 0, 0, 1},
 		FriendReceivePort: 8080,
 		OriginReceivePort: 8081,
-		Encoder:           &embedders.TcpIpUrgPtrEncoder{},
+		Embedder:          &embedders.TcpIpUrgPtrEncoder{},
 	},
 	Config{
 		FriendIP:          [4]byte{127, 0, 0, 1},
 		OriginIP:          [4]byte{127, 0, 0, 1},
 		FriendReceivePort: 8080,
 		OriginReceivePort: 8081,
-		Encoder:           &embedders.TcpIpTimeEncoder{},
+		Embedder:          &embedders.TcpIpTimestampEncoder{},
 	},
 	Config{
 		FriendIP:          [4]byte{127, 0, 0, 1},
 		OriginIP:          [4]byte{127, 0, 0, 1},
 		FriendReceivePort: 8080,
 		OriginReceivePort: 8081,
-		Encoder:           &embedders.TcpIpEcnEncoder{},
+		Embedder:          &embedders.TcpIpEcnEncoder{},
+	},
+	Config{
+		FriendIP:          [4]byte{127, 0, 0, 1},
+		OriginIP:          [4]byte{127, 0, 0, 1},
+		FriendReceivePort: 8080,
+		OriginReceivePort: 8081,
+		Embedder:          &embedders.TcpIpTemporalEncoder{Emb: embedders.TemporalEncoder{time.Duration(50 * time.Millisecond)}},
+	},
+	Config{
+		FriendIP:          [4]byte{127, 0, 0, 1},
+		OriginIP:          [4]byte{127, 0, 0, 1},
+		FriendReceivePort: 8080,
+		OriginReceivePort: 8081,
+		Embedder:          &embedders.TcpIpEcnTempEncoder{TmpEmb: embedders.TemporalEncoder{time.Duration(50 * time.Millisecond)}},
+	},
+	Config{
+		FriendIP:          [4]byte{127, 0, 0, 1},
+		OriginIP:          [4]byte{127, 0, 0, 1},
+		FriendReceivePort: 8080,
+		OriginReceivePort: 8081,
+		Embedder:          &embedders.TcpIpFreqEncoder{},
 	},
 }
 

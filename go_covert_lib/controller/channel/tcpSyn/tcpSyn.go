@@ -7,8 +7,10 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"golang.org/x/net/ipv4"
+	"log"
 	"math/rand"
 	"net"
+	"os"
 	"sync"
 	"time"
 )
@@ -17,6 +19,13 @@ const (
 	Buffer   = 0
 	Protocol = 1
 )
+
+// We make the fields public to facilitate logging
+type packet struct {
+	Ipv4h ipv4.Header
+	Tcph  layers.TCP
+	Time  time.Time
+}
 
 type WriteWaitCancel struct{}
 
@@ -47,11 +56,7 @@ type Config struct {
 	// or delinieating by a TCP packet with a specific flag (Delim::Protocol).
 	// Default is Delim::Protocol.
 	Delimiter uint8
-	Encoder   TcpEncoder
-	// A function to retrieve a delay to implement between sent packets. By default this
-	// function returns a delay of 0 ms, but users can set it to a longer time or even to
-	// their favourite distribution.
-	GetDelay func() time.Duration
+	Embedder  TcpEncoder
 
 	// Timeouts for reads and writes
 	// These are the inter packet timeout, which will always translate to the inter byte Timeout
@@ -62,10 +67,11 @@ type Config struct {
 
 // A TCP covert channel
 type Channel struct {
-	conf        Config
-	rawConn     *ipv4.RawConn
-	writeCancel chan bool
-	closeMutex  *sync.Mutex
+	conf       Config
+	rawConn    *ipv4.RawConn
+	cancel     chan bool
+	recvChan   chan packet
+	closeMutex *sync.Mutex
 }
 
 // Create the covert channel, filling in the SeqEncoder
@@ -74,9 +80,9 @@ type Channel struct {
 // that this function may one day be used for validating
 // the data structure
 func MakeChannel(conf Config) (*Channel, error) {
-	c := &Channel{conf: conf, writeCancel: make(chan bool), closeMutex: &sync.Mutex{}}
-	if c.conf.Encoder == nil {
-		c.conf.Encoder = &embedders.TcpIpSeqEncoder{}
+	c := &Channel{conf: conf, cancel: make(chan bool), recvChan: make(chan packet, 1024), closeMutex: &sync.Mutex{}}
+	if c.conf.Embedder == nil {
+		c.conf.Embedder = &embedders.TcpIpSeqEncoder{}
 	}
 
 	conn, err := net.ListenPacket("ip4:6", "0.0.0.0")
@@ -89,6 +95,21 @@ func MakeChannel(conf Config) (*Channel, error) {
 		conn.Close()
 		return nil, err
 	}
+
+	var (
+		saddr        [4]byte
+		sport, dport uint16
+	)
+
+	// Figure out the expected source and destination IP address
+	// These change depending on whether or not we are in bounce mode
+	if c.conf.Bounce {
+		saddr, sport, dport = c.conf.BounceIP, c.conf.BouncePort, c.conf.OriginPort
+	} else {
+		saddr, sport, dport = c.conf.FriendIP, c.conf.FriendPort, c.conf.OriginPort
+	}
+
+	go c.readLoop(saddr, sport, dport)
 
 	return c, nil
 }
@@ -104,7 +125,7 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 
 	// We must expand out the input storage array to
 	// the correct size to potentially handle variable size inputs
-	dataBuf, err := embedders.GetBuf(c.conf.Encoder.GetMask(), data)
+	dataBuf, err := embedders.GetBuf(c.conf.Embedder.GetMask(), data)
 	if err != nil {
 		return 0, err
 	}
@@ -114,112 +135,82 @@ func (c *Channel) Receive(data []byte) (uint64, error) {
 	}
 
 	var (
-		buf          []byte = make([]byte, 1024)
-		prev_val     uint32 = 0
-		current_val  uint32 = 0
-		first        bool   = true
-		saddr        [4]byte
-		sport, dport uint16
+		prev_val uint32 = 0
+		first    bool   = true
 		// There is guaranteed to be at least one space for a byte in the
 		// data buffer at this point
-		pos uint64 = 0
-		// The time since the last packet arrived
-		// Timeouts can occur due to the raw socket itself timing out,
-		// however this will typically not happen on a normal system
-		// since the raw socket will read any incoming tcp packet.
-		// This timer is used to timeout if packets are received, but they
-		// are not the correct type
-		prevPacketTime time.Time
-		maskIndex      int = 0
-	)
-
-	// Figure out the expected source and destination IP address
-	// These change depending on whether or not we are in bounce mode
-	if c.conf.Bounce {
-		saddr, sport, dport = c.conf.BounceIP, c.conf.BouncePort, c.conf.OriginPort
-	} else {
-		saddr, sport, dport = c.conf.FriendIP, c.conf.FriendPort, c.conf.OriginPort
-	}
-
-	prevPacketTime = time.Now()
-
-	var (
-		h *ipv4.Header
-		p []byte
+		pos      uint64 = 0
+		prevTime time.Time
+		fin      bool
+		p        packet
+		state    embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 	)
 readloop:
 	for {
-		h, p, _, err = c.readConn(buf)
-		if err != nil {
+		p, fin, err = c.readPacket(func(p packet) (packet, bool, bool, error) {
+			// Check if done
+			if c.conf.Delimiter == Protocol {
+				if (!c.conf.Bounce && p.Tcph.ACK && !p.Tcph.RST) || (c.conf.Bounce && p.Tcph.RST) {
+					return p, true, true, nil
+				}
+			}
+
+			if c.conf.Bounce {
+				p.Tcph.Seq = p.Tcph.Ack - 1
+			}
+
+			if (c.conf.Bounce && p.Tcph.SYN && p.Tcph.ACK) || (!c.conf.Bounce && p.Tcph.SYN && !p.Tcph.ACK) {
+				if first || p.Tcph.Seq != prev_val {
+					return p, true, false, nil
+				}
+			}
+			return p, false, false, nil
+		})
+
+		if err != nil || fin {
 			break readloop
-		}
-		tcph := layers.TCP{}
-		if err = tcph.DecodeFromBytes(p, gopacket.NilDecodeFeedback); err == nil {
-			// We check for the expected source IP, source port, and destination port
-			if bytes.Equal(h.Src.To4(), saddr[:]) {
-				if tcph.SrcPort == layers.TCPPort(sport) && tcph.DstPort == layers.TCPPort(dport) {
-					if c.conf.Delimiter == Protocol {
-						if (!c.conf.Bounce && tcph.ACK && !tcph.RST) || (c.conf.Bounce && tcph.RST) {
-							break readloop
-						}
-					}
-					// If in bounce mode, we extract the original sequence number
-					// from the acknowledgement number
-					if c.conf.Bounce {
-						tcph.Seq = tcph.Ack - 1
-					}
-					prev_val = tcph.Seq
+		} else {
+			prev_val = p.Tcph.Seq
+			first = false
 
-					// Check the expected flags
-					if (c.conf.Bounce && tcph.SYN && tcph.ACK) || (!c.conf.Bounce && tcph.SYN && !tcph.ACK) {
-						if first || current_val != prev_val {
-							prev_val = current_val
-							first = false
+			var newBytes []byte
 
-							var newBytes []byte
-							newBytes, err = c.conf.Encoder.GetByte(*h, tcph, maskIndex)
-							if err != nil {
-								break readloop
-							}
-							maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
+			newBytes, state, err = c.conf.Embedder.GetByte(p.Ipv4h, p.Tcph, p.Time.Sub(prevTime), state)
+			if err != nil {
+				break readloop
+			}
 
-							for _, b := range newBytes {
-								// Make sure we don't overflow the buffer
-								// The buffer can only overflow if we are in protocol delimiter mode
-								// Once the buffer fills in protocol delimiter mode we
-								// wait for the end packet. If a packet arrives that does not
-								// have the expected flags then we will reach this statement
-								// and be unable to put the new byte into the buffer
-								// In that case we return with an error indicating buffer overflow
-								// (see below)
-								if pos < uint64(len(dataBuf)) {
-									dataBuf[pos] = b
-								} else if pos == uint64(len(dataBuf)) && c.conf.Delimiter == Protocol {
-									// If we are using the protocol delimiter, then we can fill the full
-									// buffer and then wait for the end packet. It is only if more bytes
-									// are received that we must notify of an error
-									err = errors.New("End packet not received, buffer full")
-									break readloop
-								}
-								pos += 1
-								// We have filled the buffer without protocol delimiter and we should return immediately
-								if pos == uint64(len(dataBuf)) && c.conf.Delimiter != Protocol {
-									break readloop
-								}
-							}
-							prevPacketTime = time.Now()
-						}
-					}
+			state = state.IncrementState()
+			prevTime = p.Time
+
+			for _, b := range newBytes {
+				// Make sure we don't overflow the buffer
+				// The buffer can only overflow if we are in protocol delimiter mode
+				// Once the buffer fills in protocol delimiter mode we
+				// wait for the end packet. If a packet arrives that does not
+				// have the expected flags then we will reach this statement
+				// and be unable to put the new byte into the buffer
+				// In that case we return with an error indicating buffer overflow
+				// (see below)
+				if pos < uint64(len(dataBuf)) {
+					dataBuf[pos] = b
+				} else if pos == uint64(len(dataBuf)) && c.conf.Delimiter == Protocol {
+					// If we are using the protocol delimiter, then we can fill the full
+					// buffer and then wait for the end packet. It is only if more bytes
+					// are received that we must notify of an error
+					err = errors.New("End packet not received, buffer full")
+					break readloop
+				}
+				pos += 1
+				// We have filled the buffer without protocol delimiter and we should return immediately
+				if pos == uint64(len(dataBuf)) && c.conf.Delimiter != Protocol {
+					break readloop
 				}
 			}
 		}
-		if c.conf.ReadTimeout > 0 && time.Now().Sub(prevPacketTime) > c.conf.ReadTimeout {
-			err = errors.New("Covert Packet Timeout")
-			break readloop
-		}
 	}
 
-	return embedders.CopyData(c.conf.Encoder.GetMask(), pos, dataBuf, data, err)
+	return embedders.CopyData(c.conf.Embedder.GetMask(), pos, dataBuf, data, err)
 }
 
 // Send a covert message
@@ -235,18 +226,19 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 		prevSequence uint32 = r.Uint32()
 		saddr, daddr [4]byte
 		sport, dport uint16
-		num          uint64 = 0
+		rem          []byte
+		n            uint64 = 0
 		h            ipv4.Header
 		p            []byte
 		cm           ipv4.ControlMessage
 		wait         time.Duration
 		tcph         layers.TCP
 		// We make it clear that the error always starts as nil
-		err       error = nil
-		maskIndex int   = 0
+		err   error           = nil
+		state embedders.State = embedders.MakeState(c.conf.Embedder.GetMask())
 	)
 
-	data, err = embedders.EncodeFromMask(c.conf.Encoder.GetMask(), data)
+	data, err = embedders.EncodeFromMask(c.conf.Embedder.GetMask(), data)
 	if err != nil {
 		return 0, err
 	}
@@ -257,16 +249,20 @@ func (c *Channel) Send(data []byte) (uint64, error) {
 	} else {
 		saddr, daddr, sport, dport = c.conf.OriginIP, c.conf.FriendIP, c.conf.OriginPort, c.conf.FriendPort
 	}
+
+	rem = data
+
 readloop:
-	for len(data) > 0 {
+	for len(rem) > 0 {
 		h = createIPHeader(saddr, daddr)
 		cm = createCM(saddr, daddr)
 
-		h, tcph, data, err = c.createTcpHead(h, layers.TCP{SYN: true}, data, prevSequence, maskIndex)
+		tcph.SYN = true
+
+		h, tcph, rem, wait, state, err = c.createTcpHead(h, tcph, rem, prevSequence, state)
 		if err != nil {
 			break readloop
 		}
-		maskIndex = embedders.UpdateMaskIndex(c.conf.Encoder.GetMask(), maskIndex)
 		prevSequence = tcph.Seq
 
 		p, err = createTcpHeadBuf(tcph, saddr, daddr, sport, dport)
@@ -274,35 +270,26 @@ readloop:
 			break readloop
 		}
 
-		if err = c.writeConn(&h, p, &cm); err != nil {
-			break readloop
-		}
-
-		// If the user did not supply a GetDelay function,
-		// we wait for 0 duration
-		// Otherwise we wait for the specified amount of time
-		// (recalculated in each loop in case it must follow a distribution)
-		if c.conf.GetDelay == nil {
-			wait = 0
-		} else {
-			wait = c.conf.GetDelay()
-		}
-
-		num += 1
 		// We wait for the time specified by the user's GetDelay function
 		// or until the user signals to cancel
 		select {
 		case <-time.After(wait):
-		case <-c.writeCancel:
+		case <-c.cancel:
 			err = &WriteWaitCancel{}
 			break readloop
 		}
+
+		if err = c.writeConn(&h, p, &cm); err != nil {
+			break readloop
+		}
+		state = state.IncrementState()
+		n = uint64(len(data) - len(rem))
 	}
 
 	// Readjust size to represent number of bytes sent
-	num, err = embedders.GetSentSize(c.conf.Encoder.GetMask(), num, err)
+	n, err = embedders.GetSentSize(c.conf.Embedder.GetMask(), n, err)
 	if err != nil {
-		return num, err
+		return n, err
 	}
 
 	// If we are using Protocol delimiting, we must send a final
@@ -316,28 +303,28 @@ readloop:
 		// to fit the mask at this maskIndex
 		// We create a buffer with the appropriate size and fill it with
 		// random numbers
-		var fakeBuf []byte = make([]byte, len(c.conf.Encoder.GetMask()[maskIndex]))
+		var fakeBuf []byte = make([]byte, len(c.conf.Embedder.GetMask()[state.MaskIndex]))
 		for i := range fakeBuf {
 			fakeBuf[i] = byte(r.Uint32())
 		}
 
-		h, tcph, _, err = c.createTcpHead(h, layers.TCP{ACK: true}, fakeBuf, prevSequence, maskIndex)
+		h, tcph, _, _, state, err = c.createTcpHead(h, layers.TCP{ACK: true}, fakeBuf, prevSequence, state)
 		if err != nil {
-			return num, err
+			return n, err
 		}
 		prevSequence = tcph.Seq
 
 		p, err = createTcpHeadBuf(tcph, saddr, daddr, sport, dport)
 		if err != nil {
-			return num, err
+			return n, err
 		}
 
 		if err = c.writeConn(&h, p, &cm); err != nil {
-			return num, err
+			return n, err
 		}
 	}
 
-	return num, nil
+	return n, nil
 }
 
 // Closes the covert channel.
@@ -346,29 +333,50 @@ readloop:
 func (c *Channel) Close() error {
 	c.closeMutex.Lock()
 	defer c.closeMutex.Unlock()
-	// The write operation allows the user to specify
-	// a delay between packets
-	// We can't just rely on the raw connection being
-	// closed, we must also be able to cancel this delay,
-	// which is done with the writeCancel method
 	select {
-	case <-c.writeCancel:
+	case <-c.cancel:
 	default:
-		close(c.writeCancel)
+		close(c.cancel)
 	}
 	return c.rawConn.Close()
 }
 
 // Read from a raw connection whil setting a timeout if necessary
-func (c *Channel) readConn(buf []byte) (*ipv4.Header, []byte, *ipv4.ControlMessage, error) {
-	if c.conf.ReadTimeout > 0 {
-		c.rawConn.SetReadDeadline(time.Now().Add(c.conf.ReadTimeout))
-	} else {
-		// A deadline of zero means never timeout
-		// The initial Time struct is zero
-		c.rawConn.SetReadDeadline(time.Time{})
+func (c *Channel) readPacket(f func(p packet) (packet, bool, bool, error)) (packet, bool, error) {
+	var (
+		p         packet
+		err       error
+		valid     bool
+		fin       bool
+		startTime time.Time = time.Now()
+	)
+	for {
+		if c.conf.ReadTimeout > 0 {
+			select {
+			case p = <-c.recvChan:
+				p, valid, fin, err = f(p)
+				if valid || err != nil {
+					return p, fin, err
+				} else if time.Now().Sub(startTime) > c.conf.ReadTimeout {
+					return p, fin, errors.New("Read Timeout")
+				}
+			case <-time.After(c.conf.ReadTimeout):
+				return p, fin, errors.New("Read Timeout")
+			case <-c.cancel:
+				return p, fin, errors.New("Cancel")
+			}
+		} else {
+			select {
+			case p = <-c.recvChan:
+				p, valid, fin, err = f(p)
+				if valid || err != nil {
+					return p, fin, err
+				}
+			case <-c.cancel:
+				return p, fin, errors.New("Cancel")
+			}
+		}
 	}
-	return c.rawConn.ReadFrom(buf)
 }
 
 // Write to a raw connection while setting a timeout if necessary
@@ -408,7 +416,7 @@ func createCM(sip, dip [4]byte) ipv4.ControlMessage {
 	}
 }
 
-func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, prevSequence uint32, maskIndex int) (ipv4.Header, layers.TCP, []byte, error) {
+func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, prevSequence uint32, state embedders.State) (ipv4.Header, layers.TCP, []byte, time.Duration, embedders.State, error) {
 	// Based on a preliminary investigation of my machine (running Ubuntu 18.04),
 	// SYN packets always seem to have a window of 65495
 	tcph.Window = 65495
@@ -417,21 +425,26 @@ func (c *Channel) createTcpHead(ipv4h ipv4.Header, tcph layers.TCP, buf []byte, 
 	// Changes in sequence number are used in bounce mode to detect duplicate
 	// SYN/ACK packets from the legitimate TCP server
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	tcph.Seq = r.Uint32() & 0xFFFFFFFF
 
 	var (
 		newipv4h ipv4.Header
 		newtcph  layers.TCP
 		newbuf   []byte
 		err      error
+		wait     time.Duration
 	)
 
-	newipv4h, newtcph, newbuf, _, err = c.conf.Encoder.SetByte(ipv4h, tcph, buf, maskIndex)
-	if tcph.Seq == prevSequence {
+	tcph.Seq = r.Uint32() & 0xFFFFFFFF
+	for tcph.Seq == prevSequence {
 		tcph.Seq = r.Uint32() & 0xFFFFFFFF
-		newipv4h, newtcph, newbuf, _, err = c.conf.Encoder.SetByte(ipv4h, tcph, buf, maskIndex)
 	}
-	return newipv4h, newtcph, newbuf, err
+	newipv4h, newtcph, newbuf, wait, state, err = c.conf.Embedder.SetByte(ipv4h, tcph, buf, state)
+	if newtcph.Seq == prevSequence {
+		return newipv4h, newtcph, newbuf, time.Duration(0), state, errors.New("Could not send packet; " +
+			"Embedder set current sequence number to preceeding sequence number. " +
+			"Would prevent receiver from differentiating packets")
+	}
+	return newipv4h, newtcph, newbuf, wait, state, err
 }
 
 // Create the TCP header IP payload
@@ -473,4 +486,49 @@ func createTcpHeadBuf(tcph layers.TCP, sip, dip [4]byte, sport, dport uint16) ([
 	}
 
 	return sb.Bytes(), nil
+}
+
+// A loop that continuously receives packets across the raw socket
+// Incoming packets are analysed to confirm that they
+// have the expected source IP address (Our friend's IP address)
+func (c *Channel) readLoop(saddr [4]byte, sport, dport uint16) {
+	var (
+		buf [1024]byte
+		l   *log.Logger = log.New(os.Stderr, "", log.Flags())
+	)
+	for {
+		h, p, _, err := c.rawConn.ReadFrom(buf[:])
+
+		// Once the covert channel is closed we
+		// must exit this read loop
+		select {
+		case <-c.cancel:
+			return
+		default:
+			if err != nil {
+				continue
+			}
+		}
+
+		tcph := layers.TCP{}
+		if err = tcph.DecodeFromBytes(p, gopacket.NilDecodeFeedback); err == nil {
+			if bytes.Equal(h.Src.To4(), saddr[:]) {
+
+				// When reading options DecodeFromBytes does not copy option data,
+				// it merely slices into the array. We copy here to make sure that the data
+				// does not get overwritten when the underlying array is used for later reads
+				for i := range tcph.Options {
+					tcph.Options[i].OptionData = append([]byte{}, tcph.Options[i].OptionData...)
+				}
+
+				if tcph.SrcPort == layers.TCPPort(sport) && tcph.DstPort == layers.TCPPort(dport) {
+					select {
+					case c.recvChan <- packet{Ipv4h: *h, Tcph: tcph, Time: time.Now()}:
+					default:
+						l.Println("Too many packets: Dropped Packet")
+					}
+				}
+			}
+		}
+	}
 }

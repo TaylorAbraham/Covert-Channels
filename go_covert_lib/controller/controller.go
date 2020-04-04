@@ -80,8 +80,8 @@ func DefaultConfig() configData {
 
 func defaultChannel() channelData {
 	return channelData{
-		icmpIP:       icmpIP.GetDefault(),
-		icmpNormal:   icmpNormal.GetDefault(),
+		IcmpIP:       icmpIP.GetDefault(),
+		IcmpNormal:   icmpNormal.GetDefault(),
 		TcpSyn:       tcpSyn.GetDefault(),
 		TcpHandshake: tcpHandshake.GetDefault(),
 		TcpNormal:    tcpNormal.GetDefault(),

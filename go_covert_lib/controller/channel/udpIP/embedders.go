@@ -8,8 +8,8 @@ import (
 )
 
 type UdpEncoder interface {
-	GetByte(ipv4h ipv4.Header, udph layers.UDP, maskIndex int) ([]byte, error)
-	SetByte(ipv4h ipv4.Header, udph layers.UDP, buf []byte, maskIndex int) (ipv4.Header, layers.UDP, []byte, error)
+	GetByte(ipv4h ipv4.Header, udph layers.UDP, state embedders.State) ([]byte, embedders.State, error)
+	SetByte(ipv4h ipv4.Header, udph layers.UDP, buf []byte, state embedders.State) (ipv4.Header, layers.UDP, []byte, embedders.State, error)
 	GetMask() [][]byte
 }
 
@@ -18,21 +18,22 @@ type IDEncoder struct {
 	emb *embedders.IDEncoder
 }
 
-func (e *IDEncoder) GetByte(ipv4h ipv4.Header, udph layers.UDP, maskIndex int) ([]byte, error) {
+func (e *IDEncoder) GetByte(ipv4h ipv4.Header, udph layers.UDP, state embedders.State) ([]byte, embedders.State, error) {
 	if b, err := e.emb.GetByte(ipv4h); err == nil {
-		return []byte{b}, nil
+		return []byte{b}, state, nil
 	} else {
-		return nil, err
+		return nil, state, err
 	}
 }
-func (e *IDEncoder) SetByte(ipv4h ipv4.Header, udph layers.UDP, buf []byte, maskIndex int) (ipv4.Header, layers.UDP, []byte, error) {
+
+func (e *IDEncoder) SetByte(ipv4h ipv4.Header, udph layers.UDP, buf []byte, state embedders.State) (ipv4.Header, layers.UDP, []byte, embedders.State, error) {
 	if len(buf) == 0 {
-		return ipv4h, udph, nil, errors.New("Cannot set byte if no data")
+		return ipv4h, udph, nil, state, errors.New("Cannot set byte if no data")
 	}
 	if newipv4h, err := e.emb.SetByte(ipv4h, buf[0]); err == nil {
-		return newipv4h, udph, buf[1:], nil
+		return newipv4h, udph, buf[1:], state, nil
 	} else {
-		return ipv4h, udph, buf, err
+		return ipv4h, udph, buf, state, err
 	}
 }
 

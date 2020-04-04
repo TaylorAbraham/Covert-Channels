@@ -17,8 +17,7 @@ type ConfigClient struct {
 	BouncePort   config.U16Param
 	Bounce       config.BoolParam
 	Delimiter    config.SelectParam
-	Encoder      config.SelectParam
-	GetDelay     config.SelectParam
+	Embedder     config.SelectParam
 	WriteTimeout config.U64Param
 	ReadTimeout  config.U64Param
 }
@@ -32,11 +31,10 @@ func GetDefault() ConfigClient {
 		Bounce:       config.MakeBool(false, config.Display{Description: "Toggle bounce mode, which spoofs your IP address.", Name: "Bounce", Group: "Bouncing", GroupToggle: true}),
 		BounceIP:     config.MakeIPV4("127.0.0.1", config.Display{Description: "The bouncer's IP address.", Name: "Bouncer's IP", Group: "Bouncing"}),
 		BouncePort:   config.MakeU16(0, [2]uint16{0, 65535}, config.Display{Description: "The bouncer's port.", Name: "Bouncer's Port", Group: "Bouncing"}),
-		GetDelay:     config.MakeSelect("none", []string{"none"}, config.Display{Description: "The function to use for inter-byte delay.", Name: "Get Delay", Group: "Timing"}),
 		WriteTimeout: config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The write timeout in milliseconds.", Name: "Write Timeout", Group: "Timing"}),
 		ReadTimeout:  config.MakeU64(0, [2]uint64{0, 65535}, config.Display{Description: "The read timeout in milliseconds.", Name: "Read Timeout", Group: "Timing"}),
 		Delimiter:    config.MakeSelect("protocol", []string{"buffer", "protocol"}, config.Display{Description: "The delimiter to use for deciding when to return after having received a message.", Name: "Delimeter", Group: "Settings"}),
-		Encoder:      config.MakeSelect("sequence", []string{"sequence", "id", "urgptr", "urgflg", "time", "ecn"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
+		Embedder:     config.MakeSelect("sequence", []string{"sequence", "id", "urgptr", "urgflg", "timestamp", "ecn", "temporal", "frequency", "ecntemporal"}, config.Display{Description: "The encoding mechanism to use for this protocol.", Name: "Encoding", Group: "Settings"}),
 	}
 }
 
@@ -73,27 +71,31 @@ func ToChannel(cc ConfigClient) (*Channel, error) {
 		return nil, errors.New("Invalid delimiter value")
 	}
 
-	switch cc.Encoder.Value {
-	case "sequence":
-		c.Encoder = &embedders.TcpIpSeqEncoder{}
-	case "id":
-		c.Encoder = &embedders.TcpIpIDEncoder{}
-	case "urgflg":
-		c.Encoder = &embedders.TcpIpUrgFlgEncoder{}
-	case "urgptr":
-		c.Encoder = &embedders.TcpIpUrgPtrEncoder{}
-	case "time":
-		c.Encoder = &embedders.TcpIpTimeEncoder{}
-	case "ecn":
-		c.Encoder = &embedders.TcpIpEcnEncoder{}
-	default:
-		return nil, errors.New("Invalid encoder value")
+	if cc.Bounce.Value && cc.Embedder.Value != "sequence" {
+		return nil, errors.New("Only the sequence embedder is supported in bounce mode")
 	}
 
-	switch cc.GetDelay.Value {
-	case "none":
+	switch cc.Embedder.Value {
+	case "sequence":
+		c.Embedder = &embedders.TcpIpSeqEncoder{}
+	case "id":
+		c.Embedder = &embedders.TcpIpIDEncoder{}
+	case "urgflg":
+		c.Embedder = &embedders.TcpIpUrgFlgEncoder{}
+	case "urgptr":
+		c.Embedder = &embedders.TcpIpUrgPtrEncoder{}
+	case "timestamp":
+		c.Embedder = &embedders.TcpIpTimestampEncoder{}
+	case "ecn":
+		c.Embedder = &embedders.TcpIpEcnEncoder{}
+	case "temporal":
+		c.Embedder = &embedders.TcpIpTemporalEncoder{Emb: embedders.TemporalEncoder{time.Duration(50 * time.Millisecond)}}
+	case "frequency":
+		c.Embedder = &embedders.TcpIpFreqEncoder{}
+	case "ecntemporal":
+		c.Embedder = &embedders.TcpIpEcnTempEncoder{TmpEmb: embedders.TemporalEncoder{time.Duration(50 * time.Millisecond)}}
 	default:
-		return nil, errors.New("Invalid delay function")
+		return nil, errors.New("Invalid embedder value")
 	}
 
 	if ch, err := MakeChannel(c); err != nil {
